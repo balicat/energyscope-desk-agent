@@ -1,0 +1,40 @@
+            Evaluation Summary: scripted (guard off)             
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Case ID        ┃ Metrics              ┃ Assertions ┃ Duration ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ wti_30d        │ tool_calls: 2        │ ✗✗✔✔       │   72.8ms │
+│                │ tokens: 496          │            │          │
+│                │ requests: 3          │            │          │
+│                │ input_tokens: 390    │            │          │
+│                │ output_tokens: 106   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ brent_vs_wti   │ tool_calls: 3        │ ✔✔✔✔       │  282.3ms │
+│                │ tokens: 814          │            │          │
+│                │ requests: 4          │            │          │
+│                │ input_tokens: 663    │            │          │
+│                │ output_tokens: 151   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ us_crude_yoy   │ tool_calls: 2        │ ✔✔✔✔       │   73.8ms │
+│                │ tokens: 721          │            │          │
+│                │ requests: 3          │            │          │
+│                │ input_tokens: 599    │            │          │
+│                │ output_tokens: 122   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ cushing_4w     │ tool_calls: 2        │ ✔✔✔✔       │   52.4ms │
+│                │ tokens: 454          │            │          │
+│                │ requests: 3          │            │          │
+│                │ input_tokens: 341    │            │          │
+│                │ output_tokens: 113   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ abstain_carbon │ tool_calls: 1        │ ✔✔✔✔       │   19.0ms │
+│                │ tokens: 162          │            │          │
+│                │ requests: 2          │            │          │
+│                │ input_tokens: 118    │            │          │
+│                │ output_tokens: 44    │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ Averages       │ tool_calls: 2.00     │ 90.0% ✔    │  100.1ms │
+│                │ tokens: 529.4        │            │          │
+│                │ requests: 3.00       │            │          │
+│                │ input_tokens: 422.2  │            │          │
+│                │ output_tokens: 107.2 │            │          │
+└────────────────┴──────────────────────┴────────────┴──────────┘

@@ -1,0 +1,42 @@
+                  Evaluation Summary: scripted                   
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Case ID        ┃ Metrics              ┃ Assertions ┃ Duration ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ wti_30d        │ retries: 1           │ ✔✔✔✔       │   77.0ms │
+│                │ tool_calls: 2        │            │          │
+│                │ tokens: 868          │            │          │
+│                │ requests: 4          │            │          │
+│                │ input_tokens: 609    │            │          │
+│                │ output_tokens: 259   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ brent_vs_wti   │ tool_calls: 3        │ ✔✔✔✔       │  291.1ms │
+│                │ tokens: 814          │            │          │
+│                │ requests: 4          │            │          │
+│                │ input_tokens: 663    │            │          │
+│                │ output_tokens: 151   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ us_crude_yoy   │ tool_calls: 2        │ ✔✔✔✔       │   75.4ms │
+│                │ tokens: 721          │            │          │
+│                │ requests: 3          │            │          │
+│                │ input_tokens: 599    │            │          │
+│                │ output_tokens: 122   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ cushing_4w     │ tool_calls: 2        │ ✔✔✔✔       │   57.2ms │
+│                │ tokens: 454          │            │          │
+│                │ requests: 3          │            │          │
+│                │ input_tokens: 341    │            │          │
+│                │ output_tokens: 113   │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ abstain_carbon │ tool_calls: 1        │ ✔✔✔✔       │   19.5ms │
+│                │ tokens: 162          │            │          │
+│                │ requests: 2          │            │          │
+│                │ input_tokens: 118    │            │          │
+│                │ output_tokens: 44    │            │          │
+├────────────────┼──────────────────────┼────────────┼──────────┤
+│ Averages       │ retries: 1.00        │ 100.0% ✔   │  104.0ms │
+│                │ tool_calls: 2.00     │            │          │
+│                │ tokens: 603.8        │            │          │
+│                │ requests: 3.20       │            │          │
+│                │ input_tokens: 466.0  │            │          │
+│                │ output_tokens: 137.8 │            │          │
+└────────────────┴──────────────────────┴────────────┴──────────┘

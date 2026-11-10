@@ -1,0 +1,7 @@
+pydantic-ai-slim[anthropic,openai]>=2.66
+pydantic-evals>=2.66
+logfire>=5.5          # local-only tracing for the span-based evaluators; nothing is sent
+polars>=2.1
+pyarrow>=26
+# optional, for --source flight:
+# energyscope-client>=0.2
