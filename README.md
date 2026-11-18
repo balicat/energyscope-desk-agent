@@ -178,10 +178,11 @@ answers. The scripted runs were counted correctly. Found while measuring a redes
 on that branch the validator's record is the count. The true figures for the runs below cannot be recovered,
 so the rows are left as they were written and this paragraph stands over them.
 
-**The same evening, the test gate took the public service down for about half an hour.** The gate's live runs
+**The same evening, the test gate took the public service down for about ten minutes.** The gate's live runs
 and the public service shared one API key with a monthly limit of six dollars; nothing counted what the gate
-spent; two test runs of the `slots` branch used the last of it, and from 20:21 UTC every question failed until
-the owner raised the limit. Worse, the visitor did not get the service's own error: the hosting proxy replaces
+spent; two test runs of the `slots` branch used the last of it, and from about 20:20 to 20:30 UTC every question
+failed, until the owner raised the limit. The log shows three failed questions in that window, all asked by the
+builder and the reviewer to see what a visitor would get. Worse, the visitor did not get the service's own error: the hosting proxy replaces
 any 5xx with a page of its own. On the branch the gate prints what each live run cost (about nine cents on the
 small model), an application failure no longer returns 5xx, and when the provider refuses, code answers the
 example questions by itself and says so. None of that is released yet.
