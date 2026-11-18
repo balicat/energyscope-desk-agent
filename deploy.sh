@@ -29,16 +29,16 @@ git worktree add -q --detach "$CAND" "$SHA"
 cd "$CAND"
 echo "candidate $SHA, model $MODEL"
 
-echo "1/4 frozen data + golden answers";      $PY run_evals.py --source fixture --gate --golden check | tail -2
+echo "1/4 frozen data + golden answers";      $PY run_evals.py --source fixture --gate --golden check | grep -E "^assertions|^golden|^gate"
 LIBRARIAN_TODAY=$($PY -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") $PY prose_controls.py | tail -1
-echo "2/4 control run";                       $PY run_evals.py --source fixture --no-guard --expect-failures 3 | tail -1
-echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | tail -1
+echo "2/4 control run";                       $PY run_evals.py --source fixture --no-guard --expect-failures 3 | grep -E "^assertions"
+echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | grep -E "^assertions|^gate"
 if [ "${LIVE:-1}" = "1" ]; then
   export ANTHROPIC_API_KEY=$(tr -d '\r\n' < /opt/energyscope/.anthropic_api_key)
   # A live model does not answer the same way twice, so a second run of a blocked commit is allowed once and
   # no more: both runs are written to $GATE with what the validator objected to, and the README reports them.
   GATE=$HOME/librarian-gate; mkdir -p "$GATE"
-  RUNS=$(ls "$GATE"/"$SHA"-*.json 2>/dev/null | wc -l)
+  RUNS=$(find "$GATE" -name "$SHA-*.json" | wc -l)
   if [ "$RUNS" -ge 2 ]; then
     echo "this commit has had its two live runs (see $GATE): change the code, do not run it again" >&2; exit 1
   fi
