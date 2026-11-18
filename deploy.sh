@@ -44,7 +44,7 @@ if [ "${LIVE:-1}" = "1" ]; then
   fi
   echo "4/4 today's lake, $MODEL, live run $((RUNS + 1)) of at most 2 for this commit"
   echo "    numbers must all be right; at most 2 behaviour misses; no case may run out of retries; at most ${RETRY_BUDGET:-8} retries in total"
-  $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 --max-retries "${RETRY_BUDGET:-8}"       --report "$GATE/$SHA-$(date +%s).json" 2>/dev/null | grep -E "^FAILED|^RETRIED|^retries|^assertions|^gate"
+  $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 --max-retries "${RETRY_BUDGET:-8}"       --report "$GATE/$SHA-$(date +%s).json" 2>/dev/null | grep -E "^FAILED|^RETRIED|^retries|^cost|^assertions|^gate"
 else
   echo "4/4 live model skipped (LIVE=0)"
 fi

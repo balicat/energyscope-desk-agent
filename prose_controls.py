@@ -162,6 +162,7 @@ WRONG = [  # (what is wrong, the template, the table); every one must be rejecte
     ("two figures joined by a slash", f"The ratio: {B} / {C}.", TABLE),
     ("two figures joined by a dash", f"The range: {B} - {C}.", TABLE),
     ("two figures with nothing between them", f"Brent: {B}{C}.", TABLE),
+    ("two figures joined by a plus sign", f"Together: {B} + {C}.", TABLE),
     ("a percent sign glued after a slot", f"Brent: {B}%.", TABLE),
 ]
 
@@ -180,6 +181,8 @@ RIGHT = [  # templates that must pass
     ("The data does not hold a carbon price.", TABLE),
     (f"The week-earlier reading for comparison: {{curve:brent.M1_minus_M12_a_week_earlier}}; now {C}.", TABLE),
     ("{curve:brent.context}", TABLE),
+    (f"{B} {W}", TABLE),
+    (f"The curve \u2014 {C} \u2014 is steep.", TABLE),
 ]
 
 WRITES = [  # (template, what the page prints)
@@ -205,6 +208,14 @@ WRITES = [  # (template, what the page prints)
     ("{arb:us_crude_to_europe.score}.", "The arbitrage score at -0.64 on a scale from -2 to +2 (2026-11-17)."),
     ("{scenario:crack:3-2-1:+5:+0:-10.scenario_crack}.", "The 3-2-1 crack spread at 27.68 dollars per barrel (hypothetical) (2026-11-17)."),
     ("Unknown stays visible: {NO.SUCH.value}.", "Unknown stays visible: {NO.SUCH.value}."),
+    # the model wrote the slot's own subject: it is printed once
+    (f"Brent front-month future is {B}.", "Brent front-month future is at 93.07 dollars per barrel (2026-11-17)."),
+    (f"The Brent front-month future stood at {B}.", "The Brent front-month future stood at 93.07 dollars per barrel (2026-11-17)."),
+    (f"WTI spot is {W}.", "WTI spot is up 1.20 dollars per barrel (1.38%) over 7 days, from 86.90 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    # another noun is not the slot's subject: nothing is left out, and the contradiction shows
+    (f"WTI spot is {B}.", "WTI spot is Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
+    # a code sentence inside the model's sentence, and its own full stop
+    (f"Brent is firm, and {{curve:brent.context}}.", "Brent is firm, and M1 minus M12 was 13.60 on 2026-11-10 and is 15.81 now: the curve has steepened over the week."),
 ]
 
 LIMIT = [  # wrong, and still accepted: the words between slots are the model's

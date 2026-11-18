@@ -50,6 +50,7 @@ class Slot:
     source: str                     # the fact, spread or reading it belongs to
     series: tuple[str, ...] = ()
     date: dt.date | None = None     # the date of the value; None for words and sentences
+    label: str = ""                 # the subject the text opens with, when it opens with one
 
 
 Table = dict[str, Slot]
@@ -271,16 +272,17 @@ def table(facts: list[SeriesFact], spreads: list[Spread], readings: list[Reading
     """Every slot the run may use: address -> what code writes there, and where it came from."""
     t: Table = {}
     for f in facts:
-        src = fact_source(f)
+        src, name = fact_source(f), _plain(short(f.series_id, f.name))
         for k, (text, date) in _fact_slots(f).items():
-            t[f"{src}.{k}"] = Slot(text, src, (f.series_id,), date)
+            t[f"{src}.{k}"] = Slot(text, src, (f.series_id,), date, name)
     for s in spreads:
         src = spread_source(s)
         for k, (text, date) in _spread_slots(s).items():
             t[f"{src}.{k}"] = Slot(text, src, (s.series_a, s.series_b), date)
     for r in readings:
         for k, (text, date) in _reading_slots(r).items():
-            t[f"{r.key}.{k}"] = Slot(text, r.key, tuple(r.series_ids), date)
+            name = _plain(r.label_of.get(k) or k.rpartition(": ")[0])
+            t[f"{r.key}.{k}"] = Slot(text, r.key, tuple(r.series_ids), date, name if name and "|" not in name and text.startswith(name + " ") else "")
     return {a: s for a, s in t.items() if "{" not in a and "}" not in a}
 
 
@@ -346,17 +348,38 @@ def render(template: str, t: Table) -> tuple[str, list[Part]]:
     shown: dt.date | None = None
     for text, is_slot in pieces:
         if not is_slot:
+            if parts and parts[-1].slot and parts[-1].text.endswith(".") and text.startswith("."):
+                text = text[1:]  # a code sentence brings its own full stop
             parts.append(Part(text=text))
         elif text in t:
             s = t[text]
-            before = "".join(p.text for p in parts[-1:]).rstrip()
-            out = s.text[:1].upper() + s.text[1:] if before[-1:] in ("", ".", "!", "?") else s.text  # a slot that opens a sentence
+            lead = parts[-1].text if parts and not parts[-1].slot else ""
+            before = lead.rstrip()
+            out = s.text
+            # The model wrote this slot's own subject just before it ("Brent spot is {Brent spot at 92.14 ...}"): the
+            # subject is printed once. Only the slot's own label is ever left out, so a wrong noun still shows.
+            if s.label and _own_subject(s.label).search(lead):
+                out = out[len(s.label) + 1:]
+                if out.startswith("at ") and before.lower().endswith(" at"):
+                    out = out[3:]
+            elif before[-1:] in ("", ".", "!", "?"):
+                out = out[:1].upper() + out[1:]  # a slot that opens a sentence
+            elif out.endswith(".") and out[:1].isupper() and out[1:2].islower() and not out.startswith(("I ", "US ", "EU ")):
+                out = out[:1].lower() + out[1:]  # a code sentence placed inside the model's sentence
             if s.date is not None and s.date != shown:
                 out, shown = f"{out} ({s.date})", s.date
             parts.append(Part(text=out, slot=text, source=s.source, series=list(s.series), date=s.date))
         else:
             parts.append(Part(text="{" + text + "}"))
     return "".join(p.text for p in parts), parts
+
+
+_LINKING = r"(?:\s+(?:is|are|was|were|stood|stands|stand|sits|sit|remains|remain))?(?:\s+now)?(?:\s+at)?\s*$"
+
+
+def _own_subject(label: str) -> re.Pattern:
+    """Matches the model's words when they end with this slot's own subject and, at most, a linking verb."""
+    return re.compile(r"(?i)(?:^|[\s(\"'])" + re.escape(label) + _LINKING)
 
 
 def used_sources(template: str, t: Table) -> list[str]:
@@ -393,7 +416,7 @@ BALANCE_WORDS = frozenset("tight tighter tightening tightened tightness loose lo
 ARB_WORDS = frozenset("open opens opened opening shut shuts closed closes close closing".split())
 _BEFORE_SLOT = re.compile(r"(?:^|[\s(\"'])$")
 _AFTER_SLOT = re.compile(r"^(?:$|[\s.,;:)!?\"'])")
-_JOIN = re.compile(r"\s*[.,;:()]\s*|\s*[.;:,]?\s*\(\s*|\s*\)\s*[.,;:]?\s*")  # what may stand alone between two slots
+_JOIN = re.compile(r"[\s.,;:()\u2013\u2014]+")  # what may stand alone between two slots: not a slash, a hyphen or a sign
 
 Problem = tuple[str, str]  # (cause, what to tell the model)
 

@@ -106,8 +106,11 @@ class Draft(BaseModel):
         description=(
             "Two to four plain sentences for a desk analyst, written as a template. Every number, unit, date, direction of a "
             "change and curve shape is a slot: an address in braces copied exactly from a tool result, e.g. "
-            "{curve:brent.M1_minus_M12}. The page replaces each slot with the text shown beside it in the tool result. "
-            "Type no digit, no spelled-out number and no date yourself."
+            "{curve:brent.M1_minus_M12}. The page replaces each slot with the text shown beside it in the tool result, and "
+            "that text already names its subject: write a lead-in and a colon or 'with' before a slot, not the subject again. "
+            "Outside the braces type no digit (not in a name either: no M1, no 3-2-1, no delivery month), no spelled-out "
+            "number (not 'two' or 'five-year': say 'both', or leave it out), no month, weekday or 'today', and none of rose, "
+            "fell, higher, lower, backwardation, contango, tight, loose: the slots say those."
         )
     )
     cites: list[str] = Field(
