@@ -171,8 +171,16 @@
   "readings": [],
   "spreads": [
    {
+    "context": "The spread is inside its usual range, between the 10th and 90th percentile lines (2.03 and 9.71) of the window.",
+    "extras": {
+     "p10": 2.03,
+     "p90": 9.71,
+     "percentile": 17.4,
+     "percentile_years": 3.0
+    },
     "name_a": "Europe Brent Spot Price FOB, Daily",
     "name_b": "Cushing, OK WTI Spot Price FOB, Daily",
+    "note": "",
     "period": "2026-11-11",
     "series_a": "PET.RBRTE.D",
     "series_b": "PET.RWTC.D",
@@ -371,7 +379,9 @@
   "summary": "Cushing, OK Ending Stocks excluding SPR of Crude Oil, Weekly was 27356.00 Thousand Barrels on 2026-11-06, up 749.00 (2.82%) from 26607.00 on 2026-10-09, 28 days earlier."
  },
  "dubai_price": {
-  "caveats": [],
+  "caveats": [
+   "Average-price contract: NYMEX.DUBAI.FRONT.D settles on the average price of its month. It is not a spot price or a single delivery month, so it is not subtracted from one."
+  ],
   "cites": [],
   "facts": [
    {
@@ -390,6 +400,41 @@
   "readings": [],
   "spreads": [],
   "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 92.19 USD/bbl on 2026-11-17."
+ },
+ "dubai_vs_brent": {
+  "caveats": [
+   "Average-price contract: NYMEX.DUBAI.FRONT.D settles on the average price of its month. It is not a spot price or a single delivery month, so it is not subtracted from one."
+  ],
+  "cites": [],
+  "facts": [
+   {
+    "base_period": null,
+    "base_value": null,
+    "change_abs": null,
+    "change_pct": null,
+    "latest_period": "2026-11-17",
+    "latest_value": 92.186,
+    "lookback_days": null,
+    "name": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F)",
+    "series_id": "NYMEX.DUBAI.FRONT.D",
+    "units": "USD/bbl"
+   },
+   {
+    "base_period": null,
+    "base_value": null,
+    "change_abs": null,
+    "change_pct": null,
+    "latest_period": "2026-11-17",
+    "latest_value": 93.07,
+    "lookback_days": null,
+    "name": "Brent futures M1 (constant maturity, 1st nearby; NYMEX BZ, settles on ICE Brent)",
+    "series_id": "ICE.BRENT.M1.D",
+    "units": "USD/bbl"
+   }
+  ],
+  "readings": [],
+  "spreads": [],
+  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 92.19 USD/bbl on 2026-11-17. Brent futures M1 (constant maturity, 1st nearby; NYMEX BZ, settles on ICE Brent) was 93.07 USD/bbl on 2026-11-17."
  },
  "eu_gas_storage": {
   "caveats": [],

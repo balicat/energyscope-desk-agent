@@ -64,6 +64,20 @@ def close(a: float | None, b: float | None) -> bool:
     return math.isclose(a, b, rel_tol=1e-3, abs_tol=0.01)
 
 
+_LONG = re.compile(r"(?<![\w.,])(\d[\d,]*\.\d{3,})(?!\d)")
+
+
+def tidy(text: str) -> str:
+    """Round numbers written with three or more decimals to two, as the page's tables do.
+    Numbers below 1 are left alone (a small rate would round to nothing)."""
+    def fix(m: re.Match) -> str:
+        raw = m.group(1)
+        n = float(raw.replace(",", ""))
+        return raw if n < 1 else f"{n:,.2f}" if "," in raw else f"{n:.2f}"
+
+    return _LONG.sub(fix, text)
+
+
 _UP = {"up", "rose", "risen", "rise", "rising", "higher", "increase", "increased", "gain", "gained", "climbed",
        "above", "more", "build", "built", "grew", "added"}
 _DOWN = {"down", "fell", "fallen", "fall", "falling", "lower", "decrease", "decreased", "decline", "declined",
@@ -109,8 +123,8 @@ def untraceable_numbers(answer: DeskAnswer) -> list[str]:
         allowed += [x for x in (f.latest_value, f.base_value, f.change_abs, f.change_pct, f.lookback_days) if x is not None]
         in_names |= set(_NUM.findall(f"{f.name} {f.series_id}"))
     for s in answer.spreads:
-        allowed += [s.value_a, s.value_b, s.spread]
-        in_names |= set(_NUM.findall(f"{s.name_a} {s.series_a} {s.name_b} {s.series_b}"))
+        allowed += [s.value_a, s.value_b, s.spread, *s.extras.values()]
+        in_names |= set(_NUM.findall(f"{s.name_a} {s.series_a} {s.name_b} {s.series_b} {s.context} {s.note}"))
     for r in answer.readings:
         allowed += list(r.values.values())
         in_names |= set(_NUM.findall(f"{r.title} {r.note} {r.context} {r.key} {' '.join(r.series_ids)} {' '.join(r.values)}"))

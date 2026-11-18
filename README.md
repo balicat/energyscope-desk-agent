@@ -47,6 +47,15 @@ cites it, and does not speculate.
   threshold; lines count equally; the balance needs a margin of three. The model writes the conclusion but cannot
   pick the lines, and the ones that disagree are added to the caveats by code. It covers the futures curves and
   US data, not the world balance.
+- **"Compare like with like" is enforced by the tool.** A reviewer asked how Dubai compares with Brent. The model
+  subtracted the Dubai front month (a contract on the current month's average price) from Brent M1 (one delivery
+  month, two months out), and the page charted a line that stepped at every month end. The arithmetic was right,
+  so the answer got its tick. The docstring said to compare like with like; the model ignored it. `get_spread`
+  now refuses that pairing, the check fails any answer that contains one, and code adds a caveat whenever an
+  average-price contract is quoted. A spread of one kind now comes with its percentile and history; a future
+  against a spot price carries a note.
+- **Prose and tables show the same number.** Code rounds any number in the summary with three or more decimals to
+  two, so the sentence cannot say 92.186 where the table says 92.19.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -70,9 +79,9 @@ cites it, and does not speculate.
 
 | Tool | Returns |
 |---|---|
-| `search_series` | series by keyword, optionally within one dataset; four calls a run |
+| `search_series` | series by keyword, optionally within one dataset; four calls a run. The common benchmarks are listed in the instructions and need no search |
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
-| `get_spread` | one series minus another on the latest shared date; refuses if units differ |
+| `get_spread` | one series minus another on the latest shared date, with its percentile and history over three years; refuses if units differ, or if one side is a contract on a month's average price and the other is not |
 | `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
@@ -91,7 +100,7 @@ says so and uses a tanker ETF as a proxy), and no news.
 
 ## Evaluation
 
-Thirty questions, six evaluators each (180 assertions): `Grounded` (recompute from source),
+Thirty-one questions, six evaluators each (186 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `DirectionRight` (the prose points the same way as the data: backwardation or contango, rose or fell), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, why spot and futures spreads disagree, the evidence for and against a tight crude market, the week's surprises and watch list, "when was it last this high", seasonal and
@@ -100,14 +109,14 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **180/180**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **177/180** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **186/186**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **183/186** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **180/180** | the latest release run (30 cases, six evaluators). The runs before it scored 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
-right, and anything outside thirty questions.
+right, and anything outside thirty-one questions.
 
 How the suite got here, including the failures:
 

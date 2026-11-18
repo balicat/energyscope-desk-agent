@@ -47,6 +47,9 @@ class Spread(BaseModel):
     value_a: float
     value_b: float
     spread: float
+    extras: dict[str, float] = Field(default_factory=dict, description="Written by code: where the spread ranks in its own history. Leave as returned.")
+    context: str = Field("", description="Written by code: whether the spread is unusual and when it was last so.")
+    note: str = Field("", description="Written by code when the two series are not like for like. Code adds it to the caveats.")
 
 
 class Reading(BaseModel):

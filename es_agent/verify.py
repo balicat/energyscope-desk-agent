@@ -40,6 +40,15 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
         truth = a and b and metrics.spread_of(a, source.history(s.series_a, start=start), b, source.history(s.series_b, start=start))
         if not truth or s.period != truth.period or not metrics.close(s.spread, truth.spread):
             problems.append(f"spread {s.series_a} minus {s.series_b} differs from source")
+            continue
+        if not readings.pairing_note(s.series_a, s.series_b)[1]:
+            problems.append(f"spread {s.series_a} minus {s.series_b} subtracts a monthly-average contract from a different kind of price")
+            continue
+        extras, context, note = readings.spread_context(source, s.series_a, s.series_b, s.period)
+        if s.context != context or s.note != note or set(s.extras) != set(extras) or not all(
+            metrics.close(extras[k], s.extras[k]) for k in extras
+        ):
+            problems.append(f"spread {s.series_a} minus {s.series_b}: history differs from source")
     for r in answer.readings:
         truth = readings.compute(source, r.key)
         if truth is None or truth.period != r.period or truth.context != r.context or truth.counter != r.counter or set(truth.values) != set(r.values) or not all(

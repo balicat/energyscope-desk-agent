@@ -79,7 +79,10 @@ def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
             out.append(_line(f"{source.meta(sid).name}, last two years", r.units, hist,
                              {"average, same time of year": r.values["prior_average"]}))
     for s in answer.spreads:
-        out.append(_line(f"{s.name_a} minus {s.name_b}", s.units, readings.spread_history(source, s.series_a, s.series_b, 366)))
+        if not readings.pairing_note(s.series_a, s.series_b)[1]:
+            continue  # a monthly-average contract against a dated one: the line would step at every roll
+        out.append(_line(f"{s.name_a} minus {s.name_b}", s.units, readings.spread_history(source, s.series_a, s.series_b, 366),
+                         _bands(s.extras) if "p10" in s.extras else None))
     for f in answer.facts:
         out.append(_line(f.name, f.units, source.history(f.series_id, start=clock.today() - dt.timedelta(days=366))))
     return [c for c in out if c][:MAX_CHARTS]

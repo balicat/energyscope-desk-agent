@@ -14,6 +14,7 @@ the model.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from . import clock
 from .models import Reading
@@ -75,6 +76,40 @@ def crack_history(source: DataSource, kind: str, days: int = 366 * HISTORY_YEARS
 
 def spread_history(source: DataSource, a: str, b: str, days: int = 366 * HISTORY_YEARS) -> History:
     return [(d, round(v[0] - v[1], 6)) for d, v in aligned(source, [a, b], days)]
+
+
+# Series that settle on the average price of a month. Their history steps at every month end,
+# so a spread against a single-delivery contract or a spot price has no meaningful history.
+AVERAGE_PRICE = {"NYMEX.DUBAI.FRONT.D"}
+_FUTURE = re.compile(r"\.(M\d+|FRONT|\d{4}-\d{2})\.D$")
+
+
+def pairing_note(a: str, b: str) -> tuple[str, bool]:
+    """(a note when the two series are not like for like, whether a spread between them means anything).
+    get_spread refuses the pairing when the second is False: the rule lives in the tool, not the prompt."""
+    avg = [s for s in (a, b) if s in AVERAGE_PRICE]
+    if len(avg) == 1:
+        other = b if avg[0] == a else a
+        return (f"Not like for like: {avg[0]} is a contract on the average price of its month and {other} is not, so a "
+                "spread between them mixes the difference between the two crudes with the shape of the curve. "
+                "No spread is given.", False)
+    if bool(_FUTURE.search(a)) != bool(_FUTURE.search(b)):
+        return ("Not like for like: one series is a future and the other a spot price, so the gap includes the time "
+                "structure of the market.", True)
+    return "", True
+
+
+def spread_context(source: DataSource, a: str, b: str, period: dt.date) -> tuple[dict[str, float], str, str]:
+    """(extras, context, note) for series a minus series b: its percentile and spell over three years
+    when the pairing has a usable history, and a note when the two are not like for like."""
+    note, usable = pairing_note(a, b)
+    hist = spread_history(source, a, b) if usable else []
+    if len(hist) < 60 or hist[-1][0] != period:
+        return {}, "", note
+    extras = {"percentile": _rank([v for _, v in hist], hist[-1][1]), "percentile_years": HISTORY_YEARS}
+    more, context = spell(hist, "", "The spread")
+    extras.update(more)
+    return extras, context, note
 
 
 SPELL_GAP = 5  # observations back inside the line that do not end a spell
