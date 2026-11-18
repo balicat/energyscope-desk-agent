@@ -77,6 +77,7 @@ class Reading(BaseModel):
     window_of: dict[str, str] = Field(default_factory=dict, exclude=True)  # what a percentile ranks against, what a change spans
     date_of: dict[str, dt.date] = Field(default_factory=dict, exclude=True)  # the date of a value when it is not the reading's
     slot_values: bool = Field(True, exclude=True)                           # False: only its words and sentences are slots
+    undated: list[str] = Field(default_factory=list, exclude=True)          # values that belong to a window, not to a day
 
 
 class SeriesFact(BaseModel):

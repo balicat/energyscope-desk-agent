@@ -51,6 +51,7 @@ class Slot:
     series: tuple[str, ...] = ()
     date: dt.date | None = None     # the date of the value; None for words and sentences
     label: str = ""                 # the subject the text opens with, when it opens with one
+    kind: str = "figure"            # figure (names its subject, no verb), statement (a clause) or sentence
 
 
 Table = dict[str, Slot]
@@ -180,10 +181,12 @@ def _fact_slots(f: SeriesFact) -> dict[str, tuple[str, dt.date | None]]:
     if f.lookback_days is not None and f.change_abs is not None and f.base_value is not None:
         out["base"] = (f"{name} at {amount(f.base_value, u)}", f.base_period)
         pct, moved = f.change_pct, change(f.change_abs, "percentage points" if u == "%" else u)
-        share = (f" ({num(pct)}%)" if pct is not None and not math.isnan(pct) and u != "%" and moved.startswith(("up", "down"))
+        ratio = f.base_value > 0 and f.latest_value > 0 and u not in ("%", "contracts")  # a net position can cross zero
+        share = (f" ({num(pct)}%)" if ratio and pct is not None and not math.isnan(pct) and moved.startswith(("up", "down"))
                  and not _is_zero(num(pct)) else "")
-        out["change"] = (f"{name} {moved}{share} over {f.lookback_days} days, from {amount(f.base_value, u)} on {f.base_period}",
-                         f.latest_period)
+        days = (f.latest_period - f.base_period).days  # the span between the two dates printed, not the lookback asked for
+        out["change"] = (f"{name} {moved}{share} over {days} days to {f.latest_period}, from {amount(f.base_value, u)} "
+                         f"on {f.base_period}", None)
     return out
 
 
@@ -259,7 +262,7 @@ def _reading_slots(r: Reading) -> dict[str, tuple[str, dt.date | None]]:
         for k, v in r.values.items():
             text = _value_text(r, k, v)
             if text:
-                out[k] = (text, r.date_of.get(k, r.period))
+                out[k] = (text, None if k in r.undated else r.date_of.get(k, r.period))
     for k, text in r.words.items():
         out[k] = (_plain(text), None)
     _long_text(out, "context", r.context)
@@ -271,6 +274,9 @@ def _reading_slots(r: Reading) -> dict[str, tuple[str, dt.date | None]]:
 def table(facts: list[SeriesFact], spreads: list[Spread], readings: list[Reading]) -> Table:
     """Every slot the run may use: address -> what code writes there, and where it came from."""
     t: Table = {}
+    def kind(address: str, statement: bool = False) -> str:
+        return "sentence" if _SENTENCE.search(address) else "statement" if statement else "figure"
+
     for f in facts:
         src, name = fact_source(f), _plain(short(f.series_id, f.name))
         for k, (text, date) in _fact_slots(f).items():
@@ -278,11 +284,13 @@ def table(facts: list[SeriesFact], spreads: list[Spread], readings: list[Reading
     for s in spreads:
         src = spread_source(s)
         for k, (text, date) in _spread_slots(s).items():
-            t[f"{src}.{k}"] = Slot(text, src, (s.series_a, s.series_b), date)
+            t[f"{src}.{k}"] = Slot(text, src, (s.series_a, s.series_b), date, kind=kind(f"{src}.{k}"))
     for r in readings:
         for k, (text, date) in _reading_slots(r).items():
             name = _plain(r.label_of.get(k) or k.rpartition(": ")[0])
-            t[f"{r.key}.{k}"] = Slot(text, r.key, tuple(r.series_ids), date, name if name and "|" not in name and text.startswith(name + " ") else "")
+            t[f"{r.key}.{k}"] = Slot(text, r.key, tuple(r.series_ids), date,
+                                     name if name and "|" not in name and text.startswith(name + " ") else "",
+                                     kind(f"{r.key}.{k}", k in r.words))
     return {a: s for a, s in t.items() if "{" not in a and "}" not in a}
 
 
@@ -292,13 +300,13 @@ _SENTENCE = re.compile(r"\.(?:context|note|counter)(?:\.\d+)?$")
 def sheet(source: str, t: Table) -> dict:
     """What the model is shown for one tool result: each address in braces and the text it stands for."""
     mine = {a: s for a, s in t.items() if s.source == source}
-    long = {a for a in mine if _SENTENCE.search(a)}
+    long = {a for a, s in mine.items() if s.kind == "sentence"}
     whole_with_parts = {a for a in long if any(n.startswith(a + ".") for n in long)}
     return {
         "source": source,
         # a figure names its subject and has no verb; a statement is a whole clause; a sentence is a whole sentence
-        "figures": {"{" + a + "}": f"{s.text} ({s.date})" for a, s in mine.items() if a not in long and s.date},
-        "statements": {"{" + a + "}": s.text for a, s in mine.items() if a not in long and not s.date},
+        "figures": {"{" + a + "}": s.text + (f" ({s.date})" if s.date else "") for a, s in mine.items() if s.kind == "figure"},
+        "statements": {"{" + a + "}": s.text for a, s in mine.items() if s.kind == "statement"},
         "sentences": {"{" + a + "}": mine[a].text for a in sorted(long - whole_with_parts)},
     }
 
@@ -355,6 +363,7 @@ def render(template: str, t: Table) -> tuple[str, list[Part]]:
             s = t[text]
             lead = parts[-1].text if parts and not parts[-1].slot else ""
             before = lead.rstrip()
+            lead = re.split(r"(?<=[.!?:;])\s+", lead)[-1] if parts and not parts[-1].slot else "\x00"  # the words since the last break
             out = s.text
             # The model wrote this slot's own subject just before it ("Brent spot is {Brent spot at 92.14 ...}"): the
             # subject is printed once. Only the slot's own label is ever left out, so a wrong noun still shows.
@@ -378,8 +387,9 @@ _LINKING = r"(?:\s+(?:is|are|was|were|stood|stands|stand|sits|sit|remains|remain
 
 
 def _own_subject(label: str) -> re.Pattern:
-    """Matches the model's words when they end with this slot's own subject and, at most, a linking verb."""
-    return re.compile(r"(?i)(?:^|[\s(\"'])" + re.escape(label) + _LINKING)
+    """Matches the model's words since the last break when they are this slot's own subject and, at most, a
+    linking verb: nothing before the subject but an article or a connective."""
+    return re.compile(r"(?i)^\s*(?:(?:the|and|but|meanwhile,?|here,?)\s+)*" + re.escape(label) + _LINKING)
 
 
 def used_sources(template: str, t: Table) -> list[str]:
@@ -418,6 +428,7 @@ _BEFORE_SLOT = re.compile(r"(?:^|[\s(\"'])$")
 _AFTER_SLOT = re.compile(r"^(?:$|[\s.,;:)!?\"'])")
 _JOIN = re.compile(r"[\s.,;:()\u2013\u2014]+")  # what may stand alone between two slots: not a slash, a hyphen or a sign
 
+MAX_SLOTS, MAX_CHARS = 16, 2400  # a scorecard with every line fits; forty copies of a paragraph do not
 Problem = tuple[str, str]  # (cause, what to tell the model)
 
 
@@ -462,6 +473,10 @@ def template_problems(template: str, t: Table) -> list[Problem]:
                     + (f"; the nearest are {', '.join('{' + x + '}' for x in near)}" if near else "")))
     if len(unknown) > 4:
         bad.append(("address", f"and {len(unknown) - 4} more unknown slots"))
+    placed = sum(is_slot for _, is_slot in pieces)
+    if placed > MAX_SLOTS or len(render(template, t)[0]) > MAX_CHARS:
+        bad.append(("length", f"too long: at most {MAX_SLOTS} slots and {MAX_CHARS} characters as printed. Answer the question asked "
+                              "with the few figures that matter"))
     arbitrage = any(s.source.startswith(("arb:", "scenario:arb:")) for s in t.values())
     for i, (text, is_slot) in enumerate(pieces):
         if not is_slot:

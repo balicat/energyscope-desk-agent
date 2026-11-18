@@ -69,7 +69,15 @@ what_if = Reading(key="scenario:crack:3-2-1:+5:+0:-10", title="What if", period=
                   values={"crude_change": 5.0, "observed_crack": 38.37, "scenario_crack": 27.68}, hypothetical=True,
                   label_of={"crude_change": "WTI spot", "observed_crack": "the observed 3-2-1 crack spread", "scenario_crack": "the 3-2-1 crack spread"},
                   window_of={"crude_change": "in the scenario"})
-TABLE = slots.table([brent, wti_up, flat, tiny, stocks], [gap], [curve, funds, arb, what_if])
+year = SeriesFact(series_id="X.YEAR.W", name="A weekly series", units="USD/bbl", latest_period=dt.date(2026, 11, 6), latest_value=90.0,
+                  lookback_days=365, base_period=dt.date(2025, 10, 31), base_value=100.0, change_abs=-10.0, change_pct=-10.0)
+net = SeriesFact(series_id="X.NET.W", name="A net position", units="contracts", latest_period=dt.date(2026, 11, 10), latest_value=25714.0,
+                 lookback_days=7, base_period=dt.date(2026, 11, 3), base_value=21728.0, change_abs=3986.0, change_pct=18.34)
+gas = Reading(key="percentile:X.GAS.D:3", title="A gas price", period=D, units="USD", series_ids=["X.GAS.D"],
+              values={"latest": 31.4, "percentile": 95.0, "low": 9.06},
+              label_of={"latest": "a gas price", "percentile": "a gas price", "low": "the lowest of its history, which begins on 2023-05-03"},
+              window_of={"percentile": "of its history, which begins on 2023-05-03"}, undated=["low"])
+TABLE = slots.table([brent, wti_up, flat, tiny, stocks, year, net], [gap], [curve, funds, arb, what_if, gas])
 NO_ARB = slots.table([brent, wti_up, stocks], [gap], [curve, funds])
 
 B, W, C = "{ICE.BRENT.M1.D.value}", "{PET.RWTC.D.7d.change}", "{curve:brent.M1_minus_M12}"
@@ -163,6 +171,7 @@ WRONG = [  # (what is wrong, the template, the table); every one must be rejecte
     ("two figures joined by a dash", f"The range: {B} - {C}.", TABLE),
     ("two figures with nothing between them", f"Brent: {B}{C}.", TABLE),
     ("two figures joined by a plus sign", f"Together: {B} + {C}.", TABLE),
+    ("a summary of forty slots", "Everything: " + ", ".join([C] * 40) + ".", TABLE),
     ("a percent sign glued after a slot", f"Brent: {B}%.", TABLE),
 ]
 
@@ -187,17 +196,23 @@ RIGHT = [  # templates that must pass
 
 WRITES = [  # (template, what the page prints)
     (f"Brent: {B}.", "Brent: Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
-    (f"{W}.", "WTI spot up 1.20 dollars per barrel (1.38%) over 7 days, from 86.90 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    (f"{W}.", "WTI spot up 1.20 dollars per barrel (1.38%) over 7 days to 2026-11-17, from 86.90 dollars per barrel on 2026-11-10."),
     (f"{B}, and {W}.",  # one date, printed once
-     "Brent front-month future at 93.07 dollars per barrel (2026-11-17), and WTI spot up 1.20 dollars per barrel (1.38%) over 7 days, "
-     "from 86.90 dollars per barrel on 2026-11-10."),
+     "Brent front-month future at 93.07 dollars per barrel (2026-11-17), and WTI spot up 1.20 dollars per barrel (1.38%) over 7 days "
+     "to 2026-11-17, from 86.90 dollars per barrel on 2026-11-10."),
     (f"Now {C}; before, {{curve:brent.M1_minus_M12_a_week_earlier}}; and again {C}.",  # the date is printed whenever it changes
      "Now Brent M1 15.81 dollars per barrel above M12 (2026-11-17); before, Brent M1 13.60 dollars per barrel above M12 (2026-11-10); "
      "and again Brent M1 15.81 dollars per barrel above M12 (2026-11-17)."),
     ("{curve:brent.shape}. {curve:brent.move}.",  # a statement that opens a sentence is capitalised
      "The Brent curve is in backwardation (front above back). The Brent curve has steepened over the week, since 2026-11-10."),
-    ("{X.FLAT.D.7d.change}.", "A flat series unchanged over 7 days, from 50.00 dollars per barrel on 2026-11-10 (2026-11-17)."),
-    ("{X.TINY.D.7d.change}.", "A (braced) series almost unchanged over 7 days, from 50.00 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    ("{X.FLAT.D.7d.change}.", "A flat series unchanged over 7 days to 2026-11-17, from 50.00 dollars per barrel on 2026-11-10."),
+    ("{X.TINY.D.7d.change}.", "A (braced) series almost unchanged over 7 days to 2026-11-17, from 50.00 dollars per barrel on 2026-11-10."),
+    # the days are the span between the two dates printed, whatever lookback was asked for; no percentage of a net position
+    ("{X.YEAR.W.365d.change}.", "A weekly series down 10.00 dollars per barrel (10%) over 371 days to 2026-11-06, from 100.00 dollars per barrel on 2025-10-31."),
+    ("{X.NET.W.7d.change}.", "A net position up 3,986 contracts over 7 days to 2026-11-10, from 21,728 contracts on 2026-11-03."),
+    # a statistic of a window carries no date of its own
+    ("{percentile:X.GAS.D:3.low}; {percentile:X.GAS.D:3.percentile}.",
+     "The lowest of its history, which begins on 2023-05-03 at 9.06 dollars; a gas price at the 95th percentile of its history, which begins on 2023-05-03 (2026-11-17)."),
     ("{PET.RBRTE.D-minus-PET.RWTC.D.gap}.", "Brent spot 0.62 dollars per barrel below WTI spot (2026-11-11)."),
     ("{PET.WCESTUS1.W.value}; {PET.WCESTUS1.W.million_barrels}.",
      "US commercial crude stocks at 414,417 thousand barrels (2026-11-13); US commercial crude stocks at 414.42 million barrels."),
@@ -211,7 +226,13 @@ WRITES = [  # (template, what the page prints)
     # the model wrote the slot's own subject: it is printed once
     (f"Brent front-month future is {B}.", "Brent front-month future is at 93.07 dollars per barrel (2026-11-17)."),
     (f"The Brent front-month future stood at {B}.", "The Brent front-month future stood at 93.07 dollars per barrel (2026-11-17)."),
-    (f"WTI spot is {W}.", "WTI spot is up 1.20 dollars per barrel (1.38%) over 7 days, from 86.90 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    (f"WTI spot is {W}.", "WTI spot is up 1.20 dollars per barrel (1.38%) over 7 days to 2026-11-17, from 86.90 dollars per barrel on 2026-11-10."),
+    # ... but only when the subject is all the model wrote: a longer subject that ends with the label keeps it, and reads wrong on sight
+    (f"The weekly move in Brent front-month future is {B}.",
+     "The weekly move in Brent front-month future is Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
+    (f"The gap between WTI spot and Brent front-month future is {B}.",
+     "The gap between WTI spot and Brent front-month future is Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
+    (f"Prices are firm. Brent front-month future is {B}.", "Prices are firm. Brent front-month future is at 93.07 dollars per barrel (2026-11-17)."),
     # another noun is not the slot's subject: nothing is left out, and the contradiction shows
     (f"WTI spot is {B}.", "WTI spot is Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
     # a code sentence inside the model's sentence, and its own full stop

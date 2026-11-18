@@ -1535,13 +1535,13 @@
     "text": "; "
    },
    {
-    "date": "2026-11-06",
+    "date": null,
     "series": [
      "PET.W_EPC0_SAX_YCUOK_MBBL.W"
     ],
     "slot": "PET.W_EPC0_SAX_YCUOK_MBBL.W.28d.change",
     "source": "PET.W_EPC0_SAX_YCUOK_MBBL.W.28d",
-    "text": "Cushing crude stocks up 749 thousand barrels (2.82%) over 28 days, from 26,607 thousand barrels on 2026-10-09"
+    "text": "Cushing crude stocks up 749 thousand barrels (2.82%) over 28 days to 2026-11-06, from 26,607 thousand barrels on 2026-10-09"
    },
    {
     "date": null,
@@ -1553,7 +1553,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "From the data: Cushing crude stocks at 27,356 thousand barrels (2026-11-06); Cushing crude stocks up 749 thousand barrels (2.82%) over 28 days, from 26,607 thousand barrels on 2026-10-09.",
+  "summary": "From the data: Cushing crude stocks at 27,356 thousand barrels (2026-11-06); Cushing crude stocks up 749 thousand barrels (2.82%) over 28 days to 2026-11-06, from 26,607 thousand barrels on 2026-10-09.",
   "template": "From the data: {PET.W_EPC0_SAX_YCUOK_MBBL.W.28d.value}; {PET.W_EPC0_SAX_YCUOK_MBBL.W.28d.change}."
  },
  "dictated_caveat": {
@@ -2813,13 +2813,13 @@
     "text": "; "
    },
    {
-    "date": "2026-11-06",
+    "date": null,
     "series": [
      "PET.WCESTUS1.W"
     ],
     "slot": "PET.WCESTUS1.W.365d.change",
     "source": "PET.WCESTUS1.W.365d",
-    "text": "US commercial crude stocks down 6,751 thousand barrels (1.60%) over 365 days, from 421,168 thousand barrels on 2025-10-31"
+    "text": "US commercial crude stocks down 6,751 thousand barrels (1.60%) over 371 days to 2026-11-06, from 421,168 thousand barrels on 2025-10-31"
    },
    {
     "date": null,
@@ -2831,7 +2831,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "From the data: US commercial crude stocks at 414,417 thousand barrels (2026-11-06); US commercial crude stocks down 6,751 thousand barrels (1.60%) over 365 days, from 421,168 thousand barrels on 2025-10-31.",
+  "summary": "From the data: US commercial crude stocks at 414,417 thousand barrels (2026-11-06); US commercial crude stocks down 6,751 thousand barrels (1.60%) over 371 days to 2026-11-06, from 421,168 thousand barrels on 2025-10-31.",
   "template": "From the data: {PET.WCESTUS1.W.365d.value}; {PET.WCESTUS1.W.365d.change}."
  },
  "us_rigs_yoy": {
@@ -2878,13 +2878,13 @@
     "text": "; "
    },
    {
-    "date": "2026-11-13",
+    "date": null,
     "series": [
      "BH.United_States.Total.W"
     ],
     "slot": "BH.United_States.Total.W.365d.change",
     "source": "BH.United_States.Total.W.365d",
-    "text": "US rig count up 53 rigs (9.67%) over 365 days, from 548 rigs on 2025-11-06"
+    "text": "US rig count up 53 rigs (9.67%) over 372 days to 2026-11-13, from 548 rigs on 2025-11-06"
    },
    {
     "date": null,
@@ -2896,7 +2896,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "From the data: US rig count at 601 rigs (2026-11-13); US rig count up 53 rigs (9.67%) over 365 days, from 548 rigs on 2025-11-06.",
+  "summary": "From the data: US rig count at 601 rigs (2026-11-13); US rig count up 53 rigs (9.67%) over 372 days to 2026-11-13, from 548 rigs on 2025-11-06.",
   "template": "From the data: {BH.United_States.Total.W.365d.value}; {BH.United_States.Total.W.365d.change}."
  },
  "week_surprises": {
@@ -3607,13 +3607,13 @@
     "text": "; "
    },
    {
-    "date": "2026-11-11",
+    "date": null,
     "series": [
      "PET.RWTC.D"
     ],
     "slot": "PET.RWTC.D.30d.change",
     "source": "PET.RWTC.D.30d",
-    "text": "WTI spot down 5.37 dollars per barrel (5.65%) over 30 days, from 94.99 dollars per barrel on 2026-10-12"
+    "text": "WTI spot down 5.37 dollars per barrel (5.65%) over 30 days to 2026-11-11, from 94.99 dollars per barrel on 2026-10-12"
    },
    {
     "date": null,
@@ -3625,7 +3625,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "From the data: WTI spot at 89.62 dollars per barrel (2026-11-11); WTI spot down 5.37 dollars per barrel (5.65%) over 30 days, from 94.99 dollars per barrel on 2026-10-12.",
+  "summary": "From the data: WTI spot at 89.62 dollars per barrel (2026-11-11); WTI spot down 5.37 dollars per barrel (5.65%) over 30 days to 2026-11-11, from 94.99 dollars per barrel on 2026-10-12.",
   "template": "From the data: {PET.RWTC.D.30d.value}; {PET.RWTC.D.30d.change}."
  },
  "wti_curve": {

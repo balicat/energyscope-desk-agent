@@ -469,7 +469,8 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | No
                    label_of={"latest": (me := short(series_id, hit.name)), "difference": me, "difference_pct": me,
                              "prior_average": f"the average for the same time of year in the previous {years} years",
                              "prior_low": f"the lowest for the same time of year in the previous {years} years",
-                             "prior_high": f"the highest for the same time of year in the previous {years} years"})
+                             "prior_high": f"the highest for the same time of year in the previous {years} years"},
+                   undated=["prior_average", "prior_low", "prior_high"])
 
 
 def positioning(source: DataSource, market: str) -> Reading | None:
@@ -518,6 +519,8 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
     if len(hist) < 20:
         return None
     d, v = hist[-1]
+    span = (f"its last {years} years" if hist[0][0] <= _since(366 * years) + dt.timedelta(days=45)
+            else f"its history, which begins on {hist[0][0]}")
     sample = [x for _, x in hist]
     mean = sum(sample) / len(sample)
     sd = (sum((x - mean) ** 2 for x in sample) / len(sample)) ** 0.5
@@ -537,9 +540,8 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
                    period=d, units=hit.units, series_ids=[series_id], values=values,
                    note="percentile 0 = lowest of the window, 100 = highest", context=context,
                    label_of={"latest": (me := short(series_id, hit.name)), "percentile": me, "z_score": me,
-                             "low": f"the lowest of its last {years} years", "high": f"the highest of its last {years} years",
-                             "average": f"the average of its last {years} years"},
-                   window_of={"percentile": f"of its last {years} years", "z_score": f"against its last {years} years"})
+                             "low": f"the lowest of {span}", "high": f"the highest of {span}", "average": f"the average of {span}"},
+                   window_of={"percentile": f"of {span}", "z_score": f"against {span}"}, undated=["low", "high", "average"])
 
 
 def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
