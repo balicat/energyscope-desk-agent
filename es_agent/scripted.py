@@ -31,7 +31,7 @@ def _plain(x):
 
 
 def _answer(returns: list[ToolReturnPart], question: str) -> dict:
-    facts, lines = [], []
+    facts, spreads, lines = [], [], []
     for r in returns:
         body = _plain(r.content)
         if r.tool_name == "get_latest":
@@ -50,10 +50,16 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
                 f"{abs(c['change_abs']):.2f} ({abs(c['change_pct']):.2f}%) from {c['base_value']:.2f} "
                 f"on {c['base_period']}, {c['lookback_days']} days earlier."
             )
-    if not facts:
+        elif r.tool_name == "get_spread":
+            spreads.append(body)
+            lines.append(
+                f"{body['name_a']} was {body['value_a']:.2f} and {body['name_b']} was {body['value_b']:.2f} "
+                f"{body['units']} on {body['period']}: a spread of {body['spread']:.2f}."
+            )
+    if not facts and not spreads:
         return {"facts": [], "summary": "No EnergyScope series matched the question.",
                 "caveats": [f"search_series found nothing suitable for: {question}"]}
-    return {"facts": facts, "summary": " ".join(lines), "caveats": []}
+    return {"facts": facts, "spreads": spreads, "summary": " ".join(lines), "caveats": []}
 
 
 def is_rejection(p) -> bool:

@@ -1,4 +1,4 @@
-"""The agent: three tools over EnergyScope data, a typed answer, and a
+"""The agent: four tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from . import metrics
-from .models import Change, DeskAnswer, Observation, SeriesHit
+from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
 from .sources import DataSource
 
 
@@ -23,6 +23,7 @@ class Deps:
     source: DataSource
     # Every number a tool handed to the model, keyed by (series_id, lookback_days or None).
     ledger: dict[tuple[str, int | None], Observation | Change] = field(default_factory=dict)
+    spreads: dict[tuple[str, str], Spread] = field(default_factory=dict)  # every spread a tool returned
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
 
 
@@ -30,6 +31,7 @@ INSTRUCTIONS = """\
 You answer energy-market questions for a desk analyst using EnergyScope data.
 - Find series with search_series; prefer daily (D) or weekly (W) series unless asked otherwise.
 - Get numbers only from get_latest or get_change. Never compute or estimate numbers yourself.
+- For the difference between two series (a spread) call get_spread and copy its result into spreads. Never subtract yourself.
 - Copy tool values into facts unchanged. In the summary, quote numbers as they appear in facts.
 - If no suitable series exists, return empty facts and say why in caveats. Do not guess.
 """
@@ -45,7 +47,11 @@ agent = Agent(
 
 @agent.tool
 def search_series(ctx: RunContext[Deps], query: str, limit: int = 8) -> list[SeriesHit]:
-    """Search EnergyScope series by keywords in the series name, e.g. 'WTI spot price' or 'Cushing ending stocks'."""
+    """Search EnergyScope series by keywords in the series name, e.g. 'WTI spot price' or 'Cushing ending stocks'.
+
+    Names use the publisher's wording (EIA): inventories are 'ending stocks', and commercial crude stocks are
+    'ending stocks excluding SPR'. Use few, plain keywords; one or two searches should be enough.
+    """
     return ctx.deps.source.search(query, limit)
 
 
@@ -78,6 +84,26 @@ def get_change(ctx: RunContext[Deps], series_id: str, lookback_days: int) -> Cha
     return ch
 
 
+@agent.tool
+def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
+    """series_a minus series_b on the latest date both have a value, e.g. Brent minus WTI. Both must share units."""
+    hits = []
+    for sid in (series_a, series_b):
+        hit = ctx.deps.source.meta(sid)
+        if hit is None:
+            raise ModelRetry(f"Unknown series_id {sid!r}. Use search_series to find a valid ID.")
+        hits.append(hit)
+    a, b = hits
+    if a.units != b.units:
+        raise ModelRetry(f"Units differ ({a.units!r} vs {b.units!r}): no spread. Report the two values separately.")
+    start = dt.date.today() - dt.timedelta(days=400)
+    sp = metrics.spread_of(a, ctx.deps.source.history(series_a, start=start), b, ctx.deps.source.history(series_b, start=start))
+    if sp is None:
+        raise ModelRetry(f"{series_a} and {series_b} share no date in the last 400 days.")
+    ctx.deps.spreads[(series_a, series_b)] = sp
+    return sp
+
+
 @agent.output_validator
 def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     """Reject any fact that differs from what a tool returned, and any summary number that traces to no fact."""
@@ -97,10 +123,16 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
             for name in ("base_value", "change_abs", "change_pct"):
                 if not metrics.close(getattr(f, name), getattr(src, name)):
                     problems.append(f"{f.series_id}: {name} is {getattr(src, name)}, you wrote {getattr(f, name)}.")
+    for s in answer.spreads:
+        src = ctx.deps.spreads.get((s.series_a, s.series_b))
+        if src is None:
+            problems.append(f"Spread {s.series_a} minus {s.series_b} was not returned by get_spread in this run.")
+        elif s.period != src.period or not all(metrics.close(getattr(s, n), getattr(src, n)) for n in ("value_a", "value_b", "spread")):
+            problems.append(f"Spread {s.series_a} minus {s.series_b}: tool returned {src.period} {src.value_a} - {src.value_b} = {src.spread}; copy it unchanged.")
     bad = metrics.untraceable_numbers(answer)
     if bad:
-        problems.append(f"Summary numbers {bad} match no value in facts. Quote fact values, no conversions.")
-    if not answer.facts and not answer.caveats:
+        problems.append(f"Summary numbers {bad} match no value in facts or spreads. Quote those values, no conversions.")
+    if not answer.facts and not answer.spreads and not answer.caveats:
         problems.append("No facts and no caveat: say why nothing was found.")
     if problems:
         raise ModelRetry("Fix these and answer again:\n- " + "\n- ".join(problems))

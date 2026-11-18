@@ -71,16 +71,26 @@ class ParquetLakeSource:
         return SeriesHit(series_id=r["series_id"], name=r["name"], units=r["units"] or "", frequency=r["f"] or "")
 
     def search(self, query: str, limit: int = 10) -> list[SeriesHit]:
-        tokens = [t for t in _norm(query).split() if t]
+        """All query words in the name first; if none match, names holding most of the words (whole words only)."""
+        tokens = list(dict.fromkeys(t for t in _norm(query).split() if t))
         if not tokens:
             return []
         expr = pl.lit(True)
         for t in tokens:
             expr = expr & pl.col("_norm").str.contains(t, literal=True)
+        rows = self._meta.filter(expr)
+        if rows.is_empty() and len(tokens) > 1:
+            # A desk word the publisher does not use ("commercial", "inventories") must not sink the search.
+            score = pl.lit(0)
+            for t in tokens:
+                score = score + pl.col("_norm").str.contains(rf"\b{re.escape(t)}\b").cast(pl.Int32)
+            need = max(2, (len(tokens) + 1) // 2)
+            rows = self._meta.with_columns(score.alias("_score")).filter(pl.col("_score") >= need)
+        else:
+            rows = rows.with_columns(pl.lit(len(tokens)).alias("_score"))
         rows = (
-            self._meta.filter(expr)
-            .with_columns(pl.col("name").str.len_chars().alias("_len"))
-            .sort("_len")
+            rows.with_columns(pl.col("name").str.len_chars().alias("_len"))
+            .sort(["_score", "_len"], descending=[True, False])
             .head(limit)
         )
         return [self._hit(r) for r in rows.iter_rows(named=True)]

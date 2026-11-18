@@ -1,4 +1,4 @@
-"""Eval suite: five desk questions scored on grounding, series choice,
+"""Eval suite: six desk questions scored on grounding, series choice,
 abstention and tool budget.
 
     python run_evals.py                                  # offline, scripted model, Parquet lake
@@ -43,6 +43,9 @@ SUITE = [
       ("get_change", {"series_id": US_CRUDE[0], "lookback_days": 365})], False),
     ("cushing_4w", "Cushing crude stocks: latest level and the four-week change.", [[CUSHING]],
      [("search_series", {"query": "Cushing ending stocks crude"}), ("get_change", {"series_id": CUSHING, "lookback_days": 28})], False),
+    ("brent_wti_spread", "What is the Brent-WTI spread right now?", [[BRENT], [WTI]],
+     [("search_series", {"query": "Brent spot price"}), ("search_series", {"query": "WTI spot price"}),
+      ("get_spread", {"series_a": BRENT, "series_b": WTI})], False),
     ("abstain_carbon", "What did EU carbon allowances (EUA) settle at yesterday?", [],
      [("search_series", {"query": "EU carbon allowance EUA"})], False),
 ]
@@ -68,7 +71,15 @@ class Grounded(Evaluator[str, DeskAnswer]):
                 return EvaluationReason(False, f"{f.series_id}: source says {tp}={tv}, answer says {f.latest_period}={f.latest_value}")
             if lb and not (metrics.close(f.change_pct, truth.change_pct) and metrics.close(f.base_value, truth.base_value)):
                 return EvaluationReason(False, f"{f.series_id}: change differs from source")
-        return EvaluationReason(True, f"{len(ctx.output.facts)} facts match the source")
+        for s in ctx.output.spreads:
+            a, b = SOURCE.meta(s.series_a), SOURCE.meta(s.series_b)
+            if a is None or b is None:
+                return EvaluationReason(False, f"spread {s.series_a} / {s.series_b}: a series does not exist")
+            start = dt.date.today() - dt.timedelta(days=400)
+            truth = metrics.spread_of(a, SOURCE.history(s.series_a, start=start), b, SOURCE.history(s.series_b, start=start))
+            if truth is None or s.period != truth.period or not metrics.close(s.spread, truth.spread):
+                return EvaluationReason(False, f"spread {s.series_a} minus {s.series_b} differs from source")
+        return EvaluationReason(True, f"{len(ctx.output.facts)} facts and {len(ctx.output.spreads)} spreads match the source")
 
 
 @dataclass
@@ -85,7 +96,8 @@ class RightSeries(Evaluator[str, DeskAnswer]):
     """Picked an acceptable series for each thing asked about, or abstained when nothing fits."""
 
     def evaluate(self, ctx):
-        want, got = ctx.metadata["expect"], {f.series_id for f in ctx.output.facts}
+        want = ctx.metadata["expect"]
+        got = {f.series_id for f in ctx.output.facts} | {x for s in ctx.output.spreads for x in (s.series_a, s.series_b)}
         if not want:
             ok = not got and bool(ctx.output.caveats)
             return EvaluationReason(ok, "abstained with a caveat" if ok else f"should abstain, answered with {sorted(got)}")

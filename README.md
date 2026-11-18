@@ -1,6 +1,6 @@
 # EnergyScope desk agent: a Pydantic AI spike
 
-Built 10 Nov 2026 against the live [EnergyScope](https://energyscope.io) Parquet lake on my own server
+Built 10 Nov 2026, first run on a live model 18 Nov 2026, against the live [EnergyScope](https://energyscope.io) Parquet lake on my own server
 (Pydantic AI 2.66, pydantic-evals 2.66, Python 3.14).
 
 A desk analyst asks a question in plain English ("How do US commercial crude
@@ -12,7 +12,7 @@ has to trace back to a tool result, or the answer is sent back.
 
 | Pydantic AI feature | Where |
 |---|---|
-| Tools as typed Python functions (`@agent.tool`) | `es_agent/agent.py`: `search_series`, `get_latest`, `get_change` |
+| Tools as typed Python functions (`@agent.tool`) | `es_agent/agent.py`: `search_series`, `get_latest`, `get_change`, `get_spread` |
 | Structured output (`output_type`) | `DeskAnswer` / `SeriesFact` in `es_agent/models.py` |
 | Dependency injection (`deps_type`, `RunContext`) | `Deps` carries the data source and a ledger of every number a tool returned |
 | Output validator + `ModelRetry` | `grounded()` rejects any fact that differs from the ledger and any summary number that traces to no fact |
@@ -38,21 +38,36 @@ Design rules:
 
 ## Results (offline, scripted model, real data)
 
-Five cases, four evaluators each: `Grounded`, `SummaryTraceable`,
+Six cases, four evaluators each: `Grounded`, `SummaryTraceable`,
 `RightSeries`, `MaxToolCalls(6)`.
 
 | Run | Assertions | Notes |
 |---|---|---|
-| guard on (`python run_evals.py`) | **20/20** | `wti_30d` is deliberately sloppy: its first answer quotes WTI at 104.62. The validator rejects it ("latest is 2026-11-03 = 99.64, you wrote 104.62"), the retry fixes it: `retries: 1` |
-| guard off (`--no-guard`) | **18/20** | the same bad number gets through the run, and `Grounded` + `SummaryTraceable` both fail it |
+| guard on (`python run_evals.py`) | **24/24** | `wti_30d` is deliberately sloppy: its first answer misquotes WTI by 5%. The validator rejects it (on 10 Nov: "latest is 2026-11-03 = 99.64, you wrote 104.62"), the retry fixes it: `retries: 1` |
+| guard off (`--no-guard`) | **22/24** | the same bad number gets through the run, and `Grounded` + `SummaryTraceable` both fail it |
 
 The control run is the point: it shows the evals catch the error on their own,
 so a green run means something. Full reports: `results/`.
 
+## Results (live, `anthropic:claude-sonnet-5-5`, 18 Nov 2026)
+
+| Run | Assertions | Notes |
+|---|---|---|
+| first live run, five cases | **19/20** | every number matched the source and the carbon question was declined; `us_crude_yoy` used 8 tool calls against a budget of 6, because "commercial" is not in the publisher's series names and the all-words search returned nothing five times |
+| after the search fix, five cases | **20/20** | search now falls back to names holding most of the query words; 2.6 tool calls and 5.5 s a question on average |
+| with `get_spread`, six cases | **24/24** | 3.2 tool calls and 8.0 s a question on average, about $0.025 each. Report: `results/live-claude-sonnet-5-5.txt` |
+
+Five questions outside the suite, asked through `serve.py`: Henry Hub over a month and US gasoline stocks
+against last year were answered with the series and dates; an election question and a request for the system
+prompt and API key were declined with no tool calls; asked for the Brent-WTI spread, it quoted both prices
+and said it does not compute numbers itself. That gap became the fourth tool, `get_spread` (one series minus
+another on the latest date both have, computed in code), and the sixth eval case. Five questions is a smoke
+test, not a measurement.
+
 What the offline run does and does not prove: it exercises the real tools,
 data, typed output, validator, retry path and evaluators. It does not measure
 model judgement (series choice, when to abstain), because the scripted model
-follows a fixed plan. That is what the live run is for.
+follows a fixed plan. That is what the live run above is for.
 
 ## Run it
 
@@ -80,10 +95,11 @@ export ENERGYSCOPE_API_KEY=...                # over Arrow Flight instead of the
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/sources.py   DataSource protocol, ParquetLakeSource, FlightSource
 es_agent/metrics.py   change calculations + the grounding rule
-es_agent/agent.py     the agent, three tools, the output validator
+es_agent/agent.py     the agent, four tools, the output validator
 es_agent/scripted.py  offline FunctionModel
 run_evals.py          the eval suite
 ask.py                one question, prints the tool trail and the typed answer
+serve.py              HTTP front (POST /ask) with per-address, per-day and per-question limits
 results/              eval reports
 ```
 

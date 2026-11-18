@@ -11,7 +11,7 @@ import datetime as dt
 import math
 import re
 
-from .models import Change, DeskAnswer, Observation, SeriesHit
+from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
 
 
 def latest_obs(hit: SeriesHit, history: list[tuple[dt.date, float]]) -> Observation | None:
@@ -38,6 +38,16 @@ def change_over(hit: SeriesHit, history: list[tuple[dt.date, float]], lookback_d
     )
 
 
+def spread_of(a: SeriesHit, hist_a: list[tuple[dt.date, float]], b: SeriesHit, hist_b: list[tuple[dt.date, float]]) -> Spread | None:
+    """a minus b on the latest date present in both histories."""
+    vb = dict(hist_b)
+    for d, va in reversed(hist_a):
+        if d in vb:
+            return Spread(series_a=a.series_id, name_a=a.name, series_b=b.series_id, name_b=b.name, units=a.units,
+                          period=d, value_a=va, value_b=vb[d], spread=round(va - vb[d], 6))
+    return None
+
+
 def close(a: float | None, b: float | None) -> bool:
     if a is None or b is None:
         return a is b
@@ -49,12 +59,15 @@ _NUM = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
 
 
 def untraceable_numbers(answer: DeskAnswer) -> list[str]:
-    """Numbers in the summary that match no number in the facts (after rounding)."""
+    """Numbers in the summary that match no number in the facts or spreads (after rounding)."""
     allowed: list[float] = []
     in_names: set[str] = set()  # "No. 2 Heating Oil", "PADD 3": numbers that are part of a name
     for f in answer.facts:
         allowed += [x for x in (f.latest_value, f.base_value, f.change_abs, f.change_pct, f.lookback_days) if x is not None]
         in_names |= set(_NUM.findall(f"{f.name} {f.series_id}"))
+    for s in answer.spreads:
+        allowed += [s.value_a, s.value_b, s.spread]
+        in_names |= set(_NUM.findall(f"{s.name_a} {s.series_a} {s.name_b} {s.series_b}"))
     bad = []
     for m in _NUM.finditer(_ISO.sub(" ", answer.summary)):
         if m.group() in in_names:
