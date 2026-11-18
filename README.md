@@ -8,8 +8,8 @@ Built on [Pydantic AI](https://ai.pydantic.dev) over the [EnergyScope](https://e
 (22 datasets: EIA, ICE, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
 customers. First version 10 Nov 2026 (offline only); first run on a live model and public launch 18 Nov 2026.
 
-The name is a nod to the Librarian in Neal Stephenson's *Snow Crash* (1992), the novel that also gave us the
-Metaverse. In the book the Librarian is a piece of software inside the Metaverse that knows a vast library,
+The name is a nod to The Librarian in Neal Stephenson's *Snow Crash* (1992), the novel that also gave us The
+Metaverse. In the book The Librarian is a piece of software inside The Metaverse that knows a vast library,
 cites it, and does not speculate.
 
 ## The rules it is built on
