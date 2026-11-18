@@ -51,9 +51,12 @@ _COUNT = re.compile(r"[\s-]*(?:days?|weeks?|years?|months?|lines?|observations?|
 _SCALE = re.compile(r"\s*(thousand|million|billion|trillion|hundred)\b", re.I)
 _PER = re.compile(r"[^.;,]{0,24}?\bper\s+(?:metric\s+)?(barrel|bbl|tonne|ton|mt|gallon|gal|day|mmbtu|btu|mwh|therm)\b", re.I)
 _ORDINAL = {"st", "nd", "rd", "th"}
-_NUMWORD = (r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
-            r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)")
-_SPELLED = re.compile(rf"\b{_NUMWORD}(?:[\s-]+(?:and\s+)?{_NUMWORD})*\s+(?:us\s+)?"
+# A spelled-out number starts with a counting word. A scale word alone ("reported in thousand barrels")
+# is a unit, not a number: this rule once refused that sentence four times running and blocked a release.
+_COUNTING = (r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+             r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)")
+_NUMWORD = rf"(?:{_COUNTING}|hundred|thousand|million|billion)"
+_SPELLED = re.compile(rf"\b{_COUNTING}(?:[\s-]+(?:and\s+)?{_NUMWORD})*\s+(?:us\s+)?"
                       r"(?:usd|dollars?|cents?|percent|per\s+cent|barrels?|bbl|contracts?|tonnes?|gallons?)\b", re.I)
 
 _UNIT_WORDS = {"usd": "dollars", "$": "dollars", "us$": "dollars", "/": " per ", "bbl": "barrel", "barrels": "barrel",

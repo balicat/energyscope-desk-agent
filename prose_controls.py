@@ -137,6 +137,7 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[curve], summary="M12 is 14.55 below M1 on the Brent curve."),
     dict(facts=[stocks], summary="US crude stocks were 414,417 thousand barrels on 2026-11-13."),
     dict(facts=[wti_up], summary="The change over 7 days was +1.20 USD/bbl, to 88.10."),
+    dict(facts=[stocks, brent], summary="No spread is given: one is a price in dollars per barrel and the other is reported in thousand barrels."),
     dict(spreads=[fut], summary="Brent trades at a premium of 8.42 USD/bbl to WTI for 2027-01 delivery: 93.07 against 84.65."),
     dict(spreads=[fut], summary="The spread is 8.42 USD/bbl, percentile 96.4 of 3 years; the previous spell above the line ended 117 days earlier."),
     dict(readings=[brent_curve], summary="The Brent curve is in backwardation, not contango: M1 93.07 against M12 77.26, and it has steepened over the week."),

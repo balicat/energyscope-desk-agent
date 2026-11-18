@@ -195,11 +195,14 @@ def make_task(model_name: str, enforce: bool = True):
         def said(messages) -> list[str]:
             return [str(getattr(p, "content", ""))[:600] for m in messages for p in m.parts if is_rejection(p)]
 
+        deps = Deps(source=SOURCE, enforce=enforce)
         with capture_run_messages() as seen:
             try:
-                result = await agent.run(question, model=model, deps=Deps(source=SOURCE, enforce=enforce))
+                result = await agent.run(question, model=model, deps=deps)
             except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
-                RUNS[question] = {"retries": len(said(seen)), "ran_out": f"{type(e).__name__}: {e}"[:300], "validator": said(seen)}
+                # The validator's own record is used too: inside the evaluation harness the captured messages can be empty.
+                RUNS[question] = {"retries": max(len(said(seen)), len(deps.rejections)), "ran_out": f"{type(e).__name__}: {e}"[:300],
+                                  "validator": said(seen) or [r[:600] for r in deps.rejections]}
                 raise
         parts = [p for m in result.all_messages() for p in m.parts]
         RUNS[question] = {"retries": sum(is_rejection(p) for p in parts), "ran_out": None, "validator": said(result.all_messages())}

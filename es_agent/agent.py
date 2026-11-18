@@ -30,6 +30,7 @@ class Deps:
     searches: int = 0  # search_series calls so far in this run
     emit: Callable[[str, dict], None] = lambda tool, args: None  # progress hook: called as each tool starts
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
+    rejections: list[str] = field(default_factory=list)  # what the validator sent back in this run
 
 
 SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
@@ -432,5 +433,6 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     if not answer.facts and not answer.spreads and not answer.readings and not answer.caveats:
         problems.append("No facts and no caveat: say why nothing was found.")
     if problems:
+        ctx.deps.rejections.append("; ".join(problems))  # kept for the gate's record of what was sent back
         raise ModelRetry("Fix these and answer again:\n- " + "\n- ".join(problems))
     return answer
