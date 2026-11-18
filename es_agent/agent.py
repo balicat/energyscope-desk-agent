@@ -1,4 +1,4 @@
-"""The agent: sixteen tools over EnergyScope data, a typed answer, and a
+"""The agent: seventeen tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -40,6 +40,7 @@ show where every number came from.
 
 How to work
 - Prefer a computed reading when one fits the question:
+  get_evidence (is the crude market tight or tightening, what is the evidence, what argues the other way),
   get_watch (what should I look at, what matters this week), get_surprises (what moved unusually, what
   changed), get_arbitrage (is a route open), get_arbitrage_scenario and get_crack_scenario (what if a price
   moved), get_curve (backwardation or contango: Brent, WTI, Oman, RBOB, heating oil), get_futures_spread (the
@@ -53,6 +54,9 @@ How to work
 - When a context sets two measures side by side (the spot spread against the futures spread), they are both
   true and measure different things. If they point different ways, say so: give both numbers with their dates
   and where the context says the difference comes from. Do not pick one silently.
+- An evidence reading is a scorecard. Lead with its balance and the count (how many lines read tight, loose,
+  neutral), then the two or three strongest lines on each side with their numbers. Always say what points the
+  other way. Do not add evidence of your own, and do not call it a forecast. You may use up to five sentences.
 - A reading marked hypothetical is a what-if. Open with the condition ("If Brent rose 5 dollars ...") and keep
   what would happen apart from what is observed. Never state a scenario_ number as a fact about the market.
 - Otherwise find series with search_series, then read them with get_latest, get_change or get_spread, and copy
@@ -279,6 +283,17 @@ def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline",
 
 
 @agent.tool
+def get_evidence(ctx: RunContext[Deps], thesis: Literal["crude_tightness"]) -> Reading:
+    """The evidence for and against a thesis, as a fixed scorecard. crude_tightness: ten lines (Brent and WTI
+    curves, US and Cushing stocks against the five-year average, the four-week stock change against its usual,
+    spot against futures for WTI and Brent, refinery utilisation, the 3-2-1 crack, fund positioning), each
+    scored tight, loose or neutral against a stated threshold, the strongest first. Use for 'is the market
+    tight / tightening / loosening', 'what is the evidence', 'what argues against'."""
+    ctx.deps.emit("get_evidence", {"thesis": thesis})
+    return _keep(ctx, readings.evidence(ctx.deps.source, thesis), f"Not enough recent data for {thesis}.")
+
+
+@agent.tool
 def get_arbitrage(ctx: RunContext[Deps], route: Literal["us_crude_to_europe", "distillate_us_to_europe"]) -> Reading:
     """A price indicator for a transatlantic arbitrage, not an executable one. us_crude_to_europe: Brent minus
     WTI on futures of one delivery month and its percentile, a tanker freight proxy and its percentile, the
@@ -305,7 +320,9 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     used = [f.series_id for f in answer.facts] + [x for s in answer.spreads for x in (s.series_a, s.series_b)]
     used += [x for r in answer.readings for x in r.series_ids]
     stale = readings.stale_inputs(ctx.deps.source, used)
-    answer.caveats = [c for c in answer.caveats if not c.startswith("Not current as of ")] + ([stale] if stale else [])
+    kept = [c for c in answer.caveats if not c.startswith(("Not current as of ", "Against the balance of the evidence: "))]
+    # ... and the evidence that disagrees with the balance, so a one-sided answer is not possible.
+    answer.caveats = kept + [r.counter for r in answer.readings if r.counter] + ([stale] if stale else [])
     if not ctx.deps.enforce:
         return answer
     for f in answer.facts:

@@ -61,6 +61,7 @@ class Reading(BaseModel):
     note: str = ""
     context: str = Field("", description="Written by code: whether the level is unusual and when it was last seen.")
     hypothetical: bool = Field(False, description="True for a what-if scenario: its scenario_ values are not observations.")
+    counter: str = Field("", description="Written by code: the lines of evidence that point against the balance. Code adds it to the caveats.")
 
 
 class SeriesFact(BaseModel):

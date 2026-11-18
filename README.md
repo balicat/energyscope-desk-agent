@@ -39,6 +39,14 @@ cites it, and does not speculate.
 - **Direction words are checked too.** A curve called contango when it is in backwardation, or a rise described
   only with falling words, is rejected like a wrong number. The rule is narrow on purpose: it fires only when the
   prose uses the wrong word and never the right one.
+- **A research question gets a scorecard, not an opinion.** "Is the crude market tightening?" is answered from ten
+  lines fixed in code: the Brent and WTI curves (tight when M1 is more than 2% above M12), US and Cushing stocks
+  against the five-year average (3% and 10%), the four-week stock change against its usual for the time of year
+  (0.5% of stocks), spot against futures for WTI and Brent (1 dollar), refinery utilisation (above 92%, below 85%),
+  the 3-2-1 crack and fund positioning (percentile above 70, below 30). Each line states its number, date and
+  threshold; lines count equally; the balance needs a margin of three. The model writes the conclusion but cannot
+  pick the lines, and the ones that disagree are added to the caveats by code. It covers the futures curves and
+  US data, not the world balance.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -69,6 +77,7 @@ cites it, and does not speculate.
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
+| `get_evidence` | a scorecard for a thesis. `crude_tightness`: ten fixed lines, each scored tight, loose or neutral against a stated threshold, strongest first; the lines against the balance go into the caveats by code |
 | `get_watch` | flags for the week or month: unusual moves, stretched fund positioning, a curve that changed shape, stocks outside their five-year range, related prices that parted ways |
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
 | `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |
@@ -82,23 +91,23 @@ says so and uses a tanker ETF as a proxy), and no news.
 
 ## Evaluation
 
-Twenty-nine questions, six evaluators each (174 assertions): `Grounded` (recompute from source),
+Thirty questions, six evaluators each (180 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `DirectionRight` (the prose points the same way as the data: backwardation or contango, rose or fell), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
-arbitrage and a what-if on it, why spot and futures spreads disagree, the week's surprises and watch list, "when was it last this high", seasonal and
+arbitrage and a what-if on it, why spot and futures spreads disagree, the evidence for and against a tight crude market, the week's surprises and watch list, "when was it last this high", seasonal and
 percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
 a follow-up, a cross-unit "spread" that must not be computed, a prompt injection and two out-of-scope questions.
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **174/174**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **171/174** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **180/180**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **177/180** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **174/174** | the latest release run (29 cases, six evaluators). The runs before it scored 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
-right, and anything outside twenty-nine questions.
+right, and anything outside thirty questions.
 
 How the suite got here, including the failures:
 
@@ -155,7 +164,7 @@ events with one `tool` event as each tool starts.
 ## Files
 
 ```
-es_agent/agent.py     the agent: instructions, sixteen tools, the output validator
+es_agent/agent.py     the agent: instructions, seventeen tools, the output validator
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
 es_agent/readings.py  curve, crack, arbitrage, scenarios, surprises, watch, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
