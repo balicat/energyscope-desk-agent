@@ -858,35 +858,74 @@ def stale_inputs(source: DataSource, series_ids: list[str]) -> str:
 
 US_STOCKS, CUSHING_STOCKS, REFINERY_UTIL = "PET.WCESTUS1.W", "PET.W_EPC0_SAX_YCUOK_MBBL.W", "PET.WPULEUS3.W"
 THESES = ("crude_tightness",)
+BASE_RATE_YEARS = 8
+GROUPS = {"structure": "Time structure", "stocks": "US crude stocks", "refining": "Refining demand",
+          "sentiment": "Sentiment (shown, not counted)"}
 
 
-def _usual_change(source: DataSource, series_id: str, days: int = 28, years: int = 5):
-    """(date, latest, change over `days`, average change over the same days in each prior year)."""
-    hist = source.history(series_id, start=_since(366 * (years + 1) + 60))
-    if len(hist) < 60:
+def _week_index(hist: History) -> dict[tuple[int, int], int]:
+    return {(d.isocalendar()[0], d.isocalendar()[1]): i for i, (d, _) in enumerate(hist)}
+
+
+def _vs_5y(hist: History, idx: dict, i: int, years: int = 5) -> tuple[float, float] | None:
+    """Observation i against the average of the same report week in each of the previous years:
+    (difference in percent, difference in the series' own units)."""
+    d, v = hist[i]
+    y, w = d.isocalendar()[0], d.isocalendar()[1]
+    prior = [idx.get((y - k, w)) for k in range(1, years + 1)]
+    if any(q is None for q in prior):
         return None
+    avg = sum(hist[q][1] for q in prior) / years
+    return (v - avg) / avg * 100, v - avg
 
-    def at(target: dt.date) -> float | None:
-        near = min(hist, key=lambda o: abs((o[0] - target).days))
-        return near[1] if abs((near[0] - target).days) <= 5 else None
 
-    d1, v1 = hist[-1]
-    base = at(d1 - dt.timedelta(days=days))
-    prior = [(at(_same_date(d1, k)), at(_same_date(d1, k) - dt.timedelta(days=days))) for k in range(1, years + 1)]
-    if base is None or any(a is None or b is None for a, b in prior):
+def _gap_4w(hist: History, idx: dict, i: int, years: int = 5) -> tuple[float, float, float] | None:
+    """The change over four reports to observation i, the average change over the same four weeks in
+    the previous years, and the gap between them as a percentage of the level."""
+    d, v = hist[i]
+    y, w = d.isocalendar()[0], d.isocalendar()[1]
+    prior = [idx.get((y - k, w)) for k in range(1, years + 1)]
+    if i < 4 or any(q is None or q < 4 for q in prior):
         return None
-    return d1, v1, v1 - base, sum(a - b for a, b in prior) / years
+    chg = v - hist[i - 4][1]
+    usual = sum(hist[q][1] - hist[q - 4][1] for q in prior) / years
+    return chg, usual, (chg - usual) / v * 100
 
 
-def _scored(name: str, text: str, x: float, lo: float, hi: float, tight_when: str, date: dt.date,
-            ids: list[str], values: dict[str, float]) -> dict:
-    """One line of evidence. Outside the band lo..hi it reads tight or loose; `beyond` is how far
-    outside, in widths of the band, so lines can be ordered by strength."""
+def _rolling_rank(hist: History, i: int, window: int) -> float:
+    """Percentile of observation i among the `window` observations ending at it."""
+    return _rank([v for _, v in hist[max(0, i - window + 1):i + 1]], hist[i][1])
+
+
+def _verdict(x: float, lo: float, hi: float, tight_when: str) -> int:
     tight = x > hi if tight_when == "high" else x < lo
     loose = x < lo if tight_when == "high" else x > hi
+    return 1 if tight else -1 if loose else 0
+
+
+def _base_rate(hist: History, metric, lo: float, hi: float, tight_when: str, step: int = 1) -> tuple[dict[str, float], str]:
+    """How often this line has read tight and loose over the last eight years, by the same rule and
+    with only the data available on each date. A line that reads tight most of the time is weak
+    evidence when it reads tight today; printing its record lets the reader discount it."""
+    start = _since(366 * BASE_RATE_YEARS)
+    seen = [_verdict(x, lo, hi, tight_when) for i in range(0, len(hist), step)
+            if hist[i][0] >= start and (x := metric(i)) is not None]
+    if len(seen) < 52:
+        return {}, ""
+    tight, loose = round(seen.count(1) / len(seen) * 100, 1), round(seen.count(-1) / len(seen) * 100, 1)
+    first = next(d for d, _ in hist if d >= start)
+    return ({"tight_share_pct": tight, "loose_share_pct": loose},
+            f"; since {first} this line has read tight {tight:.0f}% of the time and loose {loose:.0f}%")
+
+
+def _scored(name: str, group: str, text: str, x: float, lo: float, hi: float, tight_when: str, date: dt.date,
+            ids: list[str], values: dict[str, float], base: tuple[dict[str, float], str] = ({}, "")) -> dict:
+    """One line of evidence. Outside the band lo..hi it reads tight or loose; `beyond` is how far
+    outside, in widths of the band, so lines can be ordered by strength."""
     beyond = ((x - hi) if x > hi else (lo - x) if x < lo else 0.0) / (hi - lo)
-    return {"name": name, "text": text, "verdict": 1 if tight else -1 if loose else 0, "beyond": beyond,
-            "date": date, "ids": ids, "values": values}
+    values = dict(values, **{f"{name}_{k}": v for k, v in base[0].items()})
+    return {"name": name, "group": group, "text": text + base[1] + ")", "verdict": _verdict(x, lo, hi, tight_when),
+            "beyond": beyond, "date": date, "ids": ids, "values": values}
 
 
 def _side(x: float, up: str = "above", down: str = "below") -> str:
@@ -894,13 +933,19 @@ def _side(x: float, up: str = "above", down: str = "below") -> str:
 
 
 def evidence(source: DataSource, thesis: str) -> Reading | None:
-    """Evidence for and against a thesis, one fixed line at a time.
+    """Evidence for and against a thesis, in groups.
 
-    crude_tightness: ten lines (two curves, stocks against the five-year average, the four-week stock
-    change against its usual, spot against futures, refinery runs, the crack spread, fund positioning).
-    Each is a level or a change against its own norm with a threshold fixed here; lines count equally.
-    The model writes the conclusion; it cannot choose the lines or leave out the ones that disagree,
-    because `counter` goes into the caveats by code.
+    crude_tightness: ten lines in four groups. Time structure (two curves, spot against futures for
+    WTI and Brent), US crude stocks (level against the five-year average, Cushing against its own
+    three years, the four-week change against its usual), refining demand (refinery runs against
+    the same week of earlier years, the crack spread), and fund positioning, which is sentiment and
+    is shown but not counted. The lines inside a group measure nearly the same thing, so the balance
+    counts groups: a group reads tight or loose only when more than half of its lines do.
+
+    Thresholds are fixed here and were set from eight years of weekly data so that a line is neutral
+    in roughly half of all weeks; each line with a history prints how often it has read tight and
+    loose, so a reader can discount one that usually fires. The model writes the conclusion; it
+    cannot choose the lines or leave out the ones that disagree: `counter` goes into the caveats.
     """
     if thesis != "crude_tightness":
         return None
@@ -912,30 +957,11 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
             slope = c.values[f"M1_minus_M{n}"]
             pct = round(slope / c.values["M1"] * 100, 2)
             lines.append(_scored(
-                f"{market}_curve", f"{label} futures curve: M1 is {abs(slope):.2f} {_side(slope)} M{n}, {abs(pct):.2f}% of M1 "
-                f"({c.period}; tight when M1 is more than 2% above, loose when more than 2% below)",
+                f"{market}_curve", "structure",
+                f"{label} futures curve: M1 is {abs(slope):.2f} {_side(slope)} M{n}, {abs(pct):.2f}% of M1 "
+                f"({c.period}; tight when M1 is more than 2% above, loose when more than 2% below; no record, the history starts in 2026",
                 pct, -2, 2, "high", c.period, c.series_ids,
                 {f"{market}_M1_minus_M{n}": slope, f"{market}_slope_pct": pct}))
-    for name, label, sid, band in (("us_stocks", "US commercial crude stocks", US_STOCKS, 3),
-                                   ("cushing_stocks", "Cushing crude stocks", CUSHING_STOCKS, 10)):
-        r = seasonal(source, sid, 5)
-        if r:
-            x = round(r.values["difference_pct"], 2)
-            lines.append(_scored(
-                f"{name}_vs_5y", f"{label}: {abs(x):.2f}% {_side(x)} the five-year average for the week, {r.note} "
-                f"({r.period}; tight below -{band}%, loose above {band}%)",
-                x, -band, band, "low", r.period, [sid], {f"{name}_vs_5y_pct": x}))
-    got = _usual_change(source, US_STOCKS)
-    if got:
-        d, level, chg, usual = got
-        chg, usual = round(chg, 3), round(usual, 3)
-        gap = round((chg - usual) / level * 100, 2)
-        lines.append(_scored(
-            "us_stocks_4w", f"US crude stocks over four weeks: a {_side(chg, 'build', 'draw')} of {abs(chg):,.0f} thousand barrels "
-            f"against a usual {_side(usual, 'build', 'draw')} of {abs(usual):,.0f} for the time of year, a gap of {abs(gap):.2f}% of stocks "
-            f"({d}; tight below -0.5%, loose above 0.5%)",
-            gap, -0.5, 0.5, "low", d, [US_STOCKS],
-            {"us_stocks_4w_change": chg, "us_stocks_4w_usual_change": usual, "us_stocks_4w_gap_pct": gap}))
     parts = futures_spread_parts(source)
     rows = aligned(source, [BRENT_SPOT, CRUDE, f"ICE.BRENT.{parts[0]}.D", f"NYMEX.WTI.{parts[0]}.D"], 60) if parts else []
     if rows and rows[-1][0] >= _since(30):
@@ -943,58 +969,124 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         for name, label, sid, fid, x in (("wti_spot", "WTI spot", CRUDE, f"NYMEX.WTI.{parts[0]}.D", round(ws - wf, 6)),
                                          ("brent_spot", "Brent spot", BRENT_SPOT, f"ICE.BRENT.{parts[0]}.D", round(bs - bf, 6))):
             lines.append(_scored(
-                f"{name}_premium", f"{label}: {abs(x):.2f} dollars {_side(x)} its {parts[0]} future "
-                f"({d}; tight when more than 1 dollar above, loose when more than 1 dollar below)",
+                f"{name}_premium", "structure",
+                f"{label}: {abs(x):.2f} dollars {_side(x)} its {parts[0]} future "
+                f"({d}; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026",
                 x, -1, 1, "high", d, [sid, fid], {f"{name}_minus_its_future": x}))
-    runs = source.history(REFINERY_UTIL, start=_since(60))
-    if runs and runs[-1][0] >= _since(30):
-        d, x = runs[-1]
+
+    long_ago = _since(366 * (BASE_RATE_YEARS + 7))
+    stocks = source.history(US_STOCKS, start=long_ago)
+    if len(stocks) > 60 and stocks[-1][0] >= _since(30):
+        idx, last = _week_index(stocks), len(stocks) - 1
+        got = _vs_5y(stocks, idx, last)
+        if got:
+            x = round(got[0], 2)
+            lines.append(_scored(
+                "us_stocks_vs_5y", "stocks",
+                f"US commercial crude stocks: {abs(x):.2f}% {_side(x)} the five-year average for the week "
+                f"({stocks[-1][0]}; tight below -5%, loose above 5%",
+                x, -5, 5, "low", stocks[-1][0], [US_STOCKS], {"us_stocks_vs_5y_pct": x},
+                _base_rate(stocks, lambda i: (g := _vs_5y(stocks, idx, i)) and g[0], -5, 5, "low")))
+        gap = _gap_4w(stocks, idx, last)
+        if gap:
+            chg, usual, g = round(gap[0], 3), round(gap[1], 3), round(gap[2], 2)
+            lines.append(_scored(
+                "us_stocks_4w", "stocks",
+                f"US crude stocks over four weeks: a {_side(chg, 'build', 'draw')} of {abs(chg):,.0f} thousand barrels "
+                f"against a usual {_side(usual, 'build', 'draw')} of {abs(usual):,.0f} for the time of year, a gap of {abs(g):.2f}% of stocks "
+                f"({stocks[-1][0]}; tight below -2%, loose above 2%",
+                g, -2, 2, "low", stocks[-1][0], [US_STOCKS],
+                {"us_stocks_4w_change": chg, "us_stocks_4w_usual_change": usual, "us_stocks_4w_gap_pct": g},
+                _base_rate(stocks, lambda i: (q := _gap_4w(stocks, idx, i)) and q[2], -2, 2, "low")))
+    cushing = source.history(CUSHING_STOCKS, start=long_ago)
+    if len(cushing) > 200 and cushing[-1][0] >= _since(30):
+        x = _rolling_rank(cushing, len(cushing) - 1, PERCENTILE_WEEKS)
         lines.append(_scored(
-            "refinery_utilisation", f"US refinery utilisation: {x:.1f}% of capacity ({d}; tight above 92%, loose below 85%)",
-            x, 85, 92, "high", d, [REFINERY_UTIL], {"refinery_utilisation_pct": x}))
+            "cushing_stocks", "stocks",
+            f"Cushing crude stocks: percentile {x:.1f} of their own last three years "
+            f"({cushing[-1][0]}; tight below 20, loose above 80",
+            x, 20, 80, "low", cushing[-1][0], [CUSHING_STOCKS], {"cushing_stocks_percentile": x},
+            _base_rate(cushing, lambda i: _rolling_rank(cushing, i, PERCENTILE_WEEKS) if i >= PERCENTILE_WEEKS else None, 20, 80, "low")))
+
+    runs = source.history(REFINERY_UTIL, start=long_ago)
+    if len(runs) > 60 and runs[-1][0] >= _since(30):
+        idx = _week_index(runs)
+        got = _vs_5y(runs, idx, len(runs) - 1)
+        if got:
+            x = round(got[1], 2)
+            lines.append(_scored(
+                "refinery_utilisation", "refining",
+                f"US refinery utilisation: {runs[-1][1]:.1f}% of capacity, {abs(x):.2f} points {_side(x)} the five-year average for the week "
+                f"({runs[-1][0]}; tight more than 3 points above, loose more than 3 points below",
+                x, -3, 3, "high", runs[-1][0], [REFINERY_UTIL],
+                {"refinery_utilisation_pct": runs[-1][1], "refinery_utilisation_vs_5y_points": x},
+                _base_rate(runs, lambda i: (g := _vs_5y(runs, idx, i)) and g[1], -3, 3, "high")))
     k = crack(source, "3-2-1")
     if k:
         x = k.values["crack_percentile"]
+        hist = crack_history(source, "3-2-1", 366 * (BASE_RATE_YEARS + 3))
         lines.append(_scored(
-            "crack", f"3-2-1 crack spread: {k.values['crack']:.2f} dollars per barrel, percentile {x:.1f} of three years "
-            f"({k.period}; tight above 70, loose below 30)",
-            x, 30, 70, "high", k.period, k.series_ids, {"crack_spread": k.values["crack"], "crack_spread_percentile": x}))
+            "crack", "refining",
+            f"3-2-1 crack spread: {k.values['crack']:.2f} dollars per barrel, percentile {x:.1f} of three years "
+            f"({k.period}; tight above 70, loose below 30",
+            x, 30, 70, "high", k.period, k.series_ids, {"crack_spread": k.values["crack"], "crack_spread_percentile": x},
+            _base_rate(hist, lambda i: _rolling_rank(hist, i, 750) if i >= 750 else None, 30, 70, "high", step=5)))
     p = positioning(source, "wti")
     if p:
         x = p.values["net_percentile"]
+        net = source.history(p.series_ids[0], start=long_ago)
         lines.append(_scored(
-            "fund_positioning", f"Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at "
-            f"percentile {x:.1f} of three years ({p.period}; tight above 70, loose below 30)",
-            x, 30, 70, "high", p.period, p.series_ids[:1], {"fund_net_percentile": x}))
+            "fund_positioning", "sentiment",
+            f"Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at "
+            f"percentile {x:.1f} of three years ({p.period}; tight above 70, loose below 30",
+            x, 30, 70, "high", p.period, p.series_ids[:1], {"fund_net_percentile": x},
+            _base_rate(net, lambda i: _rolling_rank(net, i, PERCENTILE_WEEKS) if i >= PERCENTILE_WEEKS else None, 30, 70, "high")))
     if len(lines) < 5:
         return None
-    tight = sorted((ln for ln in lines if ln["verdict"] > 0), key=lambda ln: -ln["beyond"])
-    loose = sorted((ln for ln in lines if ln["verdict"] < 0), key=lambda ln: -ln["beyond"])
-    neutral = [ln for ln in lines if ln["verdict"] == 0]
-    n, diff = len(lines), len(tight) - len(loose)
-    balance = "points to a tight market" if diff >= 3 else "points to a loose market" if diff <= -3 else "is mixed"
-    values: dict[str, float] = {"lines": n, "tight": len(tight), "loose": len(loose), "neutral": len(neutral)}
+
+    word = {1: "tight", -1: "loose", 0: "neutral"}
+    groups: dict[str, int] = {}
+    for g in GROUPS:
+        mine = [ln["verdict"] for ln in lines if ln["group"] == g]
+        if mine:  # a group reads tight or loose only when more than half of its lines do
+            groups[g] = 1 if mine.count(1) * 2 > len(mine) else -1 if mine.count(-1) * 2 > len(mine) else 0
+    counted = [v for g, v in groups.items() if g != "sentiment"]
+    diff = sum(counted)
+    need = 2 if len(counted) >= 3 else len(counted)
+    balance = "points to a tight market" if diff >= need else "points to a loose market" if diff <= -need else "is mixed"
+    values: dict[str, float] = {"groups_counted": len(counted), "groups_tight": counted.count(1), "groups_loose": counted.count(-1),
+                                "groups_neutral": counted.count(0), "lines": len(lines)}
+    for g, v in groups.items():
+        values[f"{g}_group_verdict"] = v
     for ln in lines:
         values.update(ln["values"])
         values[f"{ln['name']}_verdict"] = ln["verdict"]
 
     def listing(group: list[dict]) -> str:
-        return "; ".join(ln["text"] for ln in group)
+        return "; ".join(f"{ln['text']} [{word[ln['verdict']]}]" for ln in sorted(group, key=lambda ln: -ln["beyond"]))
 
-    context = " ".join(s for s in (
-        f"Tight ({len(tight)} of {n} lines, the one furthest beyond its threshold first): {listing(tight)}." if tight else "",
-        f"Loose ({len(loose)} of {n}): {listing(loose)}." if loose else "",
-        f"Neutral ({len(neutral)} of {n}): {listing(neutral)}." if neutral else "") if s)
-    minority = loose if diff >= 3 else tight if diff <= -3 else []
+    context = " ".join(
+        f"{GROUPS[g]}, {word[v]} ({sum(ln['verdict'] == v for ln in lines if ln['group'] == g)} of "
+        f"{sum(ln['group'] == g for ln in lines)} lines): {listing([ln for ln in lines if ln['group'] == g])}."
+        for g, v in groups.items())
+    side = 1 if diff >= need else -1 if diff <= -need else 0
+    minority = [ln for ln in lines if side and ln["verdict"] == -side]
+    plain = {"structure": "time structure", "stocks": "US crude stocks", "refining": "refining demand"}
+    said = ", ".join(f"{plain[g]} {word[v]}" for g, v in groups.items() if g != "sentiment")
     return Reading(
-        key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against",
+        key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against, in groups",
         period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels (stated on each line)",
         series_ids=list(dict.fromkeys(i for ln in lines for i in ln["ids"])), values=values,
-        note=(f"The evidence {balance}: {len(tight)} of {n} lines read tight, {len(loose)} loose, {len(neutral)} neutral. "
-              "Each line is a level or a change against its own norm, with a fixed threshold stated beside it; lines count "
-              "equally. It covers the futures curves and US data, not the world balance, and it is not a forecast."),
+        note=(f"The evidence {balance}: of {len(counted)} groups of physical evidence, {counted.count(1)} read tight, "
+              f"{counted.count(-1)} loose and {counted.count(0)} neutral ({said}). The lines inside a group measure nearly "
+              "the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its "
+              "lines do. Fund positioning "
+              f"is sentiment: it reads {word[groups.get('sentiment', 0)]} and is shown but not counted. Each line states its "
+              "threshold and, where eight years of history exist, how often it has read tight and loose, so a line that "
+              "usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it "
+              "is not a forecast."),
         context=context,
-        counter=f"Against the balance of the evidence: {listing(minority)}." if minority else "")
+        counter=("Against the balance of the evidence: " + "; ".join(ln["text"] for ln in minority) + ".") if minority else "")
 
 
 def compute(source: DataSource, key: str) -> Reading | None:

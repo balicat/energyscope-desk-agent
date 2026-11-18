@@ -68,7 +68,7 @@ def unit_key(units: str) -> str:
 
 def _kind(key: str) -> str:
     parts = key.lower().split("_")
-    if key in ("lines", "tight", "loose", "neutral") or "observations" in parts or any(p in ("days", "weeks", "years") for p in parts):
+    if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years") for p in parts):
         return "count"
     if "percentile" in parts or key.endswith("_pct") or "percentile" in key:
         return "percent"
@@ -374,6 +374,9 @@ def direction_problems(answer: DeskAnswer) -> list[str]:
                     if (word in _LEVEL_UP) != expect_above:
                         problems.append(f"'{tok}' with '{word}' points the wrong way; the data has it the other way round")
             ranks = [v for v in pool.percentiles if _rounds_to(v, n, dp)]
+            others = [t for k, t in toks if k == "num" and t != tok and any(_rounds_to(v, *_parse(t)) for v in pool.percentiles)]
+            if others:
+                ranks = []  # two percentiles in one sentence: "low" may belong to the other one
             if ranks and all(v >= 75 for v in ranks) and sentence_words & _LOW and not sentence_words & _HIGH:
                 problems.append(f"percentile {tok} is called low; it is high")
             if ranks and all(v <= 25 for v in ranks) and sentence_words & _HIGH and not sentence_words & _LOW:

@@ -54,9 +54,11 @@ How to work
 - When a context sets two measures side by side (the spot spread against the futures spread), they are both
   true and measure different things. If they point different ways, say so: give both numbers with their dates
   and where the context says the difference comes from. Do not pick one silently.
-- An evidence reading is a scorecard. Lead with its balance and the count (how many lines read tight, loose,
-  neutral), then the two or three strongest lines on each side with their numbers. Always say what points the
-  other way. Do not add evidence of your own, and do not call it a forecast. You may use up to five sentences.
+- An evidence reading is a scorecard in groups. Lead with its balance and how the groups read (time structure,
+  US crude stocks, refining demand), then the strongest line of each group with its number, using the word in
+  square brackets after each line (tight, loose, neutral) and no other. Always say what points the other way,
+  and that fund positioning is sentiment and is not counted. Do not add evidence of your own, and do not call
+  it a forecast. You may use up to five sentences.
 - A reading marked hypothetical is a what-if. Open with the condition ("If Brent rose 5 dollars ...") and keep
   what would happen apart from what is observed. Never state a scenario_ number as a fact about the market.
 - Otherwise take the series ID from the benchmark list below, or find it with search_series when it is not
@@ -311,11 +313,13 @@ def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline",
 
 @agent.tool
 def get_evidence(ctx: RunContext[Deps], thesis: Literal["crude_tightness"]) -> Reading:
-    """The evidence for and against a thesis, as a fixed scorecard. crude_tightness: ten lines (Brent and WTI
-    curves, US and Cushing stocks against the five-year average, the four-week stock change against its usual,
-    spot against futures for WTI and Brent, refinery utilisation, the 3-2-1 crack, fund positioning), each
-    scored tight, loose or neutral against a stated threshold, the strongest first. Use for 'is the market
-    tight / tightening / loosening', 'what is the evidence', 'what argues against'."""
+    """The evidence for and against a thesis, as a fixed scorecard. crude_tightness: ten lines in four groups
+    (time structure: Brent and WTI curves, spot against futures; US crude stocks: level against the five-year
+    average, Cushing against its own three years, the four-week change against its usual; refining demand:
+    refinery runs against the same week of earlier years, the 3-2-1 crack; and fund positioning, shown but
+    not counted). Each line is scored tight, loose or neutral against a stated threshold and says how often
+    it has read each way in eight years; the balance counts groups. Use for 'is the market tight / tightening
+    / loosening', 'what is the evidence', 'what argues against'."""
     ctx.deps.emit("get_evidence", {"thesis": thesis})
     return _keep(ctx, readings.evidence(ctx.deps.source, thesis), f"Not enough recent data for {thesis}.")
 

@@ -40,22 +40,21 @@ cites it, and does not speculate.
   only with falling words, is rejected like a wrong number. The rule is narrow on purpose: it fires only when the
   prose uses the wrong word and never the right one.
 - **A research question gets a scorecard, not an opinion.** "Is the crude market tightening?" is answered from ten
-  lines fixed in code: the Brent and WTI curves (tight when M1 is more than 2% above M12), US and Cushing stocks
-  against the five-year average (3% and 10%), the four-week stock change against its usual for the time of year
-  (0.5% of stocks), spot against futures for WTI and Brent (1 dollar), refinery utilisation (above 92%, below 85%),
-  the 3-2-1 crack and fund positioning (percentile above 70, below 30). Each line states its number, date and
-  threshold; lines count equally; the balance needs a margin of three. The model writes the conclusion but cannot
-  pick the lines, and the ones that disagree are added to the caveats by code. It covers the futures curves and
-  US data, not the world balance.
-- **"Compare like with like" is enforced by the tool.** A reviewer asked how Dubai compares with Brent. The model
-  subtracted the Dubai front month (a contract on the current month's average price) from Brent M1 (one delivery
-  month, two months out), and the page charted a line that stepped at every month end. The arithmetic was right,
-  so the answer got its tick. The docstring said to compare like with like; the model ignored it. `get_spread`
-  now refuses that pairing, the check fails any answer that contains one, and code adds a caveat whenever an
-  average-price contract is quoted. A spread of one kind now comes with its percentile and history; a future
-  against a spot price carries a note.
-- **Prose and tables show the same number.** Code rounds any number in the summary with three or more decimals to
-  two, so the sentence cannot say 92.186 where the table says 92.19.
+  lines fixed in code, in four groups: time structure (Brent and WTI curves, spot against futures for each), US
+  crude stocks (level against the five-year average for the week, Cushing against its own three years, the
+  four-week change against its usual), refining demand (refinery runs against the same week of earlier years,
+  the 3-2-1 crack) and fund positioning. The model writes the conclusion but cannot pick the lines, and the ones
+  that disagree are added to the caveats by code.
+  The first version counted the ten lines equally. The reviewer ran it over 417 weeks and showed why that was
+  wrong: Cushing read "tight" in 300 of them (every week of three whole years), the four-week line changed its
+  vote in 30% of consecutive weeks, refinery runs read "tight" every summer, and four of the ten lines were all
+  measuring backwardation. So the balance now counts three groups of physical evidence, a group reading tight or
+  loose only when more than half its lines do; positioning is sentiment and is shown but not counted; the bands
+  were set from the eight-year distribution so a line is neutral about half the time; refinery runs are compared
+  with the same week of earlier years; and every line with a history prints its own record ("since 2018-11-16
+  this line has read tight 24% of the time and loose 22%") so a reader can discount one that usually fires.
+  It covers the futures curves and US data, not the world balance. Whether a high crack spread is evidence of
+  crude tightness at all is an open question for the analyst, not a threshold.
 - **The sentences are checked, not only the tables.** An adversarial review (a second Claude session, given the
   job of breaking the service) built eleven answers whose tables were true and whose prose was wrong. All eleven
   passed and would have been shown under the tick: the checks covered numbers in the summary and nothing else.
@@ -118,7 +117,7 @@ cites it, and does not speculate.
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
-| `get_evidence` | a scorecard for a thesis. `crude_tightness`: ten fixed lines, each scored tight, loose or neutral against a stated threshold, strongest first; the lines against the balance go into the caveats by code |
+| `get_evidence` | a scorecard for a thesis. `crude_tightness`: ten fixed lines in four groups, each scored tight, loose or neutral against a stated threshold and printed with how often it has read each way in eight years; the balance counts groups; the lines against it go into the caveats by code |
 | `get_watch` | flags for the week or month: unusual moves, stretched fund positioning, a curve that changed shape, stocks outside their five-year range, related prices that parted ways |
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
 | `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |

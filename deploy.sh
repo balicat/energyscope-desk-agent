@@ -56,7 +56,16 @@ systemctl --user daemon-reload
 systemctl --user restart librarian
 for _ in 1 2 3 4 5 6 7 8 9 10; do   # the service reads the catalogue of 357,000 series before it listens
   sleep 2
-  curl -fsS "http://10.100.0.2:8790/health" && echo && echo "released $SHA" && exit 0
+  if curl -fsS "http://10.100.0.2:8790/health"; then
+    echo; echo "released $SHA"
+    # The service answering on the lab server is not the visitor's view. Ask through the public address too:
+    # on 18 Nov 2026 the page's own server looped for half an hour while this script reported success.
+    PUBLIC=${PUBLIC_URL:-https://thelibrarian.energy}
+    if curl -fsS -m 20 -o /dev/null "$PUBLIC/" && curl -fsS -m 20 "$PUBLIC/api/stats" > /dev/null; then
+      echo "public site answers: $PUBLIC"; exit 0
+    fi
+    echo "RELEASED, BUT THE PUBLIC SITE DOES NOT ANSWER: $PUBLIC" >&2; exit 1
+  fi
 done
 echo "service did not come up" >&2
 exit 1
