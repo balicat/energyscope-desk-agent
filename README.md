@@ -56,6 +56,21 @@ cites it, and does not speculate.
   against a spot price carries a note.
 - **Prose and tables show the same number.** Code rounds any number in the summary with three or more decimals to
   two, so the sentence cannot say 92.186 where the table says 92.19.
+- **The sentences are checked, not only the tables.** An adversarial review (a second Claude session, given the
+  job of breaking the service) built eleven answers whose tables were true and whose prose was wrong. All eleven
+  passed and would have been shown under the tick. The checks covered numbers in the summary and nothing else.
+  `es_agent/prose.py` now applies one set of rules to the summary and to every caveat the model writes:
+  a number must be a valid rounding of a returned value of the right kind (a percentage cannot be quoted as
+  dollars, a count of days cannot be quoted as a price move, `2,000` is not a year); a date must be one a tool
+  returned, written as YYYY-MM-DD (month names and quarters are rejected, because a date in words cannot be
+  traced); a direction word beside a number must agree with its sign (`fell 1.20`, `0.62 above WTI`), read in the
+  same clause, so a right word elsewhere in the sentence is no excuse. A caveat that fails is removed by code.
+  `prose_controls.py` plants 19 such errors and must reject every one; it runs in CI and in the release gate.
+- **What the tick does not prove.** Two true values attached to the wrong nouns (Brent's price given as WTI's) and
+  claims made in words alone ("a record high") still pass; both are kept in `prose_controls.py` as known limits.
+  A short number such as "2" matches any returned value from 1.5 to 2.5, so the chance of an accidental match
+  grows with the number of values an answer cites. The page says what was checked: the sources were recomputed,
+  and every number and date in the text matches one of them.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -67,7 +82,8 @@ cites it, and does not speculate.
 - **Budgets live in the tools, not the prompt.** `search_series` stops after four calls in a run and says so.
   An instruction to "stop after two failed searches" did not hold: one model searched 18 times on a question
   it should decline ($0.21 for one answer). The service also caps model requests per question, questions per
-  address per hour, questions per day and dollars per day.
+  address per hour and per day, questions per day and dollars per day, and alerts its owner when half, then
+  nine tenths, of the day's budget is spent.
 - **Memory holds conclusions, not tool output.** A follow-up question is given the earlier questions and the
   sentences that answered them. Any number it quotes must be fetched again in the current run, so a stale
   number cannot come through with a clean trace.
@@ -81,7 +97,7 @@ cites it, and does not speculate.
 |---|---|
 | `search_series` | series by keyword, optionally within one dataset; four calls a run. The common benchmarks are listed in the instructions and need no search |
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
-| `get_spread` | one series minus another on the latest shared date, with its percentile and history over three years; refuses if units differ, or if one side is a contract on a month's average price and the other is not |
+| `get_spread` | one series minus another on the latest shared date, with its percentile and history over three years; refuses if units differ, if the two are published at different frequencies, or if one side is a contract on a month's average price and the other is not |
 | `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
@@ -101,7 +117,7 @@ says so and uses a tanker ETF as a proxy), and no news.
 ## Evaluation
 
 Thirty-one questions, six evaluators each (186 assertions): `Grounded` (recompute from source),
-`SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
+`SummaryTraceable` (no number or date, in the summary or a caveat, that traces to nothing), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `DirectionRight` (the prose points the same way as the data: backwardation or contango, rose or fell), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, why spot and futures spreads disagree, the evidence for and against a tight crude market, the week's surprises and watch list, "when was it last this high", seasonal and
 percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
@@ -179,6 +195,7 @@ es_agent/agent.py     the agent: instructions, seventeen tools, the output valid
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
 es_agent/readings.py  curve, crack, arbitrage, scenarios, evidence, surprises, watch, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
+es_agent/prose.py     what the sentences may say: numbers, dates and direction words traced to tool results
 es_agent/verify.py    recompute an answer from the data (the Grounded eval and the live check)
 es_agent/charts.py    the series behind an answer, for the page to draw
 es_agent/memory.py    what a follow-up is allowed to remember

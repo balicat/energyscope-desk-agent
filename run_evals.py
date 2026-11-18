@@ -128,14 +128,14 @@ class Grounded(Evaluator[str, DeskAnswer]):
     """Every fact, spread and reading equals a fresh recomputation from the source."""
 
     def evaluate(self, ctx: EvaluatorContext[str, DeskAnswer]) -> EvaluationReason:
-        problems = [p for p in verify(ctx.output, SOURCE) if not p.startswith("summary numbers")]
+        problems = [p for p in verify(ctx.output, SOURCE) if not p.startswith(("summary numbers", "direction:"))]
         n = len(ctx.output.facts) + len(ctx.output.spreads) + len(ctx.output.readings)
         return EvaluationReason(not problems, "; ".join(problems) if problems else f"{n} items match the source")
 
 
 @dataclass
 class SummaryTraceable(Evaluator[str, DeskAnswer]):
-    """No number in the prose that is not in the facts, spreads or readings."""
+    """No number or date, in the summary or in a caveat the model wrote, that is not in the facts, spreads or readings."""
 
     def evaluate(self, ctx):
         bad = metrics.untraceable_numbers(ctx.output)

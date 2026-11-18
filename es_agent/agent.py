@@ -14,7 +14,7 @@ from typing import Callable, Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from . import metrics, readings
+from . import metrics, prose, readings
 from .models import Change, DeskAnswer, Observation, Reading, SeriesHit, Spread
 from . import clock
 from .sources import DATASETS, DataSource
@@ -76,6 +76,8 @@ How to answer
   thousands separators such as 414,417) but never change units.
 - Say which way things moved in plain words (rose, fell, backwardation, contango) and get the direction from
   the sign of the number, never from memory.
+- Write every date as YYYY-MM-DD and take it from a tool result; never write a month name, a weekday or a
+  quarter. Caveats follow the same rules as the summary: no number or date that a tool did not return.
 - Report what the data shows. Do not predict, and do not explain causes the data cannot show. When a question
   needs data you lack (route freight rates, physical differentials, news), say which in caveats.
 - Earlier turns of the conversation, when given, are context only: any number you quote must come from a tool
@@ -177,7 +179,8 @@ def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
     if metrics.unit_key(a.units) != metrics.unit_key(b.units):
         raise ModelRetry(f"Units differ ({a.units!r} vs {b.units!r}): no spread. Report the two values separately.")
     why, usable = readings.pairing_note(series_a, series_b)
-    if not usable:
+    why = why if not usable else readings.frequency_note(ctx.deps.source, series_a, series_b)
+    if why:
         raise ModelRetry(why + " Report the two values separately with get_latest and say why they are not subtracted.")
     start = clock.today() - dt.timedelta(days=400)
     sp = metrics.spread_of(a, ctx.deps.source.history(series_a, start=start), b, ctx.deps.source.history(series_b, start=start))
@@ -351,8 +354,9 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         and metrics.close(s.spread, src.spread) else s
         for s in answer.spreads
     ]
-    kept = [c for c in answer.caveats
-            if not c.startswith(("Not current as of ", "Against the balance of the evidence: ", "Not like for like: ", "Average-price contract: "))]
+    # The model's caveats are held to the same tracing as the summary: one that states a number or a
+    # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
+    kept = prose.clean_caveats(answer)
     # ... and the evidence that disagrees with the balance, so a one-sided answer is not possible.
     average = [f"Average-price contract: {i} settles on the average price of its month. It is not a spot price or a "
                "single delivery month, so it is not subtracted from one." for i in dict.fromkeys(used) if i in readings.AVERAGE_PRICE]

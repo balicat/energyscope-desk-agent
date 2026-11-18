@@ -22,6 +22,7 @@ import os
 import statistics
 import threading
 import time
+import urllib.request
 from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -47,7 +48,10 @@ TRUST_PROXY = os.environ.get("LIBRARIAN_TRUST_PROXY", "0") == "1"  # read X-Forw
 
 MAX_CHARS = 300
 PER_ADDRESS_PER_HOUR = int(os.environ.get("LIBRARIAN_PER_HOUR", "6"))
+PER_ADDRESS_PER_DAY = int(os.environ.get("LIBRARIAN_PER_ADDRESS_PER_DAY", "20"))  # one address cannot spend the day
 PER_DAY = int(os.environ.get("LIBRARIAN_PER_DAY", "200"))
+NTFY = os.environ.get("LIBRARIAN_NTFY", "")  # where to say that half, then nine tenths, of the day is spent
+ALERT_AT = (50, 90)
 USD_PER_DAY = float(os.environ.get("LIBRARIAN_USD_PER_DAY", "2"))
 MODEL_REQUESTS_PER_QUESTION = 8
 
@@ -55,6 +59,8 @@ _run_lock = threading.Lock()  # one question at a time: the lake reads and the s
 _state_lock = threading.Lock()
 _by_address: dict[str, deque[float]] = defaultdict(deque)
 _day = {"date": dt.date.today(), "count": 0, "usd": 0.0}
+_by_address_day: dict[str, int] = defaultdict(int)
+_alerted: set[int] = set()
 _checks = {"answers": 0, "failed": 0, "since": dt.date.today().isoformat()}
 _seconds: deque[float] = deque(maxlen=200)
 _sessions = Sessions()
@@ -72,6 +78,7 @@ def _load_counts() -> None:
     today = [r for r in rows if str(r.get("at", ""))[:10] == dt.date.today().isoformat() and r.get("status") != 429]
     _day.update(date=dt.date.today(), count=len(today),
                 usd=sum(float(r["answer"].get("usd") or 0) for r in today if isinstance(r.get("answer"), dict)))
+    _alerted.update(m for m in ALERT_AT if _spent_pct() >= m)  # a restart does not repeat an alert already sent
     answered = [r for r in rows if r.get("status") == 200 and isinstance(r.get("answer"), dict) and "checked" in r["answer"]]
     if answered:
         _checks.update(answers=len(answered), failed=sum(not r["answer"]["checked"] for r in answered), since=answered[0]["at"][:10])
@@ -83,9 +90,31 @@ class Refused(Exception):
         self.status, self.message = status, message
 
 
+def _spent_pct() -> float:
+    return max(_day["count"] / PER_DAY, _day["usd"] / USD_PER_DAY) * 100
+
+
 def _roll_day() -> None:
     if _day["date"] != dt.date.today():
         _day.update(date=dt.date.today(), count=0, usd=0.0)
+        _by_address_day.clear()
+        _alerted.clear()
+
+
+def _alert_if_due() -> None:
+    """Tell the owner when the day's budget is half gone and again at nine tenths, once each."""
+    for mark in ALERT_AT:
+        if _spent_pct() >= mark and mark not in _alerted:
+            _alerted.add(mark)
+            text = (f"The Librarian: {mark}% of today's budget used "
+                    f"({_day['count']} of {PER_DAY} questions, ${_day['usd']:.2f} of ${USD_PER_DAY:.2f}).")
+            if NTFY:
+                def send(body: str = text) -> None:
+                    try:
+                        urllib.request.urlopen(urllib.request.Request(NTFY, data=body.encode(), headers={"Title": "The Librarian"}), timeout=10)
+                    except OSError:
+                        pass
+                threading.Thread(target=send, daemon=True).start()
 
 
 def _admit(address: str) -> None:
@@ -100,8 +129,12 @@ def _admit(address: str) -> None:
             q.popleft()
         if len(q) >= PER_ADDRESS_PER_HOUR:
             raise Refused(429, f"Limit of {PER_ADDRESS_PER_HOUR} questions an hour reached. Try again later.")
+        if _by_address_day[address] >= PER_ADDRESS_PER_DAY:
+            raise Refused(429, f"Limit of {PER_ADDRESS_PER_DAY} questions a day from one address reached. Come back tomorrow.")
         q.append(now)
+        _by_address_day[address] += 1
         _day["count"] += 1
+        _alert_if_due()
 
 
 def _model_for(question: str):
@@ -147,6 +180,7 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
     with _state_lock:
         _roll_day()
         _day["usd"] += usd
+        _alert_if_due()
         _checks["answers"] += 1
         _checks["failed"] += bool(problems)
         _seconds.append(seconds)
@@ -200,7 +234,8 @@ class Handler(BaseHTTPRequestHandler):
                 _roll_day()
                 self._send(200, {"ok": True, "model": MODEL, "source": SOURCE_KIND, "today": _day["count"],
                                  "usd_today": round(_day["usd"], 4), "usd_per_day": USD_PER_DAY, "per_day": PER_DAY,
-                                 "per_address_per_hour": PER_ADDRESS_PER_HOUR, "checked_since_start": dict(_checks)})
+                                 "per_address_per_hour": PER_ADDRESS_PER_HOUR, "per_address_per_day": PER_ADDRESS_PER_DAY,
+                                 "checked_since_start": dict(_checks)})
         elif self.path == "/stats":
             with _state_lock:
                 self._send(200, {"answers": _checks["answers"], "failed_check": _checks["failed"], "since": _checks["since"],

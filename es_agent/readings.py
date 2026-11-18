@@ -99,6 +99,16 @@ def pairing_note(a: str, b: str) -> tuple[str, bool]:
     return "", True
 
 
+def frequency_note(source: DataSource, a: str, b: str) -> str:
+    """A refusal when the two series are published at different rhythms: a daily price minus a monthly
+    average is not a spread, and the only dates they share are the firsts of months."""
+    freq = [(hit.frequency if (hit := source.meta(s)) else "") or s.rsplit(".", 1)[-1] for s in (a, b)]
+    if freq[0] == freq[1]:
+        return ""
+    return (f"Not like for like: {a} is published at frequency {freq[0]} and {b} at {freq[1]}, so one is a single "
+            "observation and the other an average over a longer period. No spread is given.")
+
+
 def spread_context(source: DataSource, a: str, b: str, period: dt.date) -> tuple[dict[str, float], str, str]:
     """(extras, context, note) for series a minus series b: its percentile and spell over three years
     when the pairing has a usable history, and a note when the two are not like for like."""

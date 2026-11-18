@@ -41,8 +41,8 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
         if not truth or s.period != truth.period or not metrics.close(s.spread, truth.spread):
             problems.append(f"spread {s.series_a} minus {s.series_b} differs from source")
             continue
-        if not readings.pairing_note(s.series_a, s.series_b)[1]:
-            problems.append(f"spread {s.series_a} minus {s.series_b} subtracts a monthly-average contract from a different kind of price")
+        if not readings.pairing_note(s.series_a, s.series_b)[1] or readings.frequency_note(source, s.series_a, s.series_b):
+            problems.append(f"spread {s.series_a} minus {s.series_b} subtracts two prices of different kinds")
             continue
         extras, context, note = readings.spread_context(source, s.series_a, s.series_b, s.period)
         if s.context != context or s.note != note or set(s.extras) != set(extras) or not all(
@@ -58,4 +58,5 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
     bad = metrics.untraceable_numbers(answer)
     if bad:
         problems.append(f"summary numbers {bad} trace to nothing")
+    problems += [f"direction: {p}" for p in metrics.direction_problems(answer)]
     return problems

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Release gate for the public service. A change to the code, the prompt or the model reaches
 # visitors only if the candidate passes, in order:
-#   1. the suite on frozen data, answers equal to the golden file      (free)
+#   1. the suite on frozen data, answers equal to the golden file;
+#      and the prose control: sentences that are wrong over true tables must be rejected  (free)
 #   2. the control run: validator off, exactly three assertions fail   (free)
 #   3. the suite on today's lake with the scripted model               (free)
 #   4. the suite on today's lake with the live model                   (a few cents; LIVE=0 skips it)
@@ -27,6 +28,7 @@ cd "$CAND"
 echo "candidate $SHA, model $MODEL"
 
 echo "1/4 frozen data + golden answers";      $PY run_evals.py --source fixture --gate --golden check | tail -2
+LIBRARIAN_TODAY=$($PY -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") $PY prose_controls.py | tail -1
 echo "2/4 control run";                       $PY run_evals.py --source fixture --no-guard --expect-failures 3 | tail -1
 echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | tail -1
 if [ "${LIVE:-1}" = "1" ]; then
