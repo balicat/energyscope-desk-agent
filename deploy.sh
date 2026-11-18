@@ -39,5 +39,9 @@ git reset -q --hard "$SHA"
 sed -i "s#^Environment=LIBRARIAN_MODEL=.*#Environment=LIBRARIAN_MODEL=$MODEL#" "$UNIT"
 systemctl --user daemon-reload
 systemctl --user restart librarian
-sleep 6
-curl -fsS "http://10.100.0.2:8790/health" && echo && echo "released $SHA"
+for _ in 1 2 3 4 5 6 7 8 9 10; do   # the service reads the catalogue of 357,000 series before it listens
+  sleep 2
+  curl -fsS "http://10.100.0.2:8790/health" && echo && echo "released $SHA" && exit 0
+done
+echo "service did not come up" >&2
+exit 1
