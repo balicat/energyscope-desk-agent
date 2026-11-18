@@ -235,9 +235,19 @@ The Parquet lake (`--lake /opt/energyscope/data`) lives on my server and is not 
 makes the same calls over Arrow Flight with the public `energyscope-client` package and an EnergyScope API key
 ([sign up](https://energyscope.io/signup)).
 
-The service is also the interface for other programs: `POST https://thelibrarian.energy/api/ask` with
-`{"question": "..."}` returns the typed answer as JSON; `/api/ask/stream` returns the same as server-sent
-events with one `tool` event as each tool starts.
+## From another program
+
+The service is also the interface for other programs. `https://thelibrarian.energy/llms.txt` describes it.
+
+- `POST https://thelibrarian.energy/api/ask` with `{"question": "..."}` returns the typed answer as JSON;
+  `/api/ask/stream` returns the same as server-sent events with one `tool` event as each tool starts.
+- `librarian_mcp.py` is an MCP server for it (`pip install mcp`, then `python librarian_mcp.py`): two tools, `ask`
+  and `feedback`. It is a thin client of the public API, so an MCP client gets exactly what the page shows, with
+  the same checks and limits, and nothing is computed or reworded on the way.
+- Every answer carries an `id`. `POST /api/feedback` with `{"id", "verdict": "useful" | "wrong", "note"}` records a
+  reader's verdict beside that answer's logged trace; the page has the two buttons under each answer. Feedback is
+  accepted only for an id the service issued. The id is not a public link to the answer: there will be none until
+  the caveats are worded by code, because a link would let a visitor publish a sentence under the check mark.
 
 ## Files
 
@@ -250,6 +260,9 @@ es_agent/prose.py     what the sentences may say: numbers, dates and direction w
 es_agent/verify.py    recompute an answer from the data (the Grounded eval and the live check)
 es_agent/charts.py    the series behind an answer, for the page to draw
 es_agent/memory.py    what a follow-up is allowed to remember
+librarian_mcp.py      an MCP server over the public API
+prose_controls.py     wrong sentences over true tables: the control for the prose checks
+ops/watch_public.sh   is the public address answering? run every two minutes
 es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder
 es_agent/scripted.py  offline stand-in for the model (Pydantic AI FunctionModel)
 es_agent/clock.py     today's date, pinnable for the frozen data

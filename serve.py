@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import secrets
 import statistics
 import threading
 import time
@@ -60,6 +61,10 @@ MODEL_REQUESTS_PER_QUESTION = 8
 _run_lock = threading.Lock()  # one question at a time: the lake reads and the spend stay predictable
 _state_lock = threading.Lock()
 _by_address: dict[str, deque[float]] = defaultdict(deque)
+FEEDBACK_LOG = os.environ.get("LIBRARIAN_FEEDBACK_LOG", os.path.join(os.path.dirname(LOG) or ".", "feedback.jsonl"))
+FEEDBACK_PER_HOUR = 20
+_issued: deque[str] = deque(maxlen=5000)  # ids of answers given; feedback is accepted only against one of these
+_feedback_by_address: dict[str, deque[float]] = defaultdict(deque)
 _day = {"date": dt.date.today(), "count": 0, "usd": 0.0}
 _by_address_day: dict[str, int] = defaultdict(int)
 _alerted: set[int] = set()
@@ -81,6 +86,7 @@ def _load_counts() -> None:
     _day.update(date=dt.date.today(), count=len(today),
                 usd=sum(float(r["answer"].get("usd") or 0) for r in today if isinstance(r.get("answer"), dict)))
     _alerted.update(m for m in ALERT_AT if _spent_pct() >= m)  # a restart does not repeat an alert already sent
+    _issued.extend(r["answer"]["id"] for r in rows if isinstance(r.get("answer"), dict) and r["answer"].get("id"))
     answered = [r for r in rows if r.get("status") == 200 and isinstance(r.get("answer"), dict) and "checked" in r["answer"]]
     if answered:
         _checks.update(answers=len(answered), failed=sum(not r["answer"]["checked"] for r in answered), since=answered[0]["at"][:10])
@@ -218,6 +224,11 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         _seconds.append(seconds)
         if not degraded:  # a follow-up must not be handed a sentence that was never checked
             _sessions.add(session, question, output.summary)
+    # An id for this answer: what a reader's "useful" or "wrong" is recorded against, and what ties it to the
+    # logged trace. It is not a public link to the answer.
+    out["id"] = secrets.token_hex(6)
+    with _state_lock:
+        _issued.append(out["id"])
     out.update(
         checked=not problems,
         check_problems=problems,
@@ -305,7 +316,41 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             pass
 
+    def _feedback(self) -> None:
+        """A reader's verdict on one answer, written beside the trace it refers to. Accepted only for an id this
+        service issued; the note is plain text, capped, and never shown to anyone else."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 2048:
+                raise ValueError
+            doc = json.loads(self.rfile.read(length))
+            answer_id, verdict = str(doc.get("id", "")), str(doc.get("verdict", ""))
+            note = "".join(ch for ch in str(doc.get("note") or "") if ch.isprintable())[:300]
+        except (ValueError, AttributeError):
+            return self._send(400, {"error": "Send a JSON body with id and verdict."})
+        if verdict not in ("useful", "wrong"):
+            return self._send(400, {"error": "verdict must be 'useful' or 'wrong'."})
+        now, address = time.time(), self._address()
+        with _state_lock:
+            if answer_id not in _issued:
+                return self._send(404, {"error": "No answer with that id."})
+            q = _feedback_by_address[address]
+            while q and now - q[0] > 3600:
+                q.popleft()
+            if len(q) >= FEEDBACK_PER_HOUR:
+                return self._send(429, {"error": "Feedback limit reached. Try again later."})
+            q.append(now)
+        try:
+            with open(FEEDBACK_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                                    "id": answer_id, "verdict": verdict, "note": note}) + "\n")
+        except OSError:
+            return self._send(500, {"error": "Could not record that."})
+        self._send(200, {"ok": True})
+
     def do_POST(self):
+        if self.path == "/feedback":
+            return self._feedback()
         if self.path not in ("/ask", "/ask/stream"):
             return self._send(404, {"error": "not found"})
         stream = self.path == "/ask/stream"

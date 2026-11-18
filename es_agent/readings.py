@@ -1096,7 +1096,8 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
     side = 1 if diff >= need else -1 if diff <= -need else 0
     minority = [ln for ln in lines if side and ln["verdict"] == -side]
     plain = {"structure": "time structure", "stocks": "US crude stocks", "refining": "refining demand"}
-    said = ", ".join(f"{plain[g]} {word[v]}" for g, v in groups.items() if g != "sentiment")
+    said = ", ".join(f"{plain[g]} {word[v]}, {sum(ln['verdict'] == v for ln in lines if ln['group'] == g)} of "
+                     f"{sum(ln['group'] == g for ln in lines)} lines" for g, v in groups.items() if g != "sentiment")
     return Reading(
         key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against, in groups",
         period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels (stated on each line)",
