@@ -111,7 +111,7 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 |---|---|---|
 | scripted model, frozen data (`--source fixture`) | **186/186**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
 | scripted model, validator off (`--no-guard`) | **183/186** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
-| `anthropic:claude-haiku-5-5`, live lake | **180/180** | the latest release run (30 cases, six evaluators). The runs before it scored 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
+| `anthropic:claude-haiku-5-5`, live lake | **186/186** | the latest release run (31 cases, six evaluators). The runs before it scored 180/180 (30 cases), 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
@@ -136,6 +136,7 @@ How the suite got here, including the failures:
 | 18 Nov | 145/145 on Haiku | the arbitrage reading moved from the spot Brent-WTI spread to futures of one delivery month, after the two were seen to disagree (17th against 96th percentile); the spot spread is set beside it and the difference split in code; no new tools; 29 cases |
 | 18 Nov | 174/174 on Haiku | code adds a caveat when a series is behind its publishing rhythm (it immediately flagged a positioning series 15 days old); direction words checked by the validator and a sixth evaluator; the control run plants two errors |
 | 18 Nov | 180/180 on Haiku | `get_evidence`: a ten-line scorecard for "is the crude market tight?", scored in code, with the contrary lines forced into the caveats; 17 tools, 30 cases |
+| 18 Nov | 186/186 on Haiku | an outside review asked how Dubai compares with Brent: 7 tool calls, 4 of them searches, and a ticked answer that subtracted a monthly-average contract from a dated future. `get_spread` now refuses the pairing and benchmark IDs are in the instructions; the same question now takes 1 call and 19,000 tokens, down from 45,000; 31 cases |
 
 ## Release gate
 
