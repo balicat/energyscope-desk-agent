@@ -238,14 +238,25 @@ _PLUMBING = re.compile(r"\b(?:facts|series facts?|series lookups?|cited readings
                        r"\b[a-z]+:[a-z_0-9]+\b|\b[A-Z][A-Z_]+\.[A-Z0-9_.-]+\b")
 
 
-def clean_caveats(answer: DeskAnswer, plumbing: bool = True) -> list[str]:
+def echoes(text: str, asked: str, words: int) -> bool:
+    """Does `text` repeat `words` or more consecutive words of what the visitor wrote? A visitor who
+    asks for a sentence "exactly" must not see it come back as The Librarian's own, under the tick."""
+    mine = re.findall(r"[a-z0-9']+", text.lower())
+    theirs = " " + " ".join(re.findall(r"[a-z0-9']+", asked.lower())) + " "
+    return any(" " + " ".join(mine[i:i + words]) + " " in theirs for i in range(len(mine) - words + 1))
+
+
+ECHO_CAVEAT, ECHO_SUMMARY = 6, 12  # a summary may restate the question's terms; a caveat has no reason to
+
+
+def clean_caveats(answer: DeskAnswer, plumbing: bool = True, asked: str = "") -> list[str]:
     """The model's caveats, minus any that states a number or date no tool returned, points a
     direction the data does not, or talks about the machinery. A caveat is where a number goes
     when the summary may not hold it, so the summary's rules apply there too."""
     pool = pool_of(answer)
     return [c for c in model_caveats(answer)
             if not text_problems(c, pool) and not direction_problems(answer, c)
-            and not (plumbing and _PLUMBING.search(c))]
+            and not (plumbing and _PLUMBING.search(c)) and not (asked and echoes(c, asked, ECHO_CAVEAT))]
 
 
 # ---- direction -------------------------------------------------------------------------------

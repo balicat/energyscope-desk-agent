@@ -66,7 +66,7 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
             lines.append(f"{lead}{body['title']} on {body['period']}: {shown}.{shape}")
     if not facts and not spreads and not cites:
         return {"facts": [], "summary": "No EnergyScope series matched the question.",
-                "caveats": [f"The data does not hold this: {question}"]}
+                "caveats": ["No series in the data answers this question."]}
     return {"facts": facts, "spreads": spreads, "cites": cites, "summary": " ".join(lines), "caveats": []}
 
 

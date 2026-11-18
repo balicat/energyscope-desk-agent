@@ -950,6 +950,17 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
     if thesis != "crude_tightness":
         return None
     lines = []
+    # The curve series start in 2026, so they have no record of their own. EIA's WTI contracts 1 and 4 give a rough
+    # one: how often the front has stood above the fourth month. It is a proxy (three months apart, not eleven, and it
+    # ends in 2024), and is labelled as one.
+    proxy = aligned(source, ["PET.RCLC1.D", "PET.RCLC4.D"], 366 * BASE_RATE_YEARS)
+    if len(proxy) >= 250:
+        share = round(sum(a > b for _, (a, b) in proxy) / len(proxy) * 100, 1)
+        record = (f"no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above "
+                  f"contract 4 on {share:.0f}% of days from {proxy[0][0]} to {proxy[-1][0]}")
+        record_values = {"wti_front_above_fourth_month_share_pct": share}
+    else:
+        record, record_values = "no record, the history starts in 2026", {}
     for market, label in (("brent", "Brent"), ("wti", "WTI")):
         c = curve(source, market)
         if c:
@@ -959,9 +970,9 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
             lines.append(_scored(
                 f"{market}_curve", "structure",
                 f"{label} futures curve: M1 is {abs(slope):.2f} {_side(slope)} M{n}, {abs(pct):.2f}% of M1 "
-                f"({c.period}; tight when M1 is more than 2% above, loose when more than 2% below; no record, the history starts in 2026",
+                f"({c.period}; tight when M1 is more than 2% above, loose when more than 2% below; {record}",
                 pct, -2, 2, "high", c.period, c.series_ids,
-                {f"{market}_M1_minus_M{n}": slope, f"{market}_slope_pct": pct}))
+                {f"{market}_M1_minus_M{n}": slope, f"{market}_slope_pct": pct, **record_values}))
     parts = futures_spread_parts(source)
     rows = aligned(source, [BRENT_SPOT, CRUDE, f"ICE.BRENT.{parts[0]}.D", f"NYMEX.WTI.{parts[0]}.D"], 60) if parts else []
     if rows and rows[-1][0] >= _since(30):
@@ -1045,15 +1056,28 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         return None
 
     word = {1: "tight", -1: "loose", 0: "neutral"}
-    groups: dict[str, int] = {}
-    for g in GROUPS:
-        mine = [ln["verdict"] for ln in lines if ln["group"] == g]
-        if mine:  # a group reads tight or loose only when more than half of its lines do
-            groups[g] = 1 if mine.count(1) * 2 > len(mine) else -1 if mine.count(-1) * 2 > len(mine) else 0
-    counted = [v for g, v in groups.items() if g != "sentiment"]
-    diff = sum(counted)
-    need = 2 if len(counted) >= 3 else len(counted)
-    balance = "points to a tight market" if diff >= need else "points to a loose market" if diff <= -need else "is mixed"
+
+    def weigh(some: list[dict]) -> tuple[dict[str, int], list[int], int, int, str]:
+        by_group: dict[str, int] = {}
+        for g in GROUPS:
+            mine = [ln["verdict"] for ln in some if ln["group"] == g]
+            if mine:  # a group reads tight or loose only when more than half of its lines do
+                by_group[g] = 1 if mine.count(1) * 2 > len(mine) else -1 if mine.count(-1) * 2 > len(mine) else 0
+        physical = [v for g, v in by_group.items() if g != "sentiment"]
+        total, threshold = sum(physical), (2 if len(physical) >= 3 else len(physical))
+        verdict = "points to a tight market" if total >= threshold else "points to a loose market" if total <= -threshold else "is mixed"
+        return by_group, physical, total, threshold, verdict
+
+    groups, counted, diff, need, balance = weigh(lines)
+    # One judgement is the analyst's, not a threshold: is a high crack spread evidence of CRUDE tightness, or of
+    # plentiful crude against dear products? The note says whether today's verdict depends on the answer.
+    without = weigh([ln for ln in lines if ln["name"] != "crack"])
+    if any(ln["name"] == "crack" for ln in lines):
+        depends = (f" Whether a high crack spread is evidence of crude tightness is a judgement, not a threshold. Without that "
+                   f"line, refining demand reads {word[without[0].get('refining', 0)]} and the evidence {without[4]}"
+                   + (", so today's verdict depends on it." if without[4] != balance else ", so today's verdict does not depend on it."))
+    else:
+        depends = ""
     values: dict[str, float] = {"groups_counted": len(counted), "groups_tight": counted.count(1), "groups_loose": counted.count(-1),
                                 "groups_neutral": counted.count(0), "lines": len(lines)}
     for g, v in groups.items():
@@ -1084,7 +1108,7 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
               f"is sentiment: it reads {word[groups.get('sentiment', 0)]} and is shown but not counted. Each line states its "
               "threshold and, where eight years of history exist, how often it has read tight and loose, so a line that "
               "usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it "
-              "is not a forecast."),
+              "is not a forecast." + depends),
         context=context,
         counter=("Against the balance of the evidence: " + "; ".join(ln["text"] for ln in minority) + ".") if minority else "")
 
