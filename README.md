@@ -58,19 +58,35 @@ cites it, and does not speculate.
   two, so the sentence cannot say 92.186 where the table says 92.19.
 - **The sentences are checked, not only the tables.** An adversarial review (a second Claude session, given the
   job of breaking the service) built eleven answers whose tables were true and whose prose was wrong. All eleven
-  passed and would have been shown under the tick. The checks covered numbers in the summary and nothing else.
-  `es_agent/prose.py` now applies one set of rules to the summary and to every caveat the model writes:
-  a number must be a valid rounding of a returned value of the right kind (a percentage cannot be quoted as
-  dollars, a count of days cannot be quoted as a price move, `2,000` is not a year); a date must be one a tool
-  returned, written as YYYY-MM-DD (month names and quarters are rejected, because a date in words cannot be
-  traced); a direction word beside a number must agree with its sign (`fell 1.20`, `0.62 above WTI`), read in the
-  same clause, so a right word elsewhere in the sentence is no excuse. A caveat that fails is removed by code.
-  `prose_controls.py` plants 19 such errors and must reject every one; it runs in CI and in the release gate.
-- **What the tick does not prove.** Two true values attached to the wrong nouns (Brent's price given as WTI's) and
-  claims made in words alone ("a record high") still pass; both are kept in `prose_controls.py` as known limits.
-  A short number such as "2" matches any returned value from 1.5 to 2.5, so the chance of an accidental match
-  grows with the number of values an answer cites. The page says what was checked: the sources were recomputed,
-  and every number and date in the text matches one of them.
+  passed and would have been shown under the tick: the checks covered numbers in the summary and nothing else.
+  A second, held-out set found more after the first fix. `es_agent/prose.py` now applies one set of rules to the
+  summary and to every caveat the model writes:
+  - every run of digits must be a valid rounding of a returned value of the right kind. A percentage cannot be
+    quoted as dollars, a count of days cannot be quoted as a price move, `2,000` is not a year, and `USD97.72` is
+    still a number. A scale word or `per tonne` after a number must be in the units of something cited. A number
+    spelled out beside a unit is rejected.
+  - every date must be one a tool returned, written as YYYY-MM-DD. Month names, weekdays and quarters are rejected,
+    because a date in words cannot be traced. A bare year passes only inside a returned name. Only code writes
+    today's date.
+  - direction is denied by default for changes: a quoted change needs a listed word of the right sign, or an
+    explicit sign, right beside it (`rose 1.20`, `+1.20`), so an unlisted verb cannot slip through. A gap with
+    `above`, `below`, `premium` or `discount` must point the right way, read up to the next comma. A curve's shape
+    word must be the reading's own and not negated. A high percentile may not be called low.
+  A caveat that fails is removed by code. `prose_controls.py` plants 36 such errors and must reject every one, and
+  must pass 14 correct sentences and every recorded answer; it runs in CI and in the release gate.
+- **What the tick does not prove.** Two true values, or two true dates, attached to the wrong nouns (Brent's price
+  given as WTI's); and claims made in words alone ("a record high", "has narrowed" where no earlier value was
+  returned). Four such answers are kept in `prose_controls.py` as known limits. A short number such as "2" matches
+  any returned value from 1.5 to 2.5, so the chance of an accidental match grows with the number of values an
+  answer cites. The page says what was checked: the sources were recomputed, and every number and date in the
+  text matches one of them.
+- **A strict rule should degrade, not fail.** When every attempt at a summary fails a check, the visitor is not
+  given an error. The tools' numbers were computed by code, so the page shows them with a line saying that no
+  summary passed, and no sentence from the model.
+- **A curve has three shapes.** The Oman curve had M1 below M2 and M1 above M12; the reading called it
+  backwardation and a homepage example said so under a tick. A curve whose front spread and whole slope disagree
+  is now "mixed", a slope that crossed zero in the week "changed shape", and a reading says when its front month
+  has a later date than the row with all twelve months.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -97,8 +113,8 @@ cites it, and does not speculate.
 |---|---|
 | `search_series` | series by keyword, optionally within one dataset; four calls a run. The common benchmarks are listed in the instructions and need no search |
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
-| `get_spread` | one series minus another on the latest shared date, with its percentile and history over three years; refuses if units differ, if the two are published at different frequencies, or if one side is a contract on a month's average price and the other is not |
-| `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
+| `get_spread` | one series minus another on the latest shared date, with its percentile and history over three years; refuses if units differ, if the two are published at different frequencies, if one side is a contract on a month's average price and the other is not, or if they are futures that do not share a delivery month (Brent M1 against WTI M1) |
+| `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread; backwardation, contango or mixed; slope a week earlier |
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
@@ -157,12 +173,20 @@ How the suite got here, including the failures:
 ## Release gate
 
 `deploy.sh` is how a change to the code, the prompt or the model reaches the public service. The candidate must
-pass the frozen-data suite with golden answers, the control run, the suite on today's lake with the scripted
-model, and the suite on today's lake with the live model. Only then does the service restart. A live model does
-not make the same choices twice (the same suite scored 78, 79, 80, 78 and 80 of 80 in five runs on one day), so
-the live step is split: every number check must pass, and at most two behaviour checks (series
-choice, tool budget) may miss. It blocked two releases on its first day. Trying another
-model is the same command with `LIBRARIAN_MODEL=...`.
+pass the frozen-data suite with golden answers and the prose control, the control run, the suite on today's lake
+with the scripted model, and the suite on today's lake with the live model. Only then does the service restart.
+
+A live model does not make the same choices twice (the same suite scored 78, 79, 80, 78 and 80 of 80 in five runs
+on one day), so the live step has four conditions: every number check must pass; at most two behaviour checks
+(series choice, tool budget) may miss; no question may run out of validator retries; and the whole suite may use
+at most eight retries. The score alone hides the last two: 186/186 with fourteen retries and 186/186 with two are
+different services, because a question that runs out of retries is a visitor who gets no summary. The suite
+prints, for every retried question, what the validator objected to, and each live run is kept as a JSON file.
+
+A blocked commit may be run a second time, once, and both runs are recorded. This rule exists because of a
+mistake: on 18 Nov one question ran out of retries, the builder ran the gate again, it passed, and nobody knew
+which question it had been. The reviewer's objection was that "run again until green" turns a gate into a coin.
+Trying another model is the same command with `LIBRARIAN_MODEL=...`.
 
 ## Run it
 

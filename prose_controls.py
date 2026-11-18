@@ -7,9 +7,10 @@ wording, where the tables cannot help: a wrong date, a flipped sign, a number in
 case says what must happen. No model, no data, no cost; it runs in CI and in the release gate.
 
 The first eleven wrong answers came from an adversarial review of the live service on 18 Nov 2026
-(a second Claude session given the job of breaking it). Two of them are still accepted and are
-kept here marked LIMIT, so the gap stays visible: the checks cannot tell that two true values have
-been attached to the wrong nouns, or judge a claim made in words alone.
+(a second Claude session given the job of breaking it), and more from its second, held-out set.
+Four kinds are still accepted and are kept here marked LIMIT, so the gap stays visible: the checks
+cannot tell that two true values or dates have been attached to the wrong nouns, or judge a claim
+made in words alone.
 """
 
 from __future__ import annotations
@@ -37,6 +38,15 @@ funds = Reading(key="positioning:wti", title="WTI crude (NYMEX): managed-money p
                 values={"managed_money_net": 151200.0, "net_change_on_week": 12000.0, "net_percentile": 6.8, "percentile_weeks": 156})
 gap = Spread(series_a="PET.RBRTE.D", name_a="Brent spot", series_b="PET.RWTC.D", name_b="WTI spot", units="USD/bbl",
              period=dt.date(2026, 11, 11), value_a=87.48, value_b=88.10, spread=-0.62)
+brent_curve = Reading(key="curve:brent", title="Brent futures curve", period=D, units="USD/bbl",
+                    series_ids=["ICE.BRENT.M1.D", "ICE.BRENT.M12.D"],
+                    values={"M1": 93.07, "M12": 77.26, "M1_minus_M2": 1.41, "M1_minus_M12": 15.81, "M1_minus_M12_a_week_earlier": 13.60},
+                    note="backwardation (front above back)",
+                    context="M1 minus M12 was 13.60 on 2026-11-10 and is 15.81 now: the curve has steepened over the week.")
+fut = Spread(series_a="ICE.BRENT.2027-01.D", name_a="Brent 2027-01", series_b="NYMEX.WTI.2027-01.D", name_b="WTI 2027-01",
+             units="USD/bbl", period=D, value_a=93.07, value_b=84.65, spread=8.42,
+             extras={"percentile": 96.4, "percentile_years": 3, "spell_days": 70, "days_since_previous_spell": 117},
+             context="The spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back.")
 curve = Reading(key="evidence:x", title="Curves", period=D, units="USD/bbl", series_ids=["ICE.BRENT.M1.D"],
                 values={"brent_M1_minus_M12": 14.55, "us_stocks_vs_5y_pct": -4.47})
 
@@ -76,6 +86,40 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      dict(readings=[curve], summary="Brent M1 is 14.55 below M12.")),
     ("stocks on the wrong side of their average",
      dict(readings=[curve], summary="US crude stocks are 4.47% above the five-year average.")),
+    ("a verb that is on no list (slid), for a rise",
+     dict(facts=[wti_up], summary="WTI slid 1.20 USD/bbl on the week to 88.10.")),
+    ("another unlisted verb, on the percentage",
+     dict(facts=[wti_up], summary="WTI tumbled 1.38% on the week.")),
+    ("'unchanged' for a rise",
+     dict(facts=[wti_up], summary="WTI was unchanged on the week at 88.10 USD/bbl.")),
+    ("a premium given to the wrong side",
+     dict(spreads=[fut], summary="WTI trades at a premium of 8.42 USD/bbl to Brent: 84.65 against 93.07.")),
+    ("a curve's shape denied",
+     dict(readings=[brent_curve], summary="The Brent curve is not in backwardation: M1 is 93.07 and M12 is 77.26.")),
+    ("the wrong shape, with the right word used about another market",
+     dict(readings=[brent_curve], summary="The Brent curve is in contango, M1 93.07 against M12 77.26, unlike the backwardation in WTI.")),
+    ("flattened where the reading says steepened",
+     dict(readings=[brent_curve], summary="The Brent curve is in backwardation and has flattened over the week.")),
+    ("a high percentile called low",
+     dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, which is near the low end of its range.")),
+    ("a fabricated number glued to a currency code",
+     dict(facts=[brent], summary="Brent futures settled at USD97.72 a barrel.")),
+    ("a fabricated number behind an abbreviation",
+     dict(facts=[brent], summary="Brent futures settled at c.97.72 a barrel.")),
+    ("a number spelled out",
+     dict(facts=[brent], summary="Brent futures are near ninety-eight dollars a barrel.")),
+    ("a true number with an invented scale",
+     dict(facts=[brent], summary="Brent futures are at 93.07 million dollars.")),
+    ("a true number in the wrong scale",
+     dict(facts=[stocks], summary="US crude stocks are 414,417 million barrels.")),
+    ("a true number in the wrong unit",
+     dict(facts=[brent], summary="Brent is 93.07 dollars per tonne.")),
+    ("a true value given today's date",
+     dict(facts=[brent], summary="Brent futures settled at 93.07 USD/bbl on 2026-11-18.")),
+    ("a bare year that is the year of a returned date",
+     dict(readings=[freight], summary="Freight is at 31.40, its highest level since 2026.")),
+    ("a wrong date in a caveat",
+     dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.", caveats=["The last report was released on 2026-10-02."])),
     ("a price misquoted by 5%",
      dict(facts=[brent], summary="Brent futures are at 97.72 USD/bbl.")),
     ("falling words only, when every change is a rise",
@@ -92,6 +136,11 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[curve], summary="Brent M1 is 14.55 above M12, and US crude stocks are 4.47% below the five-year average."),
     dict(readings=[curve], summary="M12 is 14.55 below M1 on the Brent curve."),
     dict(facts=[stocks], summary="US crude stocks were 414,417 thousand barrels on 2026-11-13."),
+    dict(facts=[wti_up], summary="The change over 7 days was +1.20 USD/bbl, to 88.10."),
+    dict(spreads=[fut], summary="Brent trades at a premium of 8.42 USD/bbl to WTI for 2027-01 delivery: 93.07 against 84.65."),
+    dict(spreads=[fut], summary="The spread is 8.42 USD/bbl, percentile 96.4 of 3 years; the previous spell above the line ended 117 days earlier."),
+    dict(readings=[brent_curve], summary="The Brent curve is in backwardation, not contango: M1 93.07 against M12 77.26, and it has steepened over the week."),
+    dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, near the high end of its range."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
@@ -99,6 +148,13 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
      dict(facts=[brent, wti], summary="WTI futures are at 93.07 USD/bbl and Brent futures at 88.10.")),
     ("claims made in words alone",
      dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels, a record high, roughly double their ten-year average.")),
+    ("a change claimed in words where no earlier value was returned",
+     dict(spreads=[fut], summary="The Brent-WTI spread for the same delivery month is 8.42 USD/bbl and has narrowed sharply.")),
+    ("two true dates attached to the wrong events",
+     dict(readings=[Reading(key="percentile:X:3", title="Freight", period=D, units="USD", series_ids=["SHIP.BWET.D"],
+                            values={"latest": 31.4, "percentile": 96.0},
+                            context="Above the line since 2026-07-30; the previous spell ended 2024-02-12.")],
+          summary="Freight is at percentile 96, above the line since 2024-02-12; the previous spell ended 2026-07-30.")),
 ]
 
 

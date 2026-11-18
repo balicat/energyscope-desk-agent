@@ -26,10 +26,12 @@ import urllib.request
 from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from pydantic_ai import capture_run_messages
+from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
-from es_agent.agent import Deps, agent
+from es_agent.agent import Deps, agent, tables_only
 from es_agent.charts import charts_for
 from es_agent.memory import Sessions, with_context
 from es_agent.scripted import is_rejection, scripted
@@ -152,31 +154,43 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
     model = _model_for(question)
     with _state_lock:
         turns = _sessions.get(session)
-    with _run_lock:
-        result = agent.run_sync(
-            with_context(question, turns),
-            model=model,
-            deps=Deps(source=_source, emit=emit),
-            usage_limits=UsageLimits(request_limit=MODEL_REQUESTS_PER_QUESTION),
-        )
-    parts = [p for m in result.all_messages() for p in m.parts]
+    deps = Deps(source=_source, emit=emit)
+    degraded = None
+    with _run_lock, capture_run_messages() as messages:
+        try:
+            result = agent.run_sync(
+                with_context(question, turns),
+                model=model,
+                deps=deps,
+                usage_limits=UsageLimits(request_limit=MODEL_REQUESTS_PER_QUESTION),
+            )
+            output, usage = result.output, result.usage
+            messages = result.all_messages()
+        except (UnexpectedModelBehavior, UsageLimitExceeded) as e:
+            # Every attempt at a summary failed a check, or the request budget ran out. The numbers the
+            # tools returned were computed by code and can still be shown; the sentences cannot.
+            if not (deps.ledger or deps.spreads or deps.readings):
+                raise
+            degraded = f"{type(e).__name__}: {e}"[:300]
+            output, usage = tables_only(deps), None
+    parts = [p for m in messages for p in m.parts]
     trail = [
         {"tool": p.tool_name, "args": p.args if isinstance(p.args, dict) else json.loads(p.args or "{}")}
         for p in parts
         if isinstance(p, ToolCallPart) and p.tool_name != "final_result"
     ]
-    out = result.output.model_dump(mode="json")
+    out = output.model_dump(mode="json")
     # Live check: rebuild every number from the data, independently of the run, and record the result.
     try:
-        problems = verify(result.output, _source)
+        problems = verify(output, _source)
     except Exception as e:
         problems = [f"check failed to run: {type(e).__name__}: {e}"[:300]]
     try:  # the history behind the numbers, for the page to draw; never from the model
-        out["charts"] = charts_for(result.output, _source)
+        out["charts"] = charts_for(output, _source)
     except Exception:
         out["charts"] = []
     seconds = round(time.time() - t0, 2)
-    usd = float(getattr(result.usage, "cost", None) or 0)
+    usd = float(getattr(usage, "cost", None) or 0)
     with _state_lock:
         _roll_day()
         _day["usd"] += usd
@@ -184,7 +198,8 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         _checks["answers"] += 1
         _checks["failed"] += bool(problems)
         _seconds.append(seconds)
-        _sessions.add(session, question, result.output.summary)
+        if not degraded:  # a follow-up must not be handed a sentence that was never checked
+            _sessions.add(session, question, output.summary)
     out.update(
         checked=not problems,
         check_problems=problems,
@@ -193,7 +208,9 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         follow_up=bool(turns),
         model=MODEL,
         seconds=seconds,
-        tokens=result.usage.total_tokens or 0,
+        tokens=(usage.total_tokens or 0) if usage else 0,
+        degraded=bool(degraded),
+        degraded_reason=degraded,
         usd=round(usd, 5),
     )
     return out

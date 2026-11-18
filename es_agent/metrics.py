@@ -49,14 +49,7 @@ def spread_of(a: SeriesHit, hist_a: list[tuple[dt.date, float]], b: SeriesHit, h
     return None
 
 
-_UNIT_WORDS = {"usd": "dollars", "$": "dollars", "us$": "dollars", "/": " per ", "bbl": "barrel", "barrels": "barrel",
-               "gal": "gallon", "gallons": "gallon", "mt": "tonne", "tonnes": "tonne", "mmbtu": "million btu"}
-
-
-def unit_key(units: str) -> str:
-    """Publishers label the same unit differently ('USD/bbl', 'Dollars per Barrel'); compare on this."""
-    text = units.lower().replace("/", " per ")
-    return " ".join(_UNIT_WORDS.get(w, w) for w in text.split())
+unit_key = prose.unit_key  # one normaliser for units, shared with the prose checks
 
 
 def close(a: float | None, b: float | None) -> bool:

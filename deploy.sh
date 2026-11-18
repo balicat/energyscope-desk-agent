@@ -7,7 +7,9 @@
 #   3. the suite on today's lake with the scripted model               (free)
 #   4. the suite on today's lake with the live model                   (a few cents; LIVE=0 skips it)
 #      A live model does not make the same choices twice, so this step is split: every number check
-#      must pass, and at most two behaviour checks (series choice, tool budget) may miss.
+#      must pass, and at most two behaviour checks (series choice, tool budget) may miss. No case may
+#      run out of retries, and the suite has a budget of validator retries in total. A blocked commit
+#      may be run a second time, once; every run is kept in ~/librarian-gate.
 # Then the running checkout moves to the candidate and the service restarts.
 #
 #   ./deploy.sh                                  # gate origin/main with the model the service uses
@@ -33,8 +35,16 @@ echo "2/4 control run";                       $PY run_evals.py --source fixture 
 echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | tail -1
 if [ "${LIVE:-1}" = "1" ]; then
   export ANTHROPIC_API_KEY=$(tr -d '\r\n' < /opt/energyscope/.anthropic_api_key)
-  echo "4/4 today's lake, $MODEL (numbers must all be right; at most 2 behaviour misses)"
-  $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 2>/dev/null | grep -E "^FAILED|^assertions|^gate"
+  # A live model does not answer the same way twice, so a second run of a blocked commit is allowed once and
+  # no more: both runs are written to $GATE with what the validator objected to, and the README reports them.
+  GATE=$HOME/librarian-gate; mkdir -p "$GATE"
+  RUNS=$(ls "$GATE"/"$SHA"-*.json 2>/dev/null | wc -l)
+  if [ "$RUNS" -ge 2 ]; then
+    echo "this commit has had its two live runs (see $GATE): change the code, do not run it again" >&2; exit 1
+  fi
+  echo "4/4 today's lake, $MODEL, live run $((RUNS + 1)) of at most 2 for this commit"
+  echo "    numbers must all be right; at most 2 behaviour misses; no case may run out of retries; at most ${RETRY_BUDGET:-8} retries in total"
+  $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 --max-retries "${RETRY_BUDGET:-8}"       --report "$GATE/$SHA-$(date +%s).json" 2>/dev/null | grep -E "^FAILED|^RETRIED|^retries|^assertions|^gate"
 else
   echo "4/4 live model skipped (LIVE=0)"
 fi

@@ -58,9 +58,11 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
             )
         elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning", "get_percentile", "get_arbitrage", "get_surprises", "get_watch", "get_arbitrage_scenario", "get_crack_scenario", "get_futures_spread", "get_futures_crack", "get_evidence"):
             cites.append(body["key"])
-            shown = ", ".join(f"{k} {v:.2f}" for k, v in body["values"].items())
+            # A change is written with its direction, as the prose rules require of any model.
+            shown = ", ".join(f"{k} {'up' if v > 0 else 'down'} {abs(v):.2f}" if "change" in k and v else f"{k} {v:.2f}"
+                              for k, v in body["values"].items())
             lead = "If the stated changes happened, hypothetically: " if body.get("hypothetical") else ""
-            shape = f" The curve is in {body['note'].split(' ')[0]}." if r.tool_name == "get_curve" else ""
+            shape = f" The curve is in {body['note'].split(' ')[0].rstrip(':')}." if r.tool_name == "get_curve" else ""
             lines.append(f"{lead}{body['title']} on {body['period']}: {shown}.{shape}")
     if not facts and not spreads and not cites:
         return {"facts": [], "summary": "No EnergyScope series matched the question.",

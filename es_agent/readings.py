@@ -82,6 +82,13 @@ def spread_history(source: DataSource, a: str, b: str, days: int = 366 * HISTORY
 # so a spread against a single-delivery contract or a spot price has no meaningful history.
 AVERAGE_PRICE = {"NYMEX.DUBAI.FRONT.D"}
 _FUTURE = re.compile(r"\.(M\d+|FRONT|\d{4}-\d{2})\.D$")
+_CONTINUOUS = re.compile(r"^(?P<family>.+)\.(?P<leg>M\d+|FRONT)\.D$")
+_DATED = re.compile(r"^(?P<family>.+)\.(?P<ym>\d{4}-\d{2})\.D$")
+# Which nearby-month series roll together. Brent and Oman fronts both deliver two months after the
+# trade month; RBOB and heating oil expire on the same day. WTI and gasoil each have their own calendar.
+_CALENDAR = {"ICE.BRENT": "two months ahead", "GME.OMAN": "two months ahead",
+             "NYMEX.RBOB": "NYMEX products", "NYMEX.HO": "NYMEX products",
+             "NYMEX.WTI": "NYMEX crude", "ICE.GASOIL": "ICE gasoil"}
 
 
 def pairing_note(a: str, b: str) -> tuple[str, bool]:
@@ -93,6 +100,28 @@ def pairing_note(a: str, b: str) -> tuple[str, bool]:
         return (f"Not like for like: {avg[0]} is a contract on the average price of its month and {other} is not, so a "
                 "spread between them mixes the difference between the two crudes with the shape of the curve. "
                 "No spread is given.", False)
+    ca, cb, da, db = _CONTINUOUS.match(a), _CONTINUOUS.match(b), _DATED.match(a), _DATED.match(b)
+    if da and db:
+        if da["ym"] != db["ym"]:
+            return (f"Not like for like: {a} and {b} are contracts for different delivery months, so the gap includes "
+                    "the shape of the curve. No spread is given. Use two contracts of one delivery month.", False)
+        return "", True
+    if ca and cb and ca["family"] != cb["family"]:
+        front = "FRONT" in (ca["leg"], cb["leg"])
+        same_calendar = _CALENDAR.get(ca["family"]) and _CALENDAR.get(ca["family"]) == _CALENDAR.get(cb["family"])
+        if not same_calendar or ca["leg"] != cb["leg"] or (front and ca["leg"] != cb["leg"]):
+            return (f"Not like for like: {a} and {b} are nearby-month series of two markets whose contracts expire on "
+                    "different days, so on most dates they are different delivery months and the history steps at each "
+                    "roll. No spread is given. For Brent against WTI use get_futures_spread; otherwise use two dated "
+                    "contracts of one delivery month.", False)
+        return "", True
+    if ca and cb and (ca["leg"] == "FRONT") != (cb["leg"] == "FRONT"):
+        return (f"Not like for like: one of {a} and {b} is a continuous series that rolls before expiry and the other "
+                "is not. No spread is given.", False)
+    if (ca and db) or (da and cb):
+        return (f"Not like for like: one of {a} and {b} is a nearby-month series that rolls and the other a single dated "
+                "contract, so the history steps at each roll. No spread is given. Use two dated contracts, or two "
+                "nearby months of one curve.", False)
     if bool(_FUTURE.search(a)) != bool(_FUTURE.search(b)):
         return ("Not like for like: one series is a future and the other a spot price, so the gap includes the time "
                 "structure of the market.", True)
@@ -136,12 +165,13 @@ def spell(hist: History, prefix: str = "", what: str = "It") -> tuple[dict[str, 
     p10, p90 = ordered[int(0.10 * (len(ordered) - 1))], ordered[int(0.90 * (len(ordered) - 1))]
     d, v = hist[-1]
     values = {f"{prefix}p10": p10, f"{prefix}p90": p90}
-    if v >= p90:
+    # Strictly beyond: the observation that IS the line is not a spell of its own.
+    if v > p90:
         side, pct, line = "above", 90, p90
-        out = [x >= p90 for _, x in hist]
-    elif v <= p10:
+        out = [x > p90 for _, x in hist]
+    elif v < p10:
         side, pct, line = "below", 10, p10
-        out = [x <= p10 for _, x in hist]
+        out = [x < p10 for _, x in hist]
     else:
         return values, (f"{what} is inside its usual range, between the 10th and 90th percentile lines "
                         f"({p10:.2f} and {p90:.2f}) of the window.")
@@ -187,15 +217,32 @@ def curve(source: DataSource, market: str) -> Reading | None:
     values = {f"M{i + 1}": v for i, v in enumerate(vals)}
     values["M1_minus_M2"] = round(vals[0] - vals[1], 6)
     values[f"M1_minus_M{n}"] = round(vals[0] - vals[-1], 6)
-    slope = vals[0] - vals[-1]
-    note = "backwardation (front above back)" if slope > 0 else "contango (front below back)" if slope < 0 else "flat"
+    slope, front = vals[0] - vals[-1], vals[0] - vals[1]
+
+    def shape(x: float) -> str:
+        return "backwardation" if x > 0 else "contango" if x < 0 else "flat"
+
+    # Three shapes, not two: the front spread and the whole curve can point opposite ways.
+    if slope * front < 0:
+        note = (f"mixed: {shape(front)} at the front (M1 {'above' if front > 0 else 'below'} M2) and {shape(slope)} "
+                f"across the curve (M1 {'above' if slope > 0 else 'below'} M{n})")
+    else:
+        note = "backwardation (front above back)" if slope > 0 else "contango (front below back)" if slope < 0 else "flat"
     earlier = [(dd, v) for dd, v in rows if dd <= d - dt.timedelta(days=7)]
     context = ""
     if earlier:
         was = round(earlier[-1][1][0] - earlier[-1][1][-1], 6)
         values[f"M1_minus_M{n}_a_week_earlier"] = was
-        move = "steepened" if abs(slope) > abs(was) else "flattened" if abs(slope) < abs(was) else "not moved"
-        context = (f"M1 minus M{n} was {was:.2f} on {earlier[-1][0]} and is {slope:.2f} now: the curve has {move} over the week.")
+        if was * slope < 0:
+            move = f"changed shape, from {shape(was)} to {shape(slope)},"
+        else:
+            move = "has steepened" if abs(slope) > abs(was) else "has flattened" if abs(slope) < abs(was) else "has not moved"
+        context = f"M1 minus M{n} was {was:.2f} on {earlier[-1][0]} and is {slope:.2f} now: the curve {move} over the week."
+    newer = [(dd, v) for dd, v in source.history(ids[0], start=d) if dd > d]
+    if newer:  # the front month has a later date than the row with every month
+        values["M1_latest"] = newer[-1][1]
+        context = (context + f" The latest date with all {n} months is {d}; M1 alone has {newer[-1][0]} at "
+                             f"{newer[-1][1]:.2f}.").strip()
     return Reading(key=f"curve:{market}", title=title, period=d, units=source.meta(ids[0]).units,
                    series_ids=ids, values=values, note=note, context=context)
 
@@ -361,8 +408,15 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | No
         return None
     d1, v1 = hist[-1]
     window = 16 if hit.frequency == "M" else 5
+    # A weekly series is matched on the report week (ISO week number), as EIA and ES.Seasonal do, so the
+    # five-year average here is the same number they publish. Other series take the nearest date.
+    by_week = {(d.isocalendar()[0], d.isocalendar()[1]): v for d, v in hist} if hit.frequency == "W" else {}
+    year, week = d1.isocalendar()[0], d1.isocalendar()[1]
     prior = []
     for k in range(1, years + 1):
+        if (year - k, week) in by_week:
+            prior.append(by_week[(year - k, week)])
+            continue
         target = _same_date(d1, k)
         near = min(hist, key=lambda o: abs((o[0] - target).days))
         if abs((near[0] - target).days) <= window:
@@ -511,7 +565,7 @@ def arbitrage(source: DataSource, route: str) -> Reading | None:
         return Reading(
             key=f"arb:{route}",
             title=f"US crude to Europe, price indicator: Brent-WTI on {ym} futures, tanker freight proxy, Brent curve",
-            period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
+            period=d, units="Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
             series_ids=[f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D", FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"] + spot_ids,
             values=values, note=f"score {verdict} US crude exports: " + ARB_NOTE,
             context=" ".join(x for x in (s_context, f_context, spot_sentence) if x))
@@ -569,7 +623,7 @@ def arbitrage_scenario(source: DataSource, route: str, brent_change: float, wti_
     return Reading(
         key=f"scenario:arb:{route}:{_num(brent_change)}:{_num(wti_change)}:{_num(freight_change_pct)}",
         title="What if: US crude to Europe with changed prices",
-        period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
+        period=d, units="Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
         series_ids=[f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D", FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"],
         values=values, hypothetical=True,
         note=(f"Hypothetical. The stated changes are applied to the {ym} futures prices of {d} and the score is "

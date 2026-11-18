@@ -18,6 +18,7 @@ import os
 import sys
 from dataclasses import dataclass
 
+from pydantic_ai import capture_run_messages
 from pydantic_ai.messages import ToolCallPart
 from pydantic_evals import Case, Dataset, increment_eval_metric
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, MaxToolCalls
@@ -121,6 +122,7 @@ SUITE = [
 ]
 PLANS = {q: (plan, sloppy) for _, q, _, plan, sloppy in SUITE}
 SOURCE: DataSource | None = None
+RUNS: dict[str, dict] = {}  # per question: retries, what the validator said, whether the retries ran out
 
 
 @dataclass
@@ -189,8 +191,18 @@ def build_dataset() -> Dataset:
 def make_task(model_name: str, enforce: bool = True):
     async def task(question: str) -> DeskAnswer:
         model = scripted(*PLANS[question]) if model_name == "scripted" else model_name
-        result = await agent.run(question, model=model, deps=Deps(source=SOURCE, enforce=enforce))
+
+        def said(messages) -> list[str]:
+            return [str(getattr(p, "content", ""))[:600] for m in messages for p in m.parts if is_rejection(p)]
+
+        with capture_run_messages() as seen:
+            try:
+                result = await agent.run(question, model=model, deps=Deps(source=SOURCE, enforce=enforce))
+            except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
+                RUNS[question] = {"retries": len(said(seen)), "ran_out": f"{type(e).__name__}: {e}"[:300], "validator": said(seen)}
+                raise
         parts = [p for m in result.all_messages() for p in m.parts]
+        RUNS[question] = {"retries": sum(is_rejection(p) for p in parts), "ran_out": None, "validator": said(result.all_messages())}
         increment_eval_metric("retries", sum(is_rejection(p) for p in parts))
         increment_eval_metric("tool_calls", sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for p in parts))
         increment_eval_metric("tokens", result.usage.total_tokens or 0)
@@ -221,6 +233,8 @@ def main() -> int:
     ap.add_argument("--gate", action="store_true", help="exit 1 unless every assertion passes and no case errors")
     ap.add_argument("--allow-soft", type=int, default=0,
                     help="with --gate: behaviour failures (series choice, tool budget) tolerated; number failures never are")
+    ap.add_argument("--max-retries", type=int, help="with --gate: block when the suite needed more validator retries than this in total")
+    ap.add_argument("--report", help="write the score, the retries per case and the validator's messages to this JSON file")
     ap.add_argument("--expect-failures", type=int, help="exit 1 unless exactly this many assertions fail (control run)")
     ap.add_argument("--golden", choices=["write", "check"], help="write or compare the answers in results/golden.json")
     ap.add_argument("--record-fixture", action="store_true", help="save every series this run reads to --fixture")
@@ -248,6 +262,16 @@ def main() -> int:
     for case, name, reason in failed:
         print(f"FAILED {case} / {name}: {reason}")
     print(f"assertions: {passed}/{total} passed; cases errored: {errored}; data as of {clock.today()}")
+    names = {q: n for n, q, _, _, _ in SUITE}
+    by_case = {names[q]: r for q, r in RUNS.items()}
+    retries = sum(r["retries"] for r in by_case.values())
+    ran_out = sorted(n for n, r in by_case.items() if r["ran_out"])
+    for n, r in sorted(by_case.items()):
+        if r["retries"] or r["ran_out"]:
+            print(f"RETRIED {n}: {r['retries']} time(s){' and ran out' if r['ran_out'] else ''}: "
+                  + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
+    print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
+          f"ran out: {ran_out or 'none'}")
 
     code = 0
     if args.record_fixture:
@@ -266,9 +290,19 @@ def main() -> int:
             changed = sorted(n for n in set(golden) | set(answers) if golden.get(n) != answers.get(n))
             print("golden answers: " + ("all match" if not changed else f"DIFFER for {changed}"))
             code |= bool(changed)
+    over = args.max_retries is not None and retries > args.max_retries
+    if args.report:
+        os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
+        with open(args.report, "w", encoding="utf-8") as f:
+            json.dump({"model": args.model, "data_as_of": str(clock.today()), "passed": passed, "total": total, "errored": errored,
+                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "cases": by_case},
+                      f, indent=1)
     if args.gate:
         hard = [f for f in failed if f[1] in HARD]
-        if errored or hard or len(failed) - len(hard) > args.allow_soft:
+        if over:
+            print(f"gate: blocked ({retries} retries, budget {args.max_retries})")
+            code = 1
+        elif errored or hard or len(failed) - len(hard) > args.allow_soft:
             print(f"gate: blocked ({len(hard)} number failures, {len(failed) - len(hard)} behaviour failures, {errored} errors)")
             code = 1
         else:

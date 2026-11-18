@@ -15,7 +15,7 @@ from typing import Callable, Literal
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from . import metrics, prose, readings
-from .models import Change, DeskAnswer, Observation, Reading, SeriesHit, Spread
+from .models import Change, DeskAnswer, Observation, Reading, SeriesFact, SeriesHit, Spread
 from . import clock
 from .sources import DATASETS, DataSource
 
@@ -106,7 +106,7 @@ agent = Agent(
     deps_type=Deps,
     output_type=DeskAnswer,
     instructions=INSTRUCTIONS,
-    retries=2,
+    retries=3,  # the prose rules are strict; a third attempt is cheaper than an answer that cannot be shown
     name="energyscope-desk",
 )
 
@@ -331,6 +331,42 @@ def get_arbitrage(ctx: RunContext[Deps], route: Literal["us_crude_to_europe", "d
     return _keep(ctx, readings.arbitrage(ctx.deps.source, route), f"Not enough recent data for {route}.")
 
 
+def code_caveats(source: DataSource, answer: DeskAnswer) -> list[str]:
+    """The caveats code writes, so the model cannot leave them out: the evidence against the balance,
+    a pairing that is not like for like, an average-price contract, and anything that is not current."""
+    used = [f.series_id for f in answer.facts] + [x for s in answer.spreads for x in (s.series_a, s.series_b)]
+    used += [x for r in answer.readings for x in r.series_ids]
+    out = [r.counter for r in answer.readings if r.counter]
+    out += list(dict.fromkeys(s.note for s in answer.spreads if s.note))
+    out += [f"Average-price contract: {i} settles on the average price of its month. It is not a spot price or a "
+            "single delivery month, so it is not subtracted from one." for i in dict.fromkeys(used) if i in readings.AVERAGE_PRICE]
+    stale = readings.stale_inputs(source, used)
+    today = clock.today()
+    for s in answer.spreads:  # two current series can still share only an old date
+        hit = source.meta(s.series_a)
+        limit = readings.STALE_AFTER_DAYS.get((hit.frequency if hit else "") or s.series_a.rsplit(".", 1)[-1])
+        if limit and (today - s.period).days > limit and str(s.period) not in stale:
+            out.append(f"Not current as of {today}: the spread {s.series_a} minus {s.series_b} is for {s.period} "
+                       f"({(today - s.period).days} days ago), the latest date both series have.")
+    return out + ([stale] if stale else [])
+
+
+def tables_only(deps: Deps) -> DeskAnswer:
+    """What the tools returned, with no sentence from the model. Used when every attempt at a summary
+    failed a check: the numbers were computed and can be shown; the wording could not be trusted."""
+    facts = []
+    for o in deps.ledger.values():
+        if isinstance(o, Observation):
+            facts.append(SeriesFact(series_id=o.series_id, name=o.name, units=o.units, latest_period=o.period, latest_value=o.value))
+        else:
+            facts.append(SeriesFact(**o.model_dump()))
+    answer = DeskAnswer(
+        facts=facts, spreads=list(deps.spreads.values()), cites=list(deps.readings), readings=list(deps.readings.values()),
+        summary="The numbers the tools returned are below. No summary is shown, because none that was written passed every check.")
+    answer.caveats = code_caveats(deps.source, answer)
+    return answer
+
+
 @agent.output_validator
 def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     """Reject any fact that differs from what a tool returned, and any summary number that traces to no fact."""
@@ -344,10 +380,6 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         else:
             problems.append(f"cites {key!r}, which no tool returned in this run. Keys available: {sorted(ctx.deps.readings)}.")
     answer.cites = [r.key for r in answer.readings]
-    # Code, not the model, says when an input is behind: one caveat naming the series and their last dates.
-    used = [f.series_id for f in answer.facts] + [x for s in answer.spreads for x in (s.series_a, s.series_b)]
-    used += [x for r in answer.readings for x in r.series_ids]
-    stale = readings.stale_inputs(ctx.deps.source, used)
     # A spread the tool returned is copied in whole, so its code-written history and note come with it.
     answer.spreads = [
         src if (src := ctx.deps.spreads.get((s.series_a, s.series_b))) and s.period == src.period
@@ -356,12 +388,7 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     ]
     # The model's caveats are held to the same tracing as the summary: one that states a number or a
     # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
-    kept = prose.clean_caveats(answer)
-    # ... and the evidence that disagrees with the balance, so a one-sided answer is not possible.
-    average = [f"Average-price contract: {i} settles on the average price of its month. It is not a spot price or a "
-               "single delivery month, so it is not subtracted from one." for i in dict.fromkeys(used) if i in readings.AVERAGE_PRICE]
-    answer.caveats = (kept + [r.counter for r in answer.readings if r.counter]
-                      + list(dict.fromkeys(s.note for s in answer.spreads if s.note)) + average + ([stale] if stale else []))
+    answer.caveats = prose.clean_caveats(answer) + code_caveats(ctx.deps.source, answer)
     if not ctx.deps.enforce:
         return answer
     for f in answer.facts:
