@@ -68,6 +68,10 @@ def _load_counts() -> None:
             rows = [json.loads(line) for line in f if line.strip()]
     except (OSError, ValueError):
         return
+    # The day's limits survive a restart too: a release must not hand out a fresh daily budget.
+    today = [r for r in rows if str(r.get("at", ""))[:10] == dt.date.today().isoformat() and r.get("status") != 429]
+    _day.update(date=dt.date.today(), count=len(today),
+                usd=sum(float(r["answer"].get("usd") or 0) for r in today if isinstance(r.get("answer"), dict)))
     answered = [r for r in rows if r.get("status") == 200 and isinstance(r.get("answer"), dict) and "checked" in r["answer"]]
     if answered:
         _checks.update(answers=len(answered), failed=sum(not r["answer"]["checked"] for r in answered), since=answered[0]["at"][:10])
