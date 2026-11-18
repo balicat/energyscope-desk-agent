@@ -31,7 +31,7 @@ echo "2/4 control run";                       $PY run_evals.py --source fixture 
 echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | tail -1
 if [ "${LIVE:-1}" = "1" ]; then
   export ANTHROPIC_API_KEY=$(tr -d '\r\n' < /opt/energyscope/.anthropic_api_key)
-  echo "4/4 today's lake, $MODEL (numbers must all be right; at most 2 behaviour misses of 80)"
+  echo "4/4 today's lake, $MODEL (numbers must all be right; at most 2 behaviour misses)"
   $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 2>/dev/null | grep -E "^FAILED|^assertions|^gate"
 else
   echo "4/4 live model skipped (LIVE=0)"

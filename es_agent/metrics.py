@@ -80,7 +80,7 @@ def untraceable_numbers(answer: DeskAnswer) -> list[str]:
         in_names |= set(_NUM.findall(f"{s.name_a} {s.series_a} {s.name_b} {s.series_b}"))
     for r in answer.readings:
         allowed += list(r.values.values())
-        in_names |= set(_NUM.findall(f"{r.title} {r.note} {r.key} {' '.join(r.series_ids)} {' '.join(r.values)}"))
+        in_names |= set(_NUM.findall(f"{r.title} {r.note} {r.context} {r.key} {' '.join(r.series_ids)} {' '.join(r.values)}"))
     bad = []
     for m in _NUM.finditer(_ISO.sub(" ", answer.summary)):
         if m.group() in in_names:

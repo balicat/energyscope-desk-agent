@@ -42,7 +42,7 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
             problems.append(f"spread {s.series_a} minus {s.series_b} differs from source")
     for r in answer.readings:
         truth = readings.compute(source, r.key)
-        if truth is None or truth.period != r.period or set(truth.values) != set(r.values) or not all(
+        if truth is None or truth.period != r.period or truth.context != r.context or set(truth.values) != set(r.values) or not all(
             metrics.close(truth.values[k], r.values[k]) for k in r.values
         ):
             problems.append(f"reading {r.key} differs from source")

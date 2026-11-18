@@ -29,6 +29,7 @@ from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
 from es_agent.agent import Deps, agent
+from es_agent.charts import charts_for
 from es_agent.memory import Sessions, with_context
 from es_agent.scripted import is_rejection, scripted
 from es_agent.sources import FixtureSource, FlightSource, ParquetLakeSource
@@ -133,6 +134,10 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         problems = verify(result.output, _source)
     except Exception as e:
         problems = [f"check failed to run: {type(e).__name__}: {e}"[:300]]
+    try:  # the history behind the numbers, for the page to draw; never from the model
+        out["charts"] = charts_for(result.output, _source)
+    except Exception:
+        out["charts"] = []
     seconds = round(time.time() - t0, 2)
     usd = float(getattr(result.usage, "cost", None) or 0)
     with _state_lock:
@@ -222,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
             with open(LOG, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                                     "status": status, "question": question[:MAX_CHARS], "detail": detail,
-                                    "answer": body if status == 200 else body.get("error")}) + "\n")
+                                    "answer": {k: v for k, v in body.items() if k != "charts"} if status == 200 else body.get("error")}) + "\n")
         except OSError:
             pass
 

@@ -1,9 +1,14 @@
-"""Computed readings: a futures curve, a crack spread, a seasonal comparison, positioning.
+"""Computed readings: a curve, a crack spread, an arbitrage, surprises, a seasonal comparison,
+a percentile, positioning, a what-if scenario, a weekly watch.
 
-Each function reads series through a DataSource and does the arithmetic in
-code. A reading has a key ("curve:brent", "crack:3-2-1", ...) that is enough to
-recompute it, so the output validator, the eval and the live check can all
-rebuild the same numbers with `compute(source, key)`.
+Each function reads series through a DataSource and does the arithmetic in code. A reading has
+a key ("curve:brent", "crack:3-2-1", ...) that is enough to recompute it, so the output
+validator, the eval and the live check can all rebuild the same numbers with
+`compute(source, key)`.
+
+Readings that rank a level against its own history also say, in `context`, whether the level
+is unusual and when it was last seen: the sentence is written here, from the data, never by
+the model.
 """
 
 from __future__ import annotations
@@ -13,6 +18,8 @@ import datetime as dt
 from . import clock
 from .models import Reading
 from .sources import DataSource
+
+History = list[tuple[dt.date, float]]
 
 CURVES = {
     "brent": ("Brent futures curve (NYMEX BZ, settles on ICE Brent)", [f"ICE.BRENT.M{i}.D" for i in range(1, 13)]),
@@ -28,62 +35,147 @@ POSITIONING = {
     "gasoline": ("RBOB gasoline (NYMEX)", "CFTC.RBOB"),
 }
 PERCENTILE_WEEKS = 156
+HISTORY_YEARS = 3
+BRENT_SPOT, FREIGHT = "PET.RBRTE.D", "SHIP.BWET.D"
+GASOIL, NYH_DIESEL = "ICE.GASOIL.M1.D", "PET.EER_EPD2DXL0_PF4_Y35NY_DPG.D"
+GALLONS_PER_TONNE_GASOIL = 312.9  # 7.45 barrels a tonne x 42
+ROUTES = ("us_crude_to_europe", "distillate_us_to_europe")
 
 
 def _since(days: int) -> dt.date:
     return clock.today() - dt.timedelta(days=days)
 
 
-def _on_common_date(source: DataSource, ids: list[str], days: int = 60) -> tuple[dt.date, list[float]] | None:
-    """Values of every series on the latest date they all have."""
+def _rank(sample: list[float], v: float) -> float:
+    """Share of the sample at or below v, in percent."""
+    return round(sum(x <= v for x in sample) / len(sample) * 100, 1)
+
+
+def aligned(source: DataSource, ids: list[str], days: int) -> list[tuple[dt.date, list[float]]]:
+    """Rows for the dates every series has, oldest first."""
     hists = [dict(source.history(sid, start=_since(days))) for sid in ids]
-    common = set(hists[0]).intersection(*hists[1:]) if hists and all(hists) else set()
-    if not common:
-        return None
-    d = max(common)
-    return d, [h[d] for h in hists]
+    if not hists or not all(hists):
+        return []
+    common = sorted(set(hists[0]).intersection(*hists[1:]))
+    return [(d, [h[d] for h in hists]) for d in common]
+
+
+def crack_value(kind: str, crude: float, gas: float, dist: float) -> float:
+    gas_bbl, dist_bbl = gas * GALLONS_PER_BARREL, dist * GALLONS_PER_BARREL
+    return {"3-2-1": (2 * gas_bbl + dist_bbl) / 3, "gasoline": gas_bbl, "distillate": dist_bbl}[kind] - crude
+
+
+def crack_history(source: DataSource, kind: str, days: int = 366 * HISTORY_YEARS) -> History:
+    return [(d, round(crack_value(kind, *v), 6)) for d, v in aligned(source, [CRUDE, GASOLINE, DISTILLATE], days)]
+
+
+def spread_history(source: DataSource, a: str, b: str, days: int = 366 * HISTORY_YEARS) -> History:
+    return [(d, round(v[0] - v[1], 6)) for d, v in aligned(source, [a, b], days)]
+
+
+SPELL_GAP = 5  # observations back inside the line that do not end a spell
+
+
+def spell(hist: History, prefix: str = "", what: str = "It") -> tuple[dict[str, float], str]:
+    """Is the latest value unusual for this window, how long has it been so, and when was it last so?
+
+    "Unusual" is beyond the window's 10th or 90th percentile line. A spell is a run of observations
+    beyond that line; a dip back inside it of up to SPELL_GAP observations does not end the spell.
+    Returns the numbers and a sentence built from them.
+    """
+    ordered = sorted(v for _, v in hist)
+    p10, p90 = ordered[int(0.10 * (len(ordered) - 1))], ordered[int(0.90 * (len(ordered) - 1))]
+    d, v = hist[-1]
+    values = {f"{prefix}p10": p10, f"{prefix}p90": p90}
+    if v >= p90:
+        side, pct, line = "above", 90, p90
+        out = [x >= p90 for _, x in hist]
+    elif v <= p10:
+        side, pct, line = "below", 10, p10
+        out = [x <= p10 for _, x in hist]
+    else:
+        return values, (f"{what} is inside its usual range, between the 10th and 90th percentile lines "
+                        f"({p10:.2f} and {p90:.2f}) of the window.")
+    spells, start, last = [], None, None  # (first index, last index) of each spell, oldest first
+    for i, flag in enumerate(out):
+        if not flag:
+            continue
+        if start is None:
+            start = i
+        elif i - last - 1 > SPELL_GAP:
+            spells.append((start, last))
+            start = i
+        last = i
+    spells.append((start, last))
+    first = hist[spells[-1][0]][0]
+    values[f"{prefix}spell_days"] = (d - first).days
+    sentence = (f"{what} has been {side} the {pct}th percentile line ({line:.2f}) since {first}, "
+                f"{(d - first).days} days, allowing for brief dips back.")
+    if len(spells) == 1:
+        return values, sentence + " There is no earlier spell beyond that line in the window."
+    a, b = spells[-2]
+    run = [x for _, x in hist[a:b + 1]]
+    extreme = max(run) if side == "above" else min(run)
+    values.update({
+        f"{prefix}previous_spell_days": (hist[b][0] - hist[a][0]).days,
+        f"{prefix}previous_spell_extreme": extreme,
+        f"{prefix}days_since_previous_spell": (d - hist[b][0]).days,
+    })
+    when = (f"on {hist[a][0]} alone" if a == b else
+            f"from {hist[a][0]} to {hist[b][0]} ({(hist[b][0] - hist[a][0]).days} days)")
+    return values, sentence + f" The previous spell was {when}, reaching {extreme:.2f}."
 
 
 def curve(source: DataSource, market: str) -> Reading | None:
     if market not in CURVES:
         return None
     title, ids = CURVES[market]
-    got = _on_common_date(source, ids)
-    if got is None:
+    rows = aligned(source, ids, 60)
+    if not rows:
         return None
-    d, vals = got
+    d, vals = rows[-1]
     n = len(vals)
     values = {f"M{i + 1}": v for i, v in enumerate(vals)}
     values["M1_minus_M2"] = round(vals[0] - vals[1], 6)
     values[f"M1_minus_M{n}"] = round(vals[0] - vals[-1], 6)
     slope = vals[0] - vals[-1]
     note = "backwardation (front above back)" if slope > 0 else "contango (front below back)" if slope < 0 else "flat"
+    earlier = [(dd, v) for dd, v in rows if dd <= d - dt.timedelta(days=7)]
+    context = ""
+    if earlier:
+        was = round(earlier[-1][1][0] - earlier[-1][1][-1], 6)
+        values[f"M1_minus_M{n}_a_week_earlier"] = was
+        move = "steepened" if abs(slope) > abs(was) else "flattened" if abs(slope) < abs(was) else "not moved"
+        context = (f"M1 minus M{n} was {was:.2f} on {earlier[-1][0]} and is {slope:.2f} now: the curve has {move} over the week.")
     return Reading(key=f"curve:{market}", title=title, period=d, units=source.meta(ids[0]).units,
-                   series_ids=ids, values=values, note=note)
+                   series_ids=ids, values=values, note=note, context=context)
 
 
 def crack(source: DataSource, kind: str) -> Reading | None:
     if kind not in CRACKS:
         return None
-    ids = [CRUDE, GASOLINE, DISTILLATE]
-    got = _on_common_date(source, ids)
-    if got is None:
+    rows = aligned(source, [CRUDE, GASOLINE, DISTILLATE], 366 * HISTORY_YEARS)
+    if len(rows) < 60 or rows[-1][0] < _since(60):
         return None
-    d, (crude, gas, dist) = got
-    gas_bbl, dist_bbl = gas * GALLONS_PER_BARREL, dist * GALLONS_PER_BARREL
-    products = {"3-2-1": (2 * gas_bbl + dist_bbl) / 3, "gasoline": gas_bbl, "distillate": dist_bbl}[kind]
+    d, (crude, gas, dist) = rows[-1]
+    hist = [(dd, round(crack_value(kind, *v), 6)) for dd, v in rows]
     values = {
-        "crack": round(products - crude, 6),
+        "crack": hist[-1][1],
         "crude": crude,
         "gasoline_per_gallon": gas,
         "distillate_per_gallon": dist,
-        "gasoline_per_barrel": round(gas_bbl, 6),
-        "distillate_per_barrel": round(dist_bbl, 6),
+        "gasoline_per_barrel": round(gas * GALLONS_PER_BARREL, 6),
+        "distillate_per_barrel": round(dist * GALLONS_PER_BARREL, 6),
         "gallons_per_barrel": GALLONS_PER_BARREL,
+        "crack_percentile": _rank([v for _, v in hist], hist[-1][1]),
+        "percentile_years": HISTORY_YEARS,
     }
+    extra, context = spell(hist, "crack_", "The crack")
+    values.update(extra)
     return Reading(key=f"crack:{kind}", title=f"{kind} crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil",
-                   period=d, units="Dollars per Barrel", series_ids=ids, values=values,
-                   note="products minus crude, spot prices; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude")
+                   period=d, units="Dollars per Barrel", series_ids=[CRUDE, GASOLINE, DISTILLATE], values=values,
+                   note="products minus crude, spot prices; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude",
+                   context=context)
 
 
 def _same_date(d: dt.date, years_back: int) -> dt.date:
@@ -133,34 +225,33 @@ def positioning(source: DataSource, market: str) -> Reading | None:
     label, base = POSITIONING[market]
     ids = [f"{base}.MM_Net", f"{base}.MM_Long", f"{base}.MM_Short", f"{base}.OI"]
     net = source.history(ids[0], start=_since(7 * PERCENTILE_WEEKS + 30))
-    if len(net) < 2:
+    if len(net) < 20:
         return None
+    net = net[-PERCENTILE_WEEKS:]
     d, latest = net[-1]
     others = [dict(source.history(sid, start=d - dt.timedelta(days=7))).get(d) for sid in ids[1:]]
     if any(o is None for o in others):
         return None
-    sample = [v for _, v in net[-PERCENTILE_WEEKS:]]
+    sample = [v for _, v in net]
     values = {
         "managed_money_net": latest,
         "managed_money_long": others[0],
         "managed_money_short": others[1],
         "open_interest": others[2],
         "net_change_on_week": round(latest - net[-2][1], 6),
-        "net_percentile": round(sum(v <= latest for v in sample) / len(sample) * 100, 1),
+        "net_percentile": _rank(sample, latest),
         "percentile_weeks": len(sample),
     }
+    extra, context = spell(net, "net_", "The net position")
+    values.update(extra)
     return Reading(key=f"positioning:{market}", title=f"{label}: managed-money positioning", period=d, units="contracts",
                    series_ids=ids, values=values,
-                   note="net_percentile ranks the latest net position against the last percentile_weeks weekly reports")
-
-
-def _rank(sample: list[float], v: float) -> float:
-    """Share of the sample at or below v, in percent."""
-    return round(sum(x <= v for x in sample) / len(sample) * 100, 1)
+                   note="net_percentile ranks the latest net position against the last percentile_weeks weekly reports",
+                   context=context)
 
 
 def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | None:
-    """Where the latest value sits in its own last `years` years."""
+    """Where the latest value sits in its own last `years` years, and when it was last this unusual."""
     hit = source.meta(series_id)
     if hit is None or not 1 <= years <= 10:
         return None
@@ -181,80 +272,159 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
         "observations": len(sample),
         "years": years,
     }
+    extra, context = spell(hist)
+    values.update(extra)
     return Reading(key=f"percentile:{series_id}:{years}", title=f"{hit.name}: latest against its last {years} years",
                    period=d, units=hit.units, series_ids=[series_id], values=values,
-                   note="percentile 0 = lowest of the window, 100 = highest")
+                   note="percentile 0 = lowest of the window, 100 = highest", context=context)
 
 
-ARB_YEARS = 3
-BRENT_SPOT, FREIGHT = "PET.RBRTE.D", "SHIP.BWET.D"
-GASOIL, NYH_DIESEL = "ICE.GASOIL.M1.D", "PET.EER_EPD2DXL0_PF4_Y35NY_DPG.D"
-GALLONS_PER_TONNE_GASOIL = 312.9  # 7.45 barrels a tonne x 42
-ROUTES = ("us_crude_to_europe", "distillate_us_to_europe")
+def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
+               spreads: list[float], freights: list[float]) -> tuple[float, float, float, str]:
+    """(spread percentile, freight percentile, score from -2 to +2, verdict)."""
+    spread_pct, freight_pct = _rank(spreads, brent - wti), _rank(freights, freight)
+    parts = [(spread_pct - 50) / 50, (50 - freight_pct) / 50, max(-1.0, min(1.0, (m12 - m1) / m1 / 0.1))]
+    score = round(sum(parts) / len(parts) * 2, 2)
+    verdict = ("strongly favours" if score >= 1 else "tilts towards" if score >= 0.3 else
+               "strongly against" if score <= -1 else "tilts against" if score <= -0.3 else "neutral for")
+    return spread_pct, freight_pct, score, verdict
 
 
-def _paired(source: DataSource, a: str, b: str) -> list[tuple[dt.date, float, float]]:
-    start = _since(366 * ARB_YEARS)
-    hb = dict(source.history(b, start=start))
-    return [(d, va, hb[d]) for d, va in source.history(a, start=start) if d in hb]
+def _crude_arb_inputs(source: DataSource):
+    """Latest date with every input, the inputs on it, and the histories behind the percentiles."""
+    pairs = aligned(source, [BRENT_SPOT, CRUDE], 366 * HISTORY_YEARS)
+    freight = source.history(FREIGHT, start=_since(366 * HISTORY_YEARS))
+    m1 = dict(source.history("ICE.BRENT.M1.D", start=_since(60)))
+    m12 = dict(source.history("ICE.BRENT.M12.D", start=_since(60)))
+    dates = {d for d, _ in pairs} & {d for d, _ in freight} & set(m1) & set(m12)
+    if not dates or len(pairs) < 60 or len(freight) < 60:
+        return None
+    d = max(dates)
+    spread_hist = [(dd, round(v[0] - v[1], 6)) for dd, v in pairs if dd <= d]
+    freight_hist = [(dd, v) for dd, v in freight if dd <= d]
+    brent, wti = dict(pairs)[d]
+    return d, brent, wti, dict(freight)[d], m1[d], m12[d], spread_hist, freight_hist
+
+
+ARB_NOTE = ("+2 = wide spread, cheap freight, contango; -2 = narrow spread, dear freight, backwardation. Freight is the "
+            "Breakwave tanker ETF, a proxy, not a route rate; no physical differentials or port costs are included.")
 
 
 def arbitrage(source: DataSource, route: str) -> Reading | None:
     """Whether the prices favour moving a barrel from the US to Europe. No route freight rates or physical
     differentials are in the data, so this is the price side of the arbitrage, not the full economics."""
     if route == "us_crude_to_europe":
-        pairs = _paired(source, BRENT_SPOT, CRUDE)
-        freight = source.history(FREIGHT, start=_since(366 * ARB_YEARS))
-        m1 = dict(source.history("ICE.BRENT.M1.D", start=_since(60)))
-        m12 = dict(source.history("ICE.BRENT.M12.D", start=_since(60)))
-        dates = {d for d, _, _ in pairs} & {d for d, _ in freight} & set(m1) & set(m12)
-        if not dates or len(pairs) < 60 or len(freight) < 60:
+        got = _crude_arb_inputs(source)
+        if got is None:
             return None
-        d = max(dates)
-        spreads = [a - b for dd, a, b in pairs if dd <= d]
-        brent, wti = next((a, b) for dd, a, b in pairs if dd == d)
-        fr_sample = [v for dd, v in freight if dd <= d]
-        fr = dict(freight)[d]
-        spread_pct, freight_pct = _rank(spreads, brent - wti), _rank(fr_sample, fr)
-        slope = m12[d] - m1[d]
-        parts = [(spread_pct - 50) / 50, (50 - freight_pct) / 50, max(-1.0, min(1.0, slope / m1[d] / 0.1))]
-        score = round(sum(parts) / len(parts) * 2, 2)
-        verdict = ("strongly favours" if score >= 1 else "tilts towards" if score >= 0.3 else
-                   "strongly against" if score <= -1 else "tilts against" if score <= -0.3 else "neutral for")
+        d, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
+        spread_pct, freight_pct, score, verdict = _arb_score(
+            brent, wti, fr, m1, m12, [v for _, v in spread_hist], [v for _, v in freight_hist])
         values = {
             "brent": brent, "wti": wti, "brent_minus_wti": round(brent - wti, 6), "spread_percentile": spread_pct,
             "freight_proxy": fr, "freight_percentile": freight_pct,
-            "curve_M1": m1[d], "curve_M12": m12[d], "curve_M12_minus_M1": round(slope, 6),
-            "score": score, "percentile_years": ARB_YEARS,
+            "curve_M1": m1, "curve_M12": m12, "curve_M12_minus_M1": round(m12 - m1, 6),
+            "score": score, "percentile_years": HISTORY_YEARS,
         }
+        s_extra, s_context = spell(spread_hist, "spread_", "The Brent-WTI spread")
+        f_extra, f_context = spell(freight_hist, "freight_", "The freight proxy")
+        values.update(s_extra)
+        values.update(f_extra)
         return Reading(
             key=f"arb:{route}", title="US crude to Europe: Brent-WTI spread, tanker freight proxy, Brent curve",
             period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
             series_ids=[BRENT_SPOT, CRUDE, FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"], values=values,
-            note=(f"score {verdict} US crude exports: +2 = wide spread, cheap freight, contango; -2 = narrow spread, dear "
-                  "freight, backwardation. Freight is the Breakwave tanker ETF, a proxy, not a route rate; no physical "
-                  "differentials or port costs are included."))
+            note=f"score {verdict} US crude exports: " + ARB_NOTE, context=s_context + " " + f_context)
     if route == "distillate_us_to_europe":
-        pairs = _paired(source, GASOIL, NYH_DIESEL)
-        if len(pairs) < 60 or pairs[-1][0] < _since(60):
+        rows = aligned(source, [GASOIL, NYH_DIESEL], 366 * HISTORY_YEARS)
+        if len(rows) < 60 or rows[-1][0] < _since(60):
             return None
-        d, gasoil_t, nyh = pairs[-1]
-        diffs = [a / GALLONS_PER_TONNE_GASOIL - b for _, a, b in pairs]
+        d, (gasoil_t, nyh) = rows[-1]
+        hist = [(dd, round(v[0] / GALLONS_PER_TONNE_GASOIL - v[1], 6)) for dd, v in rows]
         gasoil_gal = gasoil_t / GALLONS_PER_TONNE_GASOIL
         values = {
             "ice_gasoil_per_tonne": gasoil_t, "ice_gasoil_per_gallon": round(gasoil_gal, 6),
-            "new_york_diesel_per_gallon": nyh, "europe_minus_us_per_gallon": round(gasoil_gal - nyh, 6),
-            "difference_percentile": _rank(diffs, diffs[-1]), "gallons_per_tonne": GALLONS_PER_TONNE_GASOIL,
-            "percentile_years": ARB_YEARS,
+            "new_york_diesel_per_gallon": nyh, "europe_minus_us_per_gallon": hist[-1][1],
+            "difference_percentile": _rank([v for _, v in hist], hist[-1][1]),
+            "gallons_per_tonne": GALLONS_PER_TONNE_GASOIL, "percentile_years": HISTORY_YEARS,
         }
+        extra, context = spell(hist, "difference_", "The Europe-minus-US gap")
+        values.update(extra)
         return Reading(
             key=f"arb:{route}", title="Distillate, US to Europe: ICE gasoil against New York Harbor diesel",
             period=d, units="Dollars per Gallon (difference); Dollars per Tonne (gasoil)",
             series_ids=[GASOIL, NYH_DIESEL], values=values,
             note=("europe_minus_us is the price gap a cargo would earn before freight; a high percentile means Europe is "
                   "paying up relative to the last three years. ICE gasoil is a futures price, New York diesel a spot "
-                  "price; no freight is included."))
+                  "price; no freight is included."), context=context)
     return None
+
+
+def _num(x: float) -> str:
+    return f"{x:+g}"
+
+
+def arbitrage_scenario(source: DataSource, route: str, brent_change: float, wti_change: float,
+                       freight_change_pct: float) -> Reading | None:
+    """What the US-crude-to-Europe score would be if prices moved: a what-if, not an observation."""
+    if route != "us_crude_to_europe" or not (abs(brent_change) <= 50 and abs(wti_change) <= 50 and abs(freight_change_pct) <= 90):
+        return None
+    got = _crude_arb_inputs(source)
+    if got is None:
+        return None
+    d, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
+    spreads, freights = [v for _, v in spread_hist], [v for _, v in freight_hist]
+    o_spread_pct, o_freight_pct, o_score, _ = _arb_score(brent, wti, fr, m1, m12, spreads, freights)
+    brent2, wti2, fr2 = brent + brent_change, wti + wti_change, fr * (1 + freight_change_pct / 100)
+    s_spread_pct, s_freight_pct, s_score, verdict = _arb_score(brent2, wti2, fr2, m1, m12, spreads, freights)
+    values = {
+        "brent_change": brent_change, "wti_change": wti_change, "freight_change_pct": freight_change_pct,
+        "observed_brent_minus_wti": round(brent - wti, 6), "observed_spread_percentile": o_spread_pct,
+        "observed_freight_proxy": fr, "observed_freight_percentile": o_freight_pct, "observed_score": o_score,
+        "scenario_brent": round(brent2, 6), "scenario_wti": round(wti2, 6),
+        "scenario_brent_minus_wti": round(brent2 - wti2, 6), "scenario_spread_percentile": s_spread_pct,
+        "scenario_freight_proxy": round(fr2, 6), "scenario_freight_percentile": s_freight_pct,
+        "scenario_score": s_score, "score_change": round(s_score - o_score, 2),
+    }
+    return Reading(
+        key=f"scenario:arb:{route}:{_num(brent_change)}:{_num(wti_change)}:{_num(freight_change_pct)}",
+        title="What if: US crude to Europe with changed prices",
+        period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
+        series_ids=[BRENT_SPOT, CRUDE, FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"], values=values, hypothetical=True,
+        note=(f"Hypothetical. The stated changes are applied to the prices of {d} and the score is recomputed against "
+              f"the same three-year history; the curve is left as it is. In the scenario the score {verdict} US crude "
+              "exports. " + ARB_NOTE),
+        context="Numbers labelled scenario are not market observations; numbers labelled observed are.")
+
+
+def crack_scenario(source: DataSource, kind: str, crude_change: float, gasoline_change_pct: float,
+                   distillate_change_pct: float) -> Reading | None:
+    """What a crack spread would be if crude or products moved: a what-if, not an observation."""
+    if kind not in CRACKS or not (abs(crude_change) <= 50 and abs(gasoline_change_pct) <= 90 and abs(distillate_change_pct) <= 90):
+        return None
+    rows = aligned(source, [CRUDE, GASOLINE, DISTILLATE], 366 * HISTORY_YEARS)
+    if len(rows) < 60 or rows[-1][0] < _since(60):
+        return None
+    d, (crude, gas, dist) = rows[-1]
+    sample = [crack_value(kind, *v) for _, v in rows]
+    observed = round(crack_value(kind, crude, gas, dist), 6)
+    crude2, gas2, dist2 = crude + crude_change, gas * (1 + gasoline_change_pct / 100), dist * (1 + distillate_change_pct / 100)
+    scenario = round(crack_value(kind, crude2, gas2, dist2), 6)
+    values = {
+        "crude_change": crude_change, "gasoline_change_pct": gasoline_change_pct, "distillate_change_pct": distillate_change_pct,
+        "observed_crack": observed, "observed_crack_percentile": _rank(sample, observed),
+        "scenario_crude": round(crude2, 6), "scenario_gasoline_per_gallon": round(gas2, 6),
+        "scenario_distillate_per_gallon": round(dist2, 6),
+        "scenario_crack": scenario, "scenario_crack_percentile": _rank(sample, scenario),
+        "crack_change": round(scenario - observed, 6),
+    }
+    return Reading(
+        key=f"scenario:crack:{kind}:{_num(crude_change)}:{_num(gasoline_change_pct)}:{_num(distillate_change_pct)}",
+        title=f"What if: {kind} crack spread with changed prices", period=d, units="Dollars per Barrel",
+        series_ids=[CRUDE, GASOLINE, DISTILLATE], values=values, hypothetical=True,
+        note=(f"Hypothetical. The stated changes are applied to the spot prices of {d}; percentiles rank against the "
+              "last three years of the observed crack."),
+        context="Numbers labelled scenario are not market observations; numbers labelled observed are.")
 
 
 # The desk's watchlist: what "what moved?" looks across. Labels carry no digits, so they never
@@ -283,7 +453,7 @@ SURPRISE_WINDOWS = {"week": 7, "month": 30}
 SURPRISE_YEARS, SURPRISE_TOP, STALE_DAYS = 2, 5, 21
 
 
-def _window_changes(hist: list[tuple[dt.date, float]], days: int) -> list[float]:
+def _window_changes(hist: History, days: int) -> list[float]:
     """Each observation minus the last one at least `days` earlier."""
     out, i = [], 0
     for j, (d, v) in enumerate(hist):
@@ -294,12 +464,8 @@ def _window_changes(hist: list[tuple[dt.date, float]], days: int) -> list[float]
     return out
 
 
-def surprises(source: DataSource, window: str) -> Reading | None:
-    """The watchlist moves that are most unusual against their own history. There are no consensus forecasts in
-    the data, so a surprise here is a move that is large for that series, not a miss against expectations."""
-    if window not in SURPRISE_WINDOWS:
-        return None
-    days = SURPRISE_WINDOWS[window]
+def _unusual_moves(source: DataSource, days: int) -> list[tuple]:
+    """(abs z, label, series id, units, latest (date, value), change, z) for every fresh watchlist series."""
     found = []
     for label, sid in WATCHLIST:
         hit = source.meta(sid)
@@ -309,12 +475,21 @@ def surprises(source: DataSource, window: str) -> Reading | None:
             continue
         mean = sum(changes) / len(changes)
         sd = (sum((c - mean) ** 2 for c in changes) / len(changes)) ** 0.5
-        if not sd:
-            continue
-        found.append((abs((changes[-1] - mean) / sd), label, sid, hit.units, hist[-1], changes[-1], (changes[-1] - mean) / sd))
-    if not found:
+        if sd:
+            z = (changes[-1] - mean) / sd
+            found.append((abs(z), label, sid, hit.units, hist[-1], changes[-1], z))
+    return sorted(found, reverse=True)
+
+
+def surprises(source: DataSource, window: str) -> Reading | None:
+    """The watchlist moves that are most unusual against their own history. There are no consensus forecasts in
+    the data, so a surprise here is a move that is large for that series, not a miss against expectations."""
+    if window not in SURPRISE_WINDOWS:
         return None
-    top = sorted(found, reverse=True)[:SURPRISE_TOP]
+    days = SURPRISE_WINDOWS[window]
+    top = _unusual_moves(source, days)[:SURPRISE_TOP]
+    if not top:
+        return None
     values, parts = {}, []
     for _, label, sid, units, (d, v), change, z in top:
         values[f"{label}: latest"] = v
@@ -329,23 +504,118 @@ def surprises(source: DataSource, window: str) -> Reading | None:
               "Units and dates: " + "; ".join(parts) + "."))
 
 
+WATCH_STOCKS = [("US commercial crude stocks", "PET.WCESTUS1.W"), ("US gasoline stocks", "PET.WGTSTUS1.W"),
+                ("US distillate stocks", "PET.WDISTUS1.W")]
+WATCH_PAIRS = [("Brent spot", BRENT_SPOT, "WTI spot", CRUDE), ("Gulf Coast gasoline", GASOLINE, "WTI spot", CRUDE)]
+
+
+def _pct_change(hist: History, days: int) -> float | None:
+    if not hist:
+        return None
+    d, v = hist[-1]
+    base = [x for dd, x in hist if dd <= d - dt.timedelta(days=days)]
+    return round((v - base[-1]) / base[-1] * 100, 2) if base and base[-1] else None
+
+
+def watch(source: DataSource, window: str) -> Reading | None:
+    """What a desk should look at: unusual moves, stretched positioning, curve change, stocks outside their
+    seasonal range, and markets that usually move together going separate ways. A list of flags, each a
+    fact from the data; it ranks nothing by importance and predicts nothing."""
+    if window not in SURPRISE_WINDOWS:
+        return None
+    days = SURPRISE_WINDOWS[window]
+    values: dict[str, float] = {}
+    flags: list[str] = []
+    ids: list[str] = []
+    latest = None
+
+    for _, label, sid, units, (d, v), change, z in _unusual_moves(source, days)[:3]:
+        if abs(z) >= 1.5:
+            values[f"{label}: change"] = round(change, 6)
+            values[f"{label}: z-score"] = round(z, 2)
+            flags.append(f"{label} moved {change:+.2f} {units} (z-score {z:+.2f}, to {d})")
+            ids.append(sid)
+            latest = max(latest or d, d)
+
+    for market, (label, base) in POSITIONING.items():
+        r = positioning(source, market)
+        if r and (r.values["net_percentile"] >= 90 or r.values["net_percentile"] <= 10):
+            values[f"{label}: fund net percentile"] = r.values["net_percentile"]
+            side = "long" if r.values["net_percentile"] >= 90 else "short"
+            flags.append(f"funds are stretched {side} in {label} (net position at the {r.values['net_percentile']:.1f} "
+                         f"percentile of three years, report of {r.period})")
+            ids.append(f"{base}.MM_Net")
+            latest = max(latest or r.period, r.period)
+
+    c = curve(source, "brent")
+    if c:
+        n = len(CURVES["brent"][1])
+        now, was = c.values[f"M1_minus_M{n}"], c.values.get(f"M1_minus_M{n}_a_week_earlier")
+        values["Brent curve: front minus back"] = now
+        if was is not None:
+            values["Brent curve: front minus back a week earlier"] = was
+            if abs(now - was) >= 1:
+                flags.append(f"the Brent curve front-minus-back spread went from {was:.2f} to {now:.2f} in a week ({c.note})")
+        ids.append("ICE.BRENT.M1.D")
+        latest = max(latest or c.period, c.period)
+
+    for label, sid in WATCH_STOCKS:
+        s = seasonal(source, sid, 5)
+        if s and s.note != "inside the range":
+            values[f"{label}: against five-year average, pct"] = round(s.values["difference_pct"], 2)
+            flags.append(f"{label} are {s.note.replace('the range', 'their five-year range')} for the time of year "
+                         f"({s.values['difference_pct']:+.2f}% against the average, week of {s.period})")
+            ids.append(sid)
+            latest = max(latest or s.period, s.period)
+
+    for la, a, lb, b in WATCH_PAIRS:
+        pa = _pct_change(source.history(a, start=_since(days + 40)), days)
+        pb = _pct_change(source.history(b, start=_since(days + 40)), days)
+        if pa is not None and pb is not None and (pa * pb < 0 or abs(pa - pb) >= 3):
+            values[f"{la}: change pct"] = pa
+            values[f"{lb}: change pct against {la}"] = pb
+            flags.append(f"{la} and {lb} parted ways over the {window}: {pa:+.2f}% against {pb:+.2f}%")
+            ids += [a, b]
+
+    if latest is None:
+        return None
+    values["flags"] = len(flags)
+    context = ("Flags, in no order of importance: " + "; ".join(flags) + "." if flags
+               else f"Nothing on the watchlist is outside its usual range over the {window}.")
+    return Reading(
+        key=f"watch:{window}", title=f"What to watch: flags from prices, stocks, the curve and positioning over a {window}",
+        period=latest, units="each item in its own units", series_ids=list(dict.fromkeys(ids)), values=values,
+        note=("A flag is a fact from the data that is outside its usual range: an unusual move, a stretched position, "
+              "a curve that changed shape, stocks outside their five-year range, or two related prices diverging. "
+              "No forecasts, no news, no ranking by importance."),
+        context=context)
+
+
 def compute(source: DataSource, key: str) -> Reading | None:
     """Rebuild a reading from its key."""
     kind, _, rest = key.partition(":")
-    if kind == "curve":
-        return curve(source, rest)
-    if kind == "crack":
-        return crack(source, rest)
-    if kind == "positioning":
-        return positioning(source, rest)
-    if kind == "arb":
-        return arbitrage(source, rest)
-    if kind == "surprises":
-        return surprises(source, rest)
-    if kind == "percentile":
-        series_id, _, years = rest.rpartition(":")
-        return percentile(source, series_id, int(years)) if years.isdigit() else None
-    if kind == "seasonal":
-        series_id, _, years = rest.rpartition(":")
-        return seasonal(source, series_id, int(years)) if years.isdigit() else None
+    try:
+        if kind == "curve":
+            return curve(source, rest)
+        if kind == "crack":
+            return crack(source, rest)
+        if kind == "positioning":
+            return positioning(source, rest)
+        if kind == "arb":
+            return arbitrage(source, rest)
+        if kind == "surprises":
+            return surprises(source, rest)
+        if kind == "watch":
+            return watch(source, rest)
+        if kind in ("percentile", "seasonal"):
+            series_id, _, years = rest.rpartition(":")
+            if not years.isdigit():
+                return None
+            return (percentile if kind == "percentile" else seasonal)(source, series_id, int(years))
+        if kind == "scenario":
+            what, target, a, b, c = rest.split(":")
+            fn = arbitrage_scenario if what == "arb" else crack_scenario if what == "crack" else None
+            return fn(source, target, float(a), float(b), float(c)) if fn else None
+    except (ValueError, KeyError):
+        return None
     return None

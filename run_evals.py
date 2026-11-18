@@ -85,6 +85,13 @@ SUITE = [
       ("get_latest", {"series_ids": [WTI, US_CRUDE[0]]})], False),
     ("week_surprises", "What are this week's surprises in the oil market?", [WATCH],
      [("get_surprises", {"window": "week"})], False),
+    ("freight_history", "Is tanker freight unusually high, and when was it last this high?", [["SHIP.BWET.D"]],
+     [("search_series", {"query": "tanker freight", "dataset": "SHIP"}),
+      ("get_percentile", {"series_id": "SHIP.BWET.D", "years": 3})], False),
+    ("what_if_arb", "If Brent rose 5 dollars and freight fell 20%, would the US crude arbitrage to Europe open?", [[BRENT], [WTI]],
+     [("get_arbitrage_scenario", {"brent_change": 5, "wti_change": 0, "freight_change_pct": -20})], False),
+    ("week_watch", "What should I be paying attention to in oil this week?", [WATCH + ["ICE.BRENT.M1.D"]],
+     [("get_watch", {"window": "week"})], False),
     ("follow_up", FOLLOW_UP, [[BRENT]],
      [("search_series", {"query": "Brent spot price"}), ("get_latest", {"series_ids": [BRENT]})], False),
     ("abstain_carbon", "What did EU carbon allowances (EUA) settle at yesterday?", [],
@@ -130,9 +137,21 @@ class RightSeries(Evaluator[str, DeskAnswer]):
         return EvaluationReason(not missing, f"missing one of {missing}" if missing else f"used {sorted(got)}")
 
 
+@dataclass
+class ScenarioLabelled(Evaluator[str, DeskAnswer]):
+    """An answer built on a what-if says so: a hypothetical number never reads as an observation."""
+
+    def evaluate(self, ctx):
+        if not any(r.hypothetical for r in ctx.output.readings):
+            return EvaluationReason(True, "no scenario in the answer")
+        words = ("if ", "would", "hypothetical", "scenario", "what-if", "assuming")
+        ok = any(w in ctx.output.summary.lower() for w in words)
+        return EvaluationReason(ok, "scenario stated as a condition" if ok else "scenario numbers presented without a condition")
+
+
 def build_dataset() -> Dataset:
     cases = [Case(name=n, inputs=q, metadata={"expect": e}) for n, q, e, _, _ in SUITE]
-    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), MaxToolCalls(max_calls=6)])
+    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), MaxToolCalls(max_calls=6)])
 
 
 def make_task(model_name: str, enforce: bool = True):
@@ -148,7 +167,7 @@ def make_task(model_name: str, enforce: bool = True):
     return task
 
 
-HARD = ("Grounded", "SummaryTraceable")  # a wrong or untraceable number: never tolerated, on any model
+HARD = ("Grounded", "SummaryTraceable", "ScenarioLabelled")  # a wrong, untraceable or unlabelled what-if number: never tolerated
 
 
 def tally(report) -> tuple[int, int, int, list[tuple[str, str, str]]]:

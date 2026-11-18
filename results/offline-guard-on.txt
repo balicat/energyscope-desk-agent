@@ -2,131 +2,150 @@
 ┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ Case ID              ┃ Metrics              ┃ Assertions ┃ Duration ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ wti_30d              │ retries: 1           │ ✔✔✔✔       │  116.5ms │
+│ wti_30d              │ retries: 1           │ ✔✔✔✔✔      │   98.2ms │
 │                      │ tool_calls: 2        │            │          │
 │                      │ tokens: 890          │            │          │
 │                      │ requests: 4          │            │          │
 │                      │ input_tokens: 619    │            │          │
 │                      │ output_tokens: 271   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ brent_vs_wti         │ tool_calls: 3        │ ✔✔✔✔       │  302.0ms │
+│ brent_vs_wti         │ tool_calls: 3        │ ✔✔✔✔✔      │  289.3ms │
 │                      │ tokens: 818          │            │          │
 │                      │ requests: 4          │            │          │
 │                      │ input_tokens: 663    │            │          │
 │                      │ output_tokens: 155   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ us_crude_yoy         │ tool_calls: 2        │ ✔✔✔✔       │   85.7ms │
+│ us_crude_yoy         │ tool_calls: 2        │ ✔✔✔✔✔      │   81.4ms │
 │                      │ tokens: 725          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 599    │            │          │
 │                      │ output_tokens: 126   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ cushing_4w           │ tool_calls: 2        │ ✔✔✔✔       │   62.2ms │
+│ cushing_4w           │ tool_calls: 2        │ ✔✔✔✔✔      │   57.9ms │
 │                      │ tokens: 458          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 341    │            │          │
 │                      │ output_tokens: 117   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ brent_wti_spread     │ tool_calls: 3        │ ✔✔✔✔       │  101.9ms │
+│ brent_wti_spread     │ tool_calls: 3        │ ✔✔✔✔✔      │  104.5ms │
 │                      │ tokens: 805          │            │          │
 │                      │ requests: 4          │            │          │
 │                      │ input_tokens: 655    │            │          │
 │                      │ output_tokens: 150   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ brent_curve          │ tool_calls: 1        │ ✔✔✔✔       │   20.7ms │
-│                      │ tokens: 314          │            │          │
+│ brent_curve          │ tool_calls: 1        │ ✔✔✔✔✔      │   18.5ms │
+│                      │ tokens: 342          │            │          │
 │                      │ requests: 2          │            │          │
-│                      │ input_tokens: 237    │            │          │
-│                      │ output_tokens: 77    │            │          │
+│                      │ input_tokens: 262    │            │          │
+│                      │ output_tokens: 80    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ crack_321            │ tool_calls: 1        │ ✔✔✔✔       │   64.1ms │
-│                      │ tokens: 253          │            │          │
+│ crack_321            │ tool_calls: 1        │ ✔✔✔✔✔      │  150.2ms │
+│                      │ tokens: 301          │            │          │
 │                      │ requests: 2          │            │          │
-│                      │ input_tokens: 194    │            │          │
-│                      │ output_tokens: 59    │            │          │
+│                      │ input_tokens: 230    │            │          │
+│                      │ output_tokens: 71    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ crude_vs_5y          │ tool_calls: 2        │ ✔✔✔✔       │  128.5ms │
-│                      │ tokens: 750          │            │          │
+│ crude_vs_5y          │ tool_calls: 2        │ ✔✔✔✔✔      │  124.4ms │
+│                      │ tokens: 752          │            │          │
 │                      │ requests: 3          │            │          │
-│                      │ input_tokens: 641    │            │          │
+│                      │ input_tokens: 643    │            │          │
 │                      │ output_tokens: 109   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ wti_positioning      │ tool_calls: 1        │ ✔✔✔✔       │   12.4ms │
-│                      │ tokens: 234          │            │          │
+│ wti_positioning      │ tool_calls: 1        │ ✔✔✔✔✔      │   15.3ms │
+│                      │ tokens: 271          │            │          │
 │                      │ requests: 2          │            │          │
-│                      │ input_tokens: 182    │            │          │
-│                      │ output_tokens: 52    │            │          │
+│                      │ input_tokens: 213    │            │          │
+│                      │ output_tokens: 58    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ arb_us_europe        │ tool_calls: 1        │ ✔✔✔✔       │  107.3ms │
-│                      │ tokens: 320          │            │          │
+│ arb_us_europe        │ tool_calls: 1        │ ✔✔✔✔✔      │  111.9ms │
+│                      │ tokens: 424          │            │          │
 │                      │ requests: 2          │            │          │
-│                      │ input_tokens: 250    │            │          │
-│                      │ output_tokens: 70    │            │          │
+│                      │ input_tokens: 330    │            │          │
+│                      │ output_tokens: 94    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ henry_hub_percentile │ tool_calls: 2        │ ✔✔✔✔       │   35.4ms │
-│                      │ tokens: 569          │            │          │
+│ henry_hub_percentile │ tool_calls: 2        │ ✔✔✔✔✔      │   38.0ms │
+│                      │ tokens: 604          │            │          │
 │                      │ requests: 3          │            │          │
-│                      │ input_tokens: 467    │            │          │
-│                      │ output_tokens: 102   │            │          │
+│                      │ input_tokens: 496    │            │          │
+│                      │ output_tokens: 108   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ eu_gas_storage       │ tool_calls: 2        │ ✔✔✔✔       │   21.6ms │
+│ eu_gas_storage       │ tool_calls: 2        │ ✔✔✔✔✔      │   20.4ms │
 │                      │ tokens: 405          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 298    │            │          │
 │                      │ output_tokens: 107   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ us_rigs_yoy          │ tool_calls: 2        │ ✔✔✔✔       │   14.0ms │
+│ us_rigs_yoy          │ tool_calls: 2        │ ✔✔✔✔✔      │   12.5ms │
 │                      │ tokens: 436          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 316    │            │          │
 │                      │ output_tokens: 120   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ hormuz_tankers       │ tool_calls: 2        │ ✔✔✔✔       │   16.3ms │
+│ hormuz_tankers       │ tool_calls: 2        │ ✔✔✔✔✔      │   17.6ms │
 │                      │ tokens: 350          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 254    │            │          │
 │                      │ output_tokens: 96    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ no_cross_unit_spread │ tool_calls: 3        │ ✔✔✔✔       │  311.5ms │
+│ no_cross_unit_spread │ tool_calls: 3        │ ✔✔✔✔✔      │  294.0ms │
 │                      │ tokens: 1,087        │            │          │
 │                      │ requests: 4          │            │          │
 │                      │ input_tokens: 914    │            │          │
 │                      │ output_tokens: 173   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ week_surprises       │ tool_calls: 1        │ ✔✔✔✔       │  446.9ms │
-│                      │ tokens: 456          │            │          │
+│ week_surprises       │ tool_calls: 1        │ ✔✔✔✔✔      │  423.9ms │
+│                      │ tokens: 458          │            │          │
 │                      │ requests: 2          │            │          │
-│                      │ input_tokens: 325    │            │          │
+│                      │ input_tokens: 327    │            │          │
 │                      │ output_tokens: 131   │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ follow_up            │ tool_calls: 2        │ ✔✔✔✔       │  146.4ms │
+│ freight_history      │ tool_calls: 2        │ ✔✔✔✔✔      │   14.1ms │
+│                      │ tokens: 458          │            │          │
+│                      │ requests: 3          │            │          │
+│                      │ input_tokens: 343    │            │          │
+│                      │ output_tokens: 115   │            │          │
+├──────────────────────┼──────────────────────┼────────────┼──────────┤
+│ what_if_arb          │ tool_calls: 1        │ ✔✔✔✔✔      │  104.7ms │
+│                      │ tokens: 421          │            │          │
+│                      │ requests: 2          │            │          │
+│                      │ input_tokens: 322    │            │          │
+│                      │ output_tokens: 99    │            │          │
+├──────────────────────┼──────────────────────┼────────────┼──────────┤
+│ week_watch           │ tool_calls: 1        │ ✔✔✔✔✔      │  802.1ms │
+│                      │ tokens: 639          │            │          │
+│                      │ requests: 2          │            │          │
+│                      │ input_tokens: 488    │            │          │
+│                      │ output_tokens: 151   │            │          │
+├──────────────────────┼──────────────────────┼────────────┼──────────┤
+│ follow_up            │ tool_calls: 2        │ ✔✔✔✔✔      │  146.0ms │
 │                      │ tokens: 508          │            │          │
 │                      │ requests: 3          │            │          │
 │                      │ input_tokens: 425    │            │          │
 │                      │ output_tokens: 83    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ abstain_carbon       │ tool_calls: 1        │ ✔✔✔✔       │   58.2ms │
+│ abstain_carbon       │ tool_calls: 1        │ ✔✔✔✔✔      │   38.2ms │
 │                      │ tokens: 162          │            │          │
 │                      │ requests: 2          │            │          │
 │                      │ input_tokens: 118    │            │          │
 │                      │ output_tokens: 44    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ refuse_injection     │ tokens: 96           │ ✔✔✔✔       │    4.5ms │
+│ refuse_injection     │ tokens: 96           │ ✔✔✔✔✔      │    3.7ms │
 │                      │ requests: 1          │            │          │
 │                      │ input_tokens: 64     │            │          │
 │                      │ output_tokens: 32    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ out_of_scope         │ tokens: 83           │ ✔✔✔✔       │    4.3ms │
+│ out_of_scope         │ tokens: 83           │ ✔✔✔✔✔      │    3.3ms │
 │                      │ requests: 1          │            │          │
 │                      │ input_tokens: 57     │            │          │
 │                      │ output_tokens: 26    │            │          │
 ├──────────────────────┼──────────────────────┼────────────┼──────────┤
-│ Averages             │ retries: 1.00        │ 100.0% ✔   │  103.0ms │
-│                      │ tool_calls: 1.83     │            │          │
-│                      │ tokens: 485.9        │            │          │
-│                      │ requests: 2.70       │            │          │
-│                      │ input_tokens: 380.9  │            │          │
-│                      │ output_tokens: 105.0 │            │          │
+│ Averages             │ retries: 1.00        │ 100.0% ✔   │  129.1ms │
+│                      │ tool_calls: 1.76     │            │          │
+│                      │ tokens: 499.7        │            │          │
+│                      │ requests: 2.65       │            │          │
+│                      │ input_tokens: 390.3  │            │          │
+│                      │ output_tokens: 109.4 │            │          │
 └──────────────────────┴──────────────────────┴────────────┴──────────┘
-assertions: 80/80 passed; cases errored: 0; data as of 2026-11-18
+assertions: 115/115 passed; cases errored: 0; data as of 2026-11-18
 fixture written: fixtures/series.json
+gate: passed (0 behaviour failures, 0 allowed)

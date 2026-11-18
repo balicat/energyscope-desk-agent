@@ -59,6 +59,8 @@ class Reading(BaseModel):
     series_ids: list[str]
     values: dict[str, float]
     note: str = ""
+    context: str = Field("", description="Written by code: whether the level is unusual and when it was last seen.")
+    hypothetical: bool = Field(False, description="True for a what-if scenario: its scenario_ values are not observations.")
 
 
 class SeriesFact(BaseModel):

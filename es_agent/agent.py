@@ -1,4 +1,4 @@
-"""The agent: eleven tools over EnergyScope data, a typed answer, and a
+"""The agent: fourteen tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -40,11 +40,17 @@ show where every number came from.
 
 How to work
 - Prefer a computed reading when one fits the question:
-  get_surprises (what moved unusually, what is new, what changed), get_arbitrage (is a route open),
-  get_curve (backwardation or contango), get_crack_spread (refining margin),
+  get_watch (what should I look at, what matters this week), get_surprises (what moved unusually, what
+  changed), get_arbitrage (is a route open), get_arbitrage_scenario and get_crack_scenario (what if a price
+  moved), get_curve (backwardation or contango), get_crack_spread (refining margin),
   get_seasonal (a level against its usual level for the time of year), get_percentile (is a level high or low
   against recent years), get_positioning (what funds are doing).
   Each returns a reading with a key. List every key you used in cites; quote the reading's values in the summary.
+- A reading's `context` says whether the level is unusual and when it was last seen. Use it: say how unusual
+  the level is, how long it has been so, and when it was last like this, in your own words but with its numbers
+  and dates unchanged.
+- A reading marked hypothetical is a what-if. Open with the condition ("If Brent rose 5 dollars ...") and keep
+  what would happen apart from what is observed. Never state a scenario_ number as a fact about the market.
 - Otherwise find series with search_series, then read them with get_latest, get_change or get_spread, and copy
   the tool values into facts or spreads unchanged. Prefer daily (D) or weekly (W) series unless asked otherwise.
 - Never compute, convert or estimate a number yourself. If you need a difference, a ratio or a comparison, a tool
@@ -210,6 +216,39 @@ def get_surprises(ctx: RunContext[Deps], window: Literal["week", "month"] = "wee
     consensus forecasts: say that a surprise here means an unusually large move."""
     ctx.deps.emit("get_surprises", {"window": window})
     return _keep(ctx, readings.surprises(ctx.deps.source, window), "No watchlist series has recent data.")
+
+
+@agent.tool
+def get_watch(ctx: RunContext[Deps], window: Literal["week", "month"] = "week") -> Reading:
+    """What a desk should look at now: flags for unusual moves, stretched fund positioning, a Brent curve that
+    changed shape, stocks outside their five-year range, and related prices that parted ways. Use for 'what
+    should I pay attention to', 'what matters this week', 'give me a brief'. Its context lists the flags; report
+    them as facts, in no order of importance, with no forecast."""
+    ctx.deps.emit("get_watch", {"window": window})
+    return _keep(ctx, readings.watch(ctx.deps.source, window), "No watchlist series has recent data.")
+
+
+@agent.tool
+def get_arbitrage_scenario(ctx: RunContext[Deps], brent_change: float = 0, wti_change: float = 0,
+                           freight_change_pct: float = 0) -> Reading:
+    """What if, for the US crude to Europe arbitrage: Brent and WTI change in dollars per barrel (plus or minus,
+    up to 50), freight in percent (up to 90). Returns the observed score and the score under the change, both
+    computed in code. Hypothetical: say so. Use for 'what if freight fell 20%', 'would it open if Brent rose 5'."""
+    args = {"brent_change": brent_change, "wti_change": wti_change, "freight_change_pct": freight_change_pct}
+    ctx.deps.emit("get_arbitrage_scenario", args)
+    return _keep(ctx, readings.arbitrage_scenario(ctx.deps.source, "us_crude_to_europe", **args),
+                 "Changes out of range (prices within 50 dollars, freight within 90 percent) or not enough recent data.")
+
+
+@agent.tool
+def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", "distillate"], crude_change: float = 0,
+                       gasoline_change_pct: float = 0, distillate_change_pct: float = 0) -> Reading:
+    """What if, for a crack spread: crude changes in dollars per barrel (up to 50), gasoline and distillate in
+    percent (up to 90). Returns the observed crack and the crack under the change. Hypothetical: say so."""
+    args = {"crude_change": crude_change, "gasoline_change_pct": gasoline_change_pct, "distillate_change_pct": distillate_change_pct}
+    ctx.deps.emit("get_crack_scenario", {"kind": kind, **args})
+    return _keep(ctx, readings.crack_scenario(ctx.deps.source, kind, **args),
+                 "Changes out of range (crude within 50 dollars, products within 90 percent) or not enough recent data.")
 
 
 @agent.tool
