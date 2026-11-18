@@ -87,7 +87,7 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 |---|---|---|
 | scripted model, frozen data (`--source fixture`) | **145/145**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
 | scripted model, validator off (`--no-guard`) | **143/145** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
-| `anthropic:claude-haiku-5-5`, live lake | **140/140** | the latest release run (28 cases). The two runs before it, on 26 cases, scored 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
+| `anthropic:claude-haiku-5-5`, live lake | **145/145** | the latest release run (29 cases). The run before it, on 28 cases, scored 140/140; the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
@@ -109,6 +109,7 @@ How the suite got here, including the failures:
 | 18 Nov | 115/115 on Haiku | history sentences, what-if scenarios, the weekly watch and charts; 23 cases, a fifth evaluator |
 | 18 Nov | 129/130 on Haiku | WTI, RBOB and heating oil futures curves ingested the same day; curve, futures-spread and futures-crack tools; 26 cases |
 | 18 Nov | 140/140 on Haiku | Oman crude (from the exchange's daily bulletin PDF) and a Dubai front-month series ingested the same day; the Oman curve through the existing curve tool, no new tools; 28 cases |
+| 18 Nov | 145/145 on Haiku | the arbitrage reading moved from the spot Brent-WTI spread to futures of one delivery month, after the two were seen to disagree (17th against 96th percentile); the spot spread is set beside it and the difference split in code; no new tools; 29 cases |
 
 ## Release gate
 
