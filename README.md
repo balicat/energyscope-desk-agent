@@ -5,7 +5,7 @@ The page shows the answer, the series and values behind it, each tool call as it
 numbers passed a recomputation from the data.
 
 Built on [Pydantic AI](https://ai.pydantic.dev) over the [EnergyScope](https://energyscope.io) data lake
-(23 datasets: EIA, NYMEX and Brent futures, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
+(24 datasets: EIA, NYMEX and Brent futures, Oman crude from the exchange's daily bulletin, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
 customers. First version 10 Nov 2026 (offline only); first run on a live model and public launch 18 Nov 2026.
 
 Named after 'The Librarian' in Neal Stephenson's *Snow Crash* (1992), the novel that also gave us 'The
@@ -70,7 +70,7 @@ Brent-WTI spread; on 18 Nov 2026 spot said $2.52 (17th percentile) while same-mo
 
 ## Evaluation
 
-Twenty-six questions, five evaluators each (130 assertions): `Grounded` (recompute from source),
+Twenty-eight questions, five evaluators each (140 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, the week's surprises and watch list, "when was it last this high", seasonal and
@@ -79,14 +79,14 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **130/130**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **128/130** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **140/140**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **138/140** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **129/130** | every number right; one question went over its tool budget. 2.5 tool calls and 6.1 s a question, $0.0031 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
-right, and anything outside twenty-six questions.
+right, and anything outside twenty-eight questions.
 
 How the suite got here, including the failures:
 

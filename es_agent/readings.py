@@ -24,6 +24,7 @@ History = list[tuple[dt.date, float]]
 CURVES = {
     "brent": ("Brent futures curve (NYMEX BZ, settles on ICE Brent)", [f"ICE.BRENT.M{i}.D" for i in range(1, 13)]),
     "wti": ("WTI futures curve (NYMEX CL)", [f"NYMEX.WTI.M{i}.D" for i in range(1, 13)]),
+    "oman": ("Oman crude futures curve (GME OQD)", [f"GME.OMAN.M{i}.D" for i in range(1, 13)]),
     "rbob": ("RBOB gasoline futures curve (NYMEX RB)", [f"NYMEX.RBOB.M{i}.D" for i in range(1, 13)]),
     "heating_oil": ("Heating oil (ULSD) futures curve (NYMEX HO)", [f"NYMEX.HO.M{i}.D" for i in range(1, 13)]),
 }

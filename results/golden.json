@@ -252,6 +252,27 @@
   "spreads": [],
   "summary": "Cushing, OK Ending Stocks excluding SPR of Crude Oil, Weekly was 27356.00 Thousand Barrels on 2026-11-06, up 749.00 (2.82%) from 26607.00 on 2026-10-09, 28 days earlier."
  },
+ "dubai_price": {
+  "caveats": [],
+  "cites": [],
+  "facts": [
+   {
+    "base_period": null,
+    "base_value": null,
+    "change_abs": null,
+    "change_pct": null,
+    "latest_period": "2026-11-17",
+    "latest_value": 92.186,
+    "lookback_days": null,
+    "name": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F)",
+    "series_id": "NYMEX.DUBAI.FRONT.D",
+    "units": "USD/bbl"
+   }
+  ],
+  "readings": [],
+  "spreads": [],
+  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 92.19 USD/bbl on 2026-11-17."
+ },
  "eu_gas_storage": {
   "caveats": [],
   "cites": [],
@@ -354,20 +375,20 @@
     "title": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil",
     "units": "Dollars per Barrel",
     "values": {
-     "crack": 41.4818,
+     "crack": 41.158,
      "crack_p10": 16.6446,
      "crack_p90": 44.976,
-     "crack_percentile": 88.1,
-     "crude": 85.13,
-     "distillate_per_gallon": 4.0369,
+     "crack_percentile": 87.9,
+     "crude": 85.22,
+     "distillate_per_gallon": 4.03,
      "gallons_per_barrel": 42.0,
-     "gasoline_per_gallon": 2.5034,
+     "gasoline_per_gallon": 2.4985,
      "observations": 755.0
     }
    }
   ],
   "spreads": [],
-  "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-18: crack 41.48, crude 85.13, gasoline_per_gallon 2.50, distillate_per_gallon 4.04, gallons_per_barrel 42.00, crack_percentile 88.10, observations 755.00, crack_p10 16.64, crack_p90 44.98."
+  "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-18: crack 41.16, crude 85.22, gasoline_per_gallon 2.50, distillate_per_gallon 4.03, gallons_per_barrel 42.00, crack_percentile 87.90, observations 755.00, crack_p10 16.64, crack_p90 44.98."
  },
  "futures_spread": {
   "caveats": [],
@@ -494,6 +515,57 @@
   "readings": [],
   "spreads": [],
   "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11. U.S. Ending Stocks excluding SPR of Crude Oil, Weekly was 414417.00 Thousand Barrels on 2026-11-06."
+ },
+ "oman_curve": {
+  "caveats": [],
+  "cites": [
+   "curve:oman"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "M1 minus M12 was 13.85 on 2026-11-10 and is 12.90 now: the curve has flattened over the week.",
+    "hypothetical": false,
+    "key": "curve:oman",
+    "note": "backwardation (front above back)",
+    "period": "2026-11-17",
+    "series_ids": [
+     "GME.OMAN.M1.D",
+     "GME.OMAN.M2.D",
+     "GME.OMAN.M3.D",
+     "GME.OMAN.M4.D",
+     "GME.OMAN.M5.D",
+     "GME.OMAN.M6.D",
+     "GME.OMAN.M7.D",
+     "GME.OMAN.M8.D",
+     "GME.OMAN.M9.D",
+     "GME.OMAN.M10.D",
+     "GME.OMAN.M11.D",
+     "GME.OMAN.M12.D"
+    ],
+    "title": "Oman crude futures curve (GME OQD)",
+    "units": "USD/bbl",
+    "values": {
+     "M1": 89.77,
+     "M10": 78.45,
+     "M11": 77.62,
+     "M12": 76.87,
+     "M1_minus_M12": 12.9,
+     "M1_minus_M12_a_week_earlier": 13.85,
+     "M1_minus_M2": -0.29,
+     "M2": 90.06,
+     "M3": 87.77,
+     "M4": 85.86,
+     "M5": 84.26,
+     "M6": 82.85,
+     "M7": 81.58,
+     "M8": 80.42,
+     "M9": 79.38
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Oman crude futures curve (GME OQD) on 2026-11-17: M1 89.77, M2 90.06, M3 87.77, M4 85.86, M5 84.26, M6 82.85, M7 81.58, M8 80.42, M9 79.38, M10 78.45, M11 77.62, M12 76.87, M1_minus_M2 -0.29, M1_minus_M12 12.90, M1_minus_M12_a_week_earlier 13.85."
  },
  "out_of_scope": {
   "caveats": [
@@ -723,7 +795,7 @@
   "facts": [],
   "readings": [
    {
-    "context": "M1 minus M12 was 11.54 on 2026-11-11 and is 13.08 now: the curve has steepened over the week.",
+    "context": "M1 minus M12 was 11.54 on 2026-11-11 and is 12.88 now: the curve has steepened over the week.",
     "hypothetical": false,
     "key": "curve:wti",
     "note": "backwardation (front above back)",
@@ -745,26 +817,26 @@
     "title": "WTI futures curve (NYMEX CL)",
     "units": "USD/bbl",
     "values": {
-     "M1": 85.13,
-     "M10": 73.86,
+     "M1": 85.22,
+     "M10": 74.08,
      "M11": 73.33,
-     "M12": 72.05,
-     "M1_minus_M12": 13.08,
+     "M12": 72.34,
+     "M1_minus_M12": 12.88,
      "M1_minus_M12_a_week_earlier": 11.54,
-     "M1_minus_M2": 1.27,
-     "M2": 83.86,
-     "M3": 82.49,
-     "M4": 81.03,
-     "M5": 79.55,
-     "M6": 78.2,
-     "M7": 76.95,
-     "M8": 75.89,
-     "M9": 74.73
+     "M1_minus_M2": 1.26,
+     "M2": 83.96,
+     "M3": 82.61,
+     "M4": 81.14,
+     "M5": 79.8,
+     "M6": 78.3,
+     "M7": 77.05,
+     "M8": 75.98,
+     "M9": 74.94
     }
    }
   ],
   "spreads": [],
-  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.13, M2 83.86, M3 82.49, M4 81.03, M5 79.55, M6 78.20, M7 76.95, M8 75.89, M9 74.73, M10 73.86, M11 73.33, M12 72.05, M1_minus_M2 1.27, M1_minus_M12 13.08, M1_minus_M12_a_week_earlier 11.54."
+  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.22, M2 83.96, M3 82.61, M4 81.14, M5 79.80, M6 78.30, M7 77.05, M8 75.98, M9 74.94, M10 74.08, M11 73.33, M12 72.34, M1_minus_M2 1.26, M1_minus_M12 12.88, M1_minus_M12_a_week_earlier 11.54."
  },
  "wti_positioning": {
   "caveats": [],

@@ -42,7 +42,7 @@ How to work
 - Prefer a computed reading when one fits the question:
   get_watch (what should I look at, what matters this week), get_surprises (what moved unusually, what
   changed), get_arbitrage (is a route open), get_arbitrage_scenario and get_crack_scenario (what if a price
-  moved), get_curve (backwardation or contango: Brent, WTI, RBOB, heating oil), get_futures_spread (the
+  moved), get_curve (backwardation or contango: Brent, WTI, Oman, RBOB, heating oil), get_futures_spread (the
   Brent-WTI spread as traded: futures of one delivery month), get_futures_crack (refining margin on futures), get_crack_spread (refining margin),
   get_seasonal (a level against its usual level for the time of year), get_percentile (is a level high or low
   against recent years), get_positioning (what funds are doing).
@@ -164,10 +164,10 @@ def _keep(ctx: RunContext[Deps], reading: Reading | None, why: str) -> Reading:
 
 
 @agent.tool
-def get_curve(ctx: RunContext[Deps], market: Literal["brent", "wti", "rbob", "heating_oil"]) -> Reading:
+def get_curve(ctx: RunContext[Deps], market: Literal["brent", "wti", "oman", "rbob", "heating_oil"]) -> Reading:
     """Futures curve on the latest date: each contract month (M1 = front), M1 minus M2, M1 minus the last month,
     and whether the curve is in backwardation or contango, with the slope a week earlier. Twelve months each for
-    Brent, WTI, RBOB gasoline and heating oil."""
+    Brent, WTI, Oman (the Middle East sour crude benchmark), RBOB gasoline and heating oil."""
     ctx.deps.emit("get_curve", {"market": market})
     return _keep(ctx, readings.curve(ctx.deps.source, market), f"No complete {market} curve in the last 60 days.")
 
