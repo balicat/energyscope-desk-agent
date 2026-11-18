@@ -175,8 +175,11 @@ the gate's budget of eight retries never applied to a live run, and the `retries
 was 0 whatever happened. The scores (224/224 and the rest) are not affected: they are computed from the final
 answers. The scripted runs were counted correctly. Found while measuring a redesign of the summary (branch
 `slots`), where the validator's own record showed corrections on 20 of 32 questions and the counter printed 0;
-on that branch the validator's record is the count. The true figures for the runs below cannot be recovered,
-so the rows are left as they were written and this paragraph stands over them.
+the validator's own record is now the count (release `b2a49b3`). The true figures for the earlier runs cannot be
+recovered, so their rows are left as they were written and this paragraph stands over them. **The first true
+count on the release line: 224/224 with 11 retries in 10 of 32 questions, then 12 in 11, at about $0.10 a run.**
+The first of those was blocked by the gate's budget of eight retries, a limit that had been chosen from a count
+of zero; the budget is now 16, one correction for half the questions, and it is a number to bring down.
 
 **The same evening, the test gate took the public service down for about ten minutes.** The gate's live runs
 and the public service shared one API key with a monthly limit of six dollars; nothing counted what the gate
@@ -184,8 +187,9 @@ spent; two test runs of the `slots` branch used the last of it, and from about 2
 failed, until the owner raised the limit. The log shows three failed questions in that window, all asked by the
 builder and the reviewer to see what a visitor would get. Worse, the visitor did not get the service's own error: the hosting proxy replaces
 any 5xx with a page of its own. On the branch the gate prints what each live run cost (about nine cents on the
-small model), an application failure no longer returns 5xx, and when the provider refuses, code answers the
-example questions by itself and says so. None of that is released yet.
+small model) and an application failure no longer returns 5xx (both released in `b2a49b3`: a provider failure
+is 429 with a plain sentence). On the branch only: when the provider refuses, code answers the example questions
+by itself and says so.
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
@@ -217,6 +221,7 @@ How the suite got here, including the failures:
 | 18 Nov | blocked: 180/180 and one question ran out of retries | the gate named it this time: the cross-unit question. A new rule against spelled-out numbers took "reported in thousand barrels" for one and refused it on every attempt. The reviewer had predicted this: each added rule raises false refusals. Rule narrowed, sentence added to the control; the gate now keeps the validator's own record of what it sent back. The next commit passed on its one live run: 186/186, 0 retries |
 | 18 Nov | 224/224 on Haiku, 0 retries, one live run | round 4 of the review: a visitor could dictate a caveat that was shown under the tick. Closed, with a seventh evaluator and a new case; asked again on the public site, the model declined to include the sentence and said why |
 | 18 Nov | not released: 224/224 on Haiku in three full live runs of branch `slots`, with 16 to about 30 validator corrections a run | the summary rebuilt so that the model places slots and code writes every figure, noun, unit, date and direction. It passes every check and about a third of the answers read like a form; half the questions need one correction. Measuring it exposed the retry undercount above and exhausted the API key |
+| 18 Nov | 224/224 on Haiku, **12 retries in 11 of 32 questions**, $0.10, one live run | the retry count made true and reported in every answer; the gate counts its own cost; no 5xx for a failure; a percentile on a series shorter than its window says so in a caveat. The first live run of the day whose retries were counted |
 
 ## Release gate
 
@@ -227,7 +232,7 @@ with the scripted model, and the suite on today's lake with the live model. Only
 A live model does not make the same choices twice (the same suite scored 78, 79, 80, 78 and 80 of 80 in five runs
 on one day), so the live step has four conditions: every number check must pass; at most two behaviour checks
 (series choice, tool budget) may miss; no question may run out of validator retries; and the whole suite may use
-at most eight retries. The score alone hides the last two: 186/186 with fourteen retries and 186/186 with two are
+at most sixteen retries (eight until 18 Nov, when it turned out the count had never included a live model's retries). The score alone hides the last two: 186/186 with fourteen retries and 186/186 with two are
 different services, because a question that runs out of retries is a visitor who gets no summary. The suite
 prints, for every retried question, what the validator objected to, and each live run is kept as a JSON file.
 
