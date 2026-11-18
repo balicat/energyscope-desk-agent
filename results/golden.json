@@ -420,6 +420,48 @@
   "spreads": [],
   "summary": "Baker Hughes Weekly \u2014 United States, all rigs was 601.00 Rigs on 2026-11-13, up 53.00 (9.67%) from 548.00 on 2025-11-06, 365 days earlier."
  },
+ "week_surprises": {
+  "caveats": [],
+  "cites": [
+   "surprises:week"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "key": "surprises:week",
+    "note": "Change over 7 days, ranked by z-score against two years of 7-day changes in the same series; beyond plus or minus two is unusual. Not a miss against forecasts: the data holds no consensus. Units and dates: Tanker freight proxy (USD, 2026-11-17); US distillate stocks (Thousand Barrels, 2026-11-06); Brent fund net position (contracts, 2026-11-03); ICE gasoil (USD/MT, 2026-11-17); US commercial crude stocks (Thousand Barrels, 2026-11-06).",
+    "period": "2026-11-17",
+    "series_ids": [
+     "SHIP.BWET.D",
+     "PET.WDISTUS1.W",
+     "ICE_COT.BRENT.MM_Net",
+     "ICE.GASOIL.M1.D",
+     "PET.WCESTUS1.W"
+    ],
+    "title": "Most unusual moves over a week, from a watchlist of 18 series",
+    "units": "each series in its own units",
+    "values": {
+     "Brent fund net position: change": -48466.0,
+     "Brent fund net position: latest": 171603.0,
+     "Brent fund net position: z-score": -1.28,
+     "ICE gasoil: change": -70.25,
+     "ICE gasoil: latest": 1210.5,
+     "ICE gasoil: z-score": -1.02,
+     "Tanker freight proxy: change": 111.94,
+     "Tanker freight proxy: latest": 647.86,
+     "Tanker freight proxy: z-score": 2.03,
+     "US commercial crude stocks: change": 4657.0,
+     "US commercial crude stocks: latest": 414417.0,
+     "US commercial crude stocks: z-score": 0.97,
+     "US distillate stocks: change": 4071.0,
+     "US distillate stocks: latest": 103330.0,
+     "US distillate stocks: z-score": 1.51
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Most unusual moves over a week, from a watchlist of 18 series on 2026-11-17: Tanker freight proxy: latest 647.86, Tanker freight proxy: change 111.94, Tanker freight proxy: z-score 2.03, US distillate stocks: latest 103330.00, US distillate stocks: change 4071.00, US distillate stocks: z-score 1.51, Brent fund net position: latest 171603.00, Brent fund net position: change -48466.00, Brent fund net position: z-score -1.28, ICE gasoil: latest 1210.50, ICE gasoil: change -70.25, ICE gasoil: z-score -1.02, US commercial crude stocks: latest 414417.00, US commercial crude stocks: change 4657.00, US commercial crude stocks: z-score 0.97."
+ },
  "wti_30d": {
   "caveats": [],
   "cites": [],

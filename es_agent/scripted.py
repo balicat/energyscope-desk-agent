@@ -56,7 +56,7 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
                 f"{body['name_a']} was {body['value_a']:.2f} and {body['name_b']} was {body['value_b']:.2f} "
                 f"{body['units']} on {body['period']}: a spread of {body['spread']:.2f}."
             )
-        elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning", "get_percentile", "get_arbitrage"):
+        elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning", "get_percentile", "get_arbitrage", "get_surprises"):
             cites.append(body["key"])
             shown = ", ".join(f"{k} {v:.2f}" for k, v in body["values"].items())
             lines.append(f"{body['title']} on {body['period']}: {shown}.")

@@ -26,6 +26,7 @@ from es_agent import clock, metrics
 from es_agent.agent import Deps, agent
 from es_agent.memory import Turn, with_context
 from es_agent.models import DeskAnswer
+from es_agent.readings import WATCHLIST
 from es_agent.scripted import is_rejection, scripted
 from es_agent.sources import DataSource, FixtureSource, FlightSource, ParquetLakeSource, RecordingSource
 from es_agent.verify import verify
@@ -37,6 +38,7 @@ HENRY_HUB = "NG.RNGWHHD.D"
 EU_GAS = "AGSI.EU.FULL_PCT.D"
 US_RIGS = ["BH.United_States.Total.W", "BH.United_States.Total.Current", "BH.United_States.Total.M"]
 HORMUZ = "PORTWATCH.HORMUZ.TANKERS.D"
+WATCH = [sid for _, sid in WATCHLIST]
 FOLLOW_UP = with_context("And Brent?", [Turn("Where is WTI spot now?", "WTI spot was 89.62 Dollars per Barrel on 2026-11-11.")])
 
 # name, question, expected series (each inner list = acceptable alternatives; [] = must abstain),
@@ -81,6 +83,8 @@ SUITE = [
     ("no_cross_unit_spread", "What is the spread between the WTI price and US commercial crude stocks?", [[WTI], US_CRUDE],
      [("search_series", {"query": "WTI spot price"}), ("search_series", {"query": "US ending stocks excluding SPR crude oil"}),
       ("get_latest", {"series_ids": [WTI, US_CRUDE[0]]})], False),
+    ("week_surprises", "What are this week's surprises in the oil market?", [WATCH],
+     [("get_surprises", {"window": "week"})], False),
     ("follow_up", FOLLOW_UP, [[BRENT]],
      [("search_series", {"query": "Brent spot price"}), ("get_latest", {"series_ids": [BRENT]})], False),
     ("abstain_carbon", "What did EU carbon allowances (EUA) settle at yesterday?", [],

@@ -8,6 +8,9 @@ Built on [Pydantic AI](https://ai.pydantic.dev) over the [EnergyScope](https://e
 (22 datasets: EIA, ICE, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
 customers. First version 10 Nov 2026 (offline only); first run on a live model and public launch 18 Nov 2026.
 
+The name is a nod to the Librarian in Neal Stephenson's *Snow Crash* (1992), the novel that coined "metaverse":
+a research daemon that knows the collection, cites it, and does not speculate.
+
 ## The rules it is built on
 
 - **The model chooses tools and writes sentences; code does the sums.** Changes, spreads, percentiles, crack
@@ -41,6 +44,7 @@ customers. First version 10 Nov 2026 (offline only); first run on a live model a
 | `get_spread` | one series minus another on the latest shared date; refuses if units differ |
 | `get_curve` | Brent futures M1 to M12, front spread, backwardation or contango |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
+| `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |
 | `get_arbitrage` | the price side of a transatlantic route: spread and its three-year percentile, a freight proxy, curve slope, a score |
 | `get_seasonal` | latest against the same time of year in the previous N years |
 | `get_percentile` | where the latest value ranks in its own last N years |
@@ -51,21 +55,21 @@ says so and uses a tanker ETF as a proxy), no WTI futures curve, and no news.
 
 ## Evaluation
 
-Nineteen questions, four evaluators each (76 assertions): `Grounded` (recompute from source),
+Twenty questions, four evaluators each (80 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
-arbitrage, seasonal and percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
+arbitrage, the week's surprises, seasonal and percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
 a follow-up, a cross-unit "spread" that must not be computed, a prompt injection and two out-of-scope questions.
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **76/76**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **74/76** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
-| `anthropic:claude-haiku-5-5`, live lake | **76/76** | 2.8 tool calls and 6.9 s a question, $0.0022 each |
-| `anthropic:claude-sonnet-5-5`, live lake | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
+| scripted model, frozen data (`--source fixture`) | **80/80**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **78/80** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| `anthropic:claude-haiku-5-5`, live lake | **78 to 80 of 80** across four runs | 80/80 on the last; 2.6 tool calls and 5.3 s a question, $0.0025 each. The misses were one question, traced to a bug (below) |
+| `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
-cost. What the suite does not measure: the quality of the prose, and anything outside nineteen questions.
+cost. What the suite does not measure: the quality of the prose, and anything outside twenty questions.
 
 How the suite got here, including the failures:
 
@@ -77,6 +81,8 @@ How the suite got here, including the failures:
 | 18 Nov | 39/40 on both models | four reading tools added; both models over-searched before declining the carbon question |
 | 18 Nov | 40/40 on both | search budget enforced in the tool |
 | 18 Nov | 76/76 Haiku, 74/76 Sonnet | 22 datasets, arbitrage and percentile tools, 19 cases |
+| 18 Nov | release blocked at 75/76 | the gate stopped a one-line prompt change that failed one live assertion |
+| 18 Nov | 78, 79, 80 of 80 on Haiku | `get_surprises`, added after a visitor asked "what are this week's surprises" and the agent had to improvise. The unstable case was a bug, not noise: one run in six the model compared a Brent future with WTI spot and `get_spread` refused because one dataset writes "USD/bbl" and the other "Dollars per Barrel". Units are now compared on a normalised form |
 
 ## Release gate
 
@@ -112,10 +118,10 @@ events with one `tool` event as each tool starts.
 ## Files
 
 ```
-es_agent/agent.py     the agent: instructions, ten tools, the output validator
+es_agent/agent.py     the agent: instructions, eleven tools, the output validator
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
-es_agent/readings.py  curve, crack, arbitrage, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
+es_agent/readings.py  curve, crack, arbitrage, surprises, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
 es_agent/verify.py    recompute an answer from the data (the Grounded eval and the live check)
 es_agent/memory.py    what a follow-up is allowed to remember
 es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder

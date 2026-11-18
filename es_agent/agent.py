@@ -1,4 +1,4 @@
-"""The agent: ten tools over EnergyScope data, a typed answer, and a
+"""The agent: eleven tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -40,7 +40,8 @@ show where every number came from.
 
 How to work
 - Prefer a computed reading when one fits the question:
-  get_arbitrage (is a route open), get_curve (backwardation or contango), get_crack_spread (refining margin),
+  get_surprises (what moved unusually, what is new, what changed), get_arbitrage (is a route open),
+  get_curve (backwardation or contango), get_crack_spread (refining margin),
   get_seasonal (a level against its usual level for the time of year), get_percentile (is a level high or low
   against recent years), get_positioning (what funds are doing).
   Each returns a reading with a key. List every key you used in cites; quote the reading's values in the summary.
@@ -48,7 +49,9 @@ How to work
   the tool values into facts or spreads unchanged. Prefer daily (D) or weekly (W) series unless asked otherwise.
 - Never compute, convert or estimate a number yourself. If you need a difference, a ratio or a comparison, a tool
   must return it.
-- A question with several parts needs several tool calls; make them together when you can.
+- Use the fewest tool calls that answer the question asked. Do not fetch context nobody asked for, and do not
+  call a second tool for a number a reading already gave you. A question with several parts needs several
+  calls; make them together.
 
 How to answer
 - Two to four plain sentences. Lead with the answer to the question asked, then the numbers that support it.
@@ -125,7 +128,9 @@ def get_change(ctx: RunContext[Deps], series_id: str, lookback_days: int) -> Cha
 
 @agent.tool
 def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
-    """series_a minus series_b on the latest date both have a value, e.g. Brent minus WTI. Both must share units."""
+    """series_a minus series_b on the latest date both have a value. Both must share units. Compare like with
+    like: a spot price with a spot price, a future with a future. For the Brent-WTI spread use the two spot
+    prices (there is no WTI future in the data)."""
     ctx.deps.emit("get_spread", {"series_a": series_a, "series_b": series_b})
     hits = []
     for sid in (series_a, series_b):
@@ -134,7 +139,7 @@ def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
             raise ModelRetry(f"Unknown series_id {sid!r}. Use search_series to find a valid ID.")
         hits.append(hit)
     a, b = hits
-    if a.units != b.units:
+    if metrics.unit_key(a.units) != metrics.unit_key(b.units):
         raise ModelRetry(f"Units differ ({a.units!r} vs {b.units!r}): no spread. Report the two values separately.")
     start = clock.today() - dt.timedelta(days=400)
     sp = metrics.spread_of(a, ctx.deps.source.history(series_a, start=start), b, ctx.deps.source.history(series_b, start=start))
@@ -195,6 +200,16 @@ def get_percentile(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Rea
         raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
     return _keep(ctx, readings.percentile(ctx.deps.source, series_id, years),
                  f"{series_id} has too little history in the last {years} years (or years is outside 1 to 10).")
+
+
+@agent.tool
+def get_surprises(ctx: RunContext[Deps], window: Literal["week", "month"] = "week") -> Reading:
+    """The five most unusual moves over the last week or month across a watchlist of prices, stocks, refinery
+    runs, production, gas storage, rigs, freight and fund positioning, ranked by z-score against each series'
+    own two-year history. Use for 'any surprises', 'what moved', 'what changed', 'what is new'. The data has no
+    consensus forecasts: say that a surprise here means an unusually large move."""
+    ctx.deps.emit("get_surprises", {"window": window})
+    return _keep(ctx, readings.surprises(ctx.deps.source, window), "No watchlist series has recent data.")
 
 
 @agent.tool

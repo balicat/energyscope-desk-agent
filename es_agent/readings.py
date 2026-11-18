@@ -257,6 +257,78 @@ def arbitrage(source: DataSource, route: str) -> Reading | None:
     return None
 
 
+# The desk's watchlist: what "what moved?" looks across. Labels carry no digits, so they never
+# collide with the number-tracing rule.
+WATCHLIST = [
+    ("WTI spot", "PET.RWTC.D"),
+    ("Brent spot", "PET.RBRTE.D"),
+    ("Brent front-month future", "ICE.BRENT.M1.D"),
+    ("Henry Hub gas", "NG.RNGWHHD.D"),
+    ("Gulf Coast gasoline", "PET.EER_EPMRU_PF4_RGC_DPG.D"),
+    ("New York heating oil", "PET.EER_EPD2F_PF4_Y35NY_DPG.D"),
+    ("ICE gasoil", "ICE.GASOIL.M1.D"),
+    ("Tanker freight proxy", "SHIP.BWET.D"),
+    ("US commercial crude stocks", "PET.WCESTUS1.W"),
+    ("Cushing crude stocks", "PET.W_EPC0_SAX_YCUOK_MBBL.W"),
+    ("US gasoline stocks", "PET.WGTSTUS1.W"),
+    ("US distillate stocks", "PET.WDISTUS1.W"),
+    ("US refinery utilisation", "PET.WPULEUS3.W"),
+    ("US crude production", "PET.WCRFPUS2.W"),
+    ("EU gas storage fullness", "AGSI.EU.FULL_PCT.D"),
+    ("US rig count", "BH.United_States.Total.W"),
+    ("WTI fund net position", "CFTC.WTI.MM_Net"),
+    ("Brent fund net position", "ICE_COT.BRENT.MM_Net"),
+]
+SURPRISE_WINDOWS = {"week": 7, "month": 30}
+SURPRISE_YEARS, SURPRISE_TOP, STALE_DAYS = 2, 5, 21
+
+
+def _window_changes(hist: list[tuple[dt.date, float]], days: int) -> list[float]:
+    """Each observation minus the last one at least `days` earlier."""
+    out, i = [], 0
+    for j, (d, v) in enumerate(hist):
+        while i + 1 < j and hist[i + 1][0] <= d - dt.timedelta(days=days):
+            i += 1
+        if j and hist[i][0] <= d - dt.timedelta(days=days):
+            out.append(v - hist[i][1])
+    return out
+
+
+def surprises(source: DataSource, window: str) -> Reading | None:
+    """The watchlist moves that are most unusual against their own history. There are no consensus forecasts in
+    the data, so a surprise here is a move that is large for that series, not a miss against expectations."""
+    if window not in SURPRISE_WINDOWS:
+        return None
+    days = SURPRISE_WINDOWS[window]
+    found = []
+    for label, sid in WATCHLIST:
+        hit = source.meta(sid)
+        hist = source.history(sid, start=_since(366 * SURPRISE_YEARS + days)) if hit else []
+        changes = _window_changes(hist, days)
+        if len(changes) < 30 or hist[-1][0] < _since(STALE_DAYS):
+            continue
+        mean = sum(changes) / len(changes)
+        sd = (sum((c - mean) ** 2 for c in changes) / len(changes)) ** 0.5
+        if not sd:
+            continue
+        found.append((abs((changes[-1] - mean) / sd), label, sid, hit.units, hist[-1], changes[-1], (changes[-1] - mean) / sd))
+    if not found:
+        return None
+    top = sorted(found, reverse=True)[:SURPRISE_TOP]
+    values, parts = {}, []
+    for _, label, sid, units, (d, v), change, z in top:
+        values[f"{label}: latest"] = v
+        values[f"{label}: change"] = round(change, 6)
+        values[f"{label}: z-score"] = round(z, 2)
+        parts.append(f"{label} ({units}, {d.isoformat()})")
+    return Reading(
+        key=f"surprises:{window}", title=f"Most unusual moves over a {window}, from a watchlist of {len(WATCHLIST)} series",
+        period=max(t[4][0] for t in top), units="each series in its own units", series_ids=[t[2] for t in top], values=values,
+        note=(f"Change over {days} days, ranked by z-score against two years of {days}-day changes in the same series; "
+              "beyond plus or minus two is unusual. Not a miss against forecasts: the data holds no consensus. "
+              "Units and dates: " + "; ".join(parts) + "."))
+
+
 def compute(source: DataSource, key: str) -> Reading | None:
     """Rebuild a reading from its key."""
     kind, _, rest = key.partition(":")
@@ -268,6 +340,8 @@ def compute(source: DataSource, key: str) -> Reading | None:
         return positioning(source, rest)
     if kind == "arb":
         return arbitrage(source, rest)
+    if kind == "surprises":
+        return surprises(source, rest)
     if kind == "percentile":
         series_id, _, years = rest.rpartition(":")
         return percentile(source, series_id, int(years)) if years.isdigit() else None
