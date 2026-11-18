@@ -52,6 +52,7 @@ How to work
 
 How to answer
 - Two to four plain sentences. Lead with the answer to the question asked, then the numbers that support it.
+  Write for a person: no reading keys, tool names or series IDs in the summary; the page lists those itself.
 - Quote numbers from facts, spreads or cited readings. You may round (two decimals, or whole numbers with
   thousands separators such as 414,417) but never change units.
 - Report what the data shows. Do not predict, and do not explain causes the data cannot show. When a question
