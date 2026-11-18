@@ -168,6 +168,24 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 | `anthropic:claude-haiku-5-5`, live lake | **224/224, 0 retries** | the latest release run (32 cases, seven evaluators), one live run, no question retried. The runs before it scored 186/186 with 0 retries (31 cases, six evaluators), 186/186 (retries not yet counted), 180/180 (30 cases), 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
+**Correction, 18 Nov 2026, evening: every "0 retries" in this file is an undercount of unknown size.** The
+counter recognised two of the three forms in which the model library returns a rejected answer, and the live
+model's rejections arrive in the third (`RetryFeedbackPart`). So a live run was always reported with no retries,
+the gate's budget of eight retries never applied to a live run, and the `retries` field of every public answer
+was 0 whatever happened. The scores (224/224 and the rest) are not affected: they are computed from the final
+answers. The scripted runs were counted correctly. Found while measuring a redesign of the summary (branch
+`slots`), where the validator's own record showed corrections on 20 of 32 questions and the counter printed 0;
+on that branch the validator's record is the count. The true figures for the runs below cannot be recovered,
+so the rows are left as they were written and this paragraph stands over them.
+
+**The same evening, the test gate took the public service down for about half an hour.** The gate's live runs
+and the public service shared one API key with a monthly limit of six dollars; nothing counted what the gate
+spent; two test runs of the `slots` branch used the last of it, and from 20:21 UTC every question failed until
+the owner raised the limit. Worse, the visitor did not get the service's own error: the hosting proxy replaces
+any 5xx with a page of its own. On the branch the gate prints what each live run cost (about nine cents on the
+small model), an application failure no longer returns 5xx, and when the provider refuses, code answers the
+example questions by itself and says so. None of that is released yet.
+
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
 right, and anything outside thirty-two questions.
@@ -197,6 +215,7 @@ How the suite got here, including the failures:
 | 18 Nov | outage, about 35 minutes | not the agent: the page's nginx config. A `www` redirect placed first became the default server and redirected the bare domain to itself. `nginx -t` passed; the release health check asked the lab server, not the public address. Found by the reviewer's script. Now: a routing test before every page push, a public-address check at the end of every release, and a two-minute watchdog |
 | 18 Nov | blocked: 180/180 and one question ran out of retries | the gate named it this time: the cross-unit question. A new rule against spelled-out numbers took "reported in thousand barrels" for one and refused it on every attempt. The reviewer had predicted this: each added rule raises false refusals. Rule narrowed, sentence added to the control; the gate now keeps the validator's own record of what it sent back. The next commit passed on its one live run: 186/186, 0 retries |
 | 18 Nov | 224/224 on Haiku, 0 retries, one live run | round 4 of the review: a visitor could dictate a caveat that was shown under the tick. Closed, with a seventh evaluator and a new case; asked again on the public site, the model declined to include the sentence and said why |
+| 18 Nov | not released: 224/224 on Haiku in three full live runs of branch `slots`, with 16 to about 30 validator corrections a run | the summary rebuilt so that the model places slots and code writes every figure, noun, unit, date and direction. It passes every check and about a third of the answers read like a form; half the questions need one correction. Measuring it exposed the retry undercount above and exhausted the API key |
 
 ## Release gate
 
