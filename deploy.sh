@@ -5,6 +5,8 @@
 #   2. the control run: validator off, exactly two assertions fail     (free)
 #   3. the suite on today's lake with the scripted model               (free)
 #   4. the suite on today's lake with the live model                   (a few cents; LIVE=0 skips it)
+#      A live model does not make the same choices twice, so this step is split: every number check
+#      must pass, and at most two behaviour checks (series choice, tool budget) may miss.
 # Then the running checkout moves to the candidate and the service restarts.
 #
 #   ./deploy.sh                                  # gate origin/main with the model the service uses
@@ -29,7 +31,8 @@ echo "2/4 control run";                       $PY run_evals.py --source fixture 
 echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | tail -1
 if [ "${LIVE:-1}" = "1" ]; then
   export ANTHROPIC_API_KEY=$(tr -d '\r\n' < /opt/energyscope/.anthropic_api_key)
-  echo "4/4 today's lake, $MODEL";            $PY run_evals.py --model "$MODEL" --gate | tail -1
+  echo "4/4 today's lake, $MODEL (numbers must all be right; at most 2 behaviour misses of 80)"
+  $PY run_evals.py --model "$MODEL" --gate --allow-soft 2 2>/dev/null | grep -E "^FAILED|^assertions|^gate"
 else
   echo "4/4 live model skipped (LIVE=0)"
 fi

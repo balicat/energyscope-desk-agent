@@ -148,10 +148,14 @@ def make_task(model_name: str, enforce: bool = True):
     return task
 
 
-def tally(report) -> tuple[int, int, int]:
-    """(assertions passed, assertions total, cases that errored)."""
-    results = [a for c in report.cases for a in c.assertions.values()]
-    return sum(bool(a.value) for a in results), len(results), len(getattr(report, "failures", []) or [])
+HARD = ("Grounded", "SummaryTraceable")  # a wrong or untraceable number: never tolerated, on any model
+
+
+def tally(report) -> tuple[int, int, int, list[tuple[str, str, str]]]:
+    """(assertions passed, assertions total, cases that errored, failed assertions as (case, evaluator, reason))."""
+    results = [(c.name, name, a) for c in report.cases for name, a in c.assertions.items()]
+    failed = [(case, name, str(a.reason or "")) for case, name, a in results if not a.value]
+    return len(results) - len(failed), len(results), len(getattr(report, "failures", []) or []), failed
 
 
 def main() -> int:
@@ -163,6 +167,8 @@ def main() -> int:
     ap.add_argument("--fixture", default="fixtures/series.json")
     ap.add_argument("--no-guard", action="store_true", help="switch the output validator off (control run)")
     ap.add_argument("--gate", action="store_true", help="exit 1 unless every assertion passes and no case errors")
+    ap.add_argument("--allow-soft", type=int, default=0,
+                    help="with --gate: behaviour failures (series choice, tool budget) tolerated; number failures never are")
     ap.add_argument("--expect-failures", type=int, help="exit 1 unless exactly this many assertions fail (control run)")
     ap.add_argument("--golden", choices=["write", "check"], help="write or compare the answers in results/golden.json")
     ap.add_argument("--record-fixture", action="store_true", help="save every series this run reads to --fixture")
@@ -186,7 +192,9 @@ def main() -> int:
 
     report = build_dataset().evaluate_sync(make_task(args.model, not args.no_guard), name=args.model + (" (guard off)" if args.no_guard else ""), max_concurrency=1, progress=False)
     report.print(include_input=False, include_output=False, include_durations=True)
-    passed, total, errored = tally(report)
+    passed, total, errored, failed = tally(report)
+    for case, name, reason in failed:
+        print(f"FAILED {case} / {name}: {reason}")
     print(f"assertions: {passed}/{total} passed; cases errored: {errored}; data as of {clock.today()}")
 
     code = 0
@@ -206,8 +214,13 @@ def main() -> int:
             changed = sorted(n for n in set(golden) | set(answers) if golden.get(n) != answers.get(n))
             print("golden answers: " + ("all match" if not changed else f"DIFFER for {changed}"))
             code |= bool(changed)
-    if args.gate and (passed != total or errored):
-        code = 1
+    if args.gate:
+        hard = [f for f in failed if f[1] in HARD]
+        if errored or hard or len(failed) - len(hard) > args.allow_soft:
+            print(f"gate: blocked ({len(hard)} number failures, {len(failed) - len(hard)} behaviour failures, {errored} errors)")
+            code = 1
+        else:
+            print(f"gate: passed ({len(failed)} behaviour failures, {args.allow_soft} allowed)")
     if args.expect_failures is not None and (total - passed != args.expect_failures or errored):
         print(f"expected exactly {args.expect_failures} failed assertions, got {total - passed}")
         code = 1

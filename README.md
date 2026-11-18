@@ -88,7 +88,10 @@ How the suite got here, including the failures:
 
 `deploy.sh` is how a change to the code, the prompt or the model reaches the public service. The candidate must
 pass the frozen-data suite with golden answers, the control run, the suite on today's lake with the scripted
-model, and the suite on today's lake with the live model. Only then does the service restart. Trying another
+model, and the suite on today's lake with the live model. Only then does the service restart. A live model does
+not make the same choices twice (the same suite scored 78, 79, 80, 78 and 80 of 80 in five runs on one day), so
+the live step is split: every number check must pass, and at most two of the 80 behaviour checks (series
+choice, tool budget) may miss. It blocked two releases on its first day. Trying another
 model is the same command with `LIBRARIAN_MODEL=...`.
 
 ## Run it
