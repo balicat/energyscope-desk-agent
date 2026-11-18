@@ -26,6 +26,13 @@ cites it, and does not speculate.
   whether the level is beyond its 10th or 90th percentile line, since when, and when it was last so ("above the
   90th percentile line since 2026-07-30, 110 days; the previous spell was ..."). The sentence and its numbers are
   computed in `readings.spell()`, recomputed by the check, and the model may only restate them.
+- **When two measures disagree, the reading says so.** On 18 Nov 2026 the spot Brent-WTI spread said $2.52 (17th
+  percentile) and the same-month futures spread said $8.42 (96th). The arbitrage reading used spot, which is
+  published a week behind futures. It now uses futures of one delivery month, and both it and the futures-spread
+  reading set the spot spread beside it on the latest date both exist, with the difference split by identity:
+  spot spread minus futures spread = (spot Brent minus its future) minus (spot WTI minus its future). On
+  11 Nov that was -0.62 and +4.19: spot WTI stood well above its January future, spot Brent slightly below its
+  own. Code writes the sentence; it states the arithmetic and no cause.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -53,40 +60,39 @@ cites it, and does not speculate.
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
 | `get_spread` | one series minus another on the latest shared date; refuses if units differ |
 | `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
-| `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history |
+| `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
 | `get_watch` | flags for the week or month: unusual moves, stretched fund positioning, a curve that changed shape, stocks outside their five-year range, related prices that parted ways |
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
 | `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |
-| `get_arbitrage` | the price side of a transatlantic route: spread and its three-year percentile, a freight proxy, curve slope, a score |
+| `get_arbitrage` | a price indicator for a transatlantic route, not an executable arbitrage: the spread on futures of one delivery month and its percentile, a freight proxy, curve slope, a score, and the spot spread beside the futures spread |
 | `get_seasonal` | latest against the same time of year in the previous N years |
 | `get_percentile` | where the latest value ranks in its own last N years |
 | `get_positioning` | managed-money net, long, short, change on the week, three-year percentile |
 
 What it cannot do: there are no route freight rates or physical differentials in the data (the arbitrage reading
-says so and uses a tanker ETF as a proxy), and no news. The arbitrage reading still uses the spot
-Brent-WTI spread; on 18 Nov 2026 spot said $2.52 (17th percentile) while same-month futures said $8.42 (96th).
+says so and uses a tanker ETF as a proxy), and no news.
 
 ## Evaluation
 
-Twenty-eight questions, five evaluators each (140 assertions): `Grounded` (recompute from source),
+Twenty-nine questions, five evaluators each (145 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
-arbitrage and a what-if on it, the week's surprises and watch list, "when was it last this high", seasonal and
+arbitrage and a what-if on it, why spot and futures spreads disagree, the week's surprises and watch list, "when was it last this high", seasonal and
 percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
 a follow-up, a cross-unit "spread" that must not be computed, a prompt injection and two out-of-scope questions.
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **140/140**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **138/140** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **145/145**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **143/145** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **140/140** | the latest release run (28 cases). The two runs before it, on 26 cases, scored 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
-right, and anything outside twenty-eight questions.
+right, and anything outside twenty-nine questions.
 
 How the suite got here, including the failures:
 

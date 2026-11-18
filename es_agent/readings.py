@@ -213,6 +213,38 @@ def futures_spread_parts(source: DataSource) -> tuple[str, History] | None:
     return (ym, [(d, round(v[0] - v[1], 6)) for d, v in rows]) if len(rows) >= 20 else None
 
 
+def spot_vs_futures(source: DataSource, ym: str) -> tuple[dict[str, float], str, list[str]]:
+    """The spot Brent-WTI spread beside the futures spread of one delivery month, on the latest date
+    that has all four prices, and where the difference comes from.
+
+    Spot spread minus futures spread equals (spot Brent minus its future) minus (spot WTI minus its
+    future): an identity, so the sentence states arithmetic and no cause. Returns values, a sentence
+    and the spot series, or empty ones when spot prices are more than 30 days old.
+    """
+    rows = aligned(source, [BRENT_SPOT, CRUDE, f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D"], 366 * HISTORY_YEARS)
+    if len(rows) < 20 or rows[-1][0] < _since(30):
+        return {}, "", []
+    d, (bs, ws, bf, wf) = rows[-1]
+    spot, fut = round(bs - ws, 6), round(bf - wf, 6)
+    b_gap, w_gap = round(bs - bf, 6), round(ws - wf, 6)
+    spot_pct = _rank([v for dd, v in spread_history(source, BRENT_SPOT, CRUDE) if dd <= d], spot)
+    values = {
+        "spot_brent": bs, "spot_wti": ws, "spot_brent_minus_wti": spot, "spot_spread_percentile": spot_pct,
+        "futures_spread_on_spot_date": fut, "spot_minus_futures_spread": round(spot - fut, 6),
+        "spot_brent_minus_its_future": b_gap, "spot_wti_minus_its_future": w_gap,
+    }
+
+    def side(x: float) -> str:
+        return f"{abs(x):.2f} {'above' if x >= 0 else 'below'}"
+
+    sentence = (f"Spot prices are published days later than futures. On {d}, the latest date with "
+                f"both, spot Brent minus spot WTI was {spot:.2f} (percentile {spot_pct:.1f} of its last three years) "
+                f"while the {ym} futures spread was {fut:.2f}. The {abs(spot - fut):.2f} difference is the gap between "
+                f"spot and futures in each market: spot Brent stood {side(b_gap)} its {ym} future and spot WTI "
+                f"{side(w_gap)} its own.")
+    return values, sentence, [BRENT_SPOT, CRUDE]
+
+
 def futures_spread(source: DataSource) -> Reading | None:
     parts = futures_spread_parts(source)
     if parts is None or parts[1][-1][0] < _since(10):
@@ -225,8 +257,11 @@ def futures_spread(source: DataSource) -> Reading | None:
               "spread_percentile": _rank([v for _, v in hist], spread), "observations": len(hist)}
     extra, context = spell(hist, "spread_", "The futures spread")
     values.update(extra)
+    spot_values, spot_sentence, spot_ids = spot_vs_futures(source, ym)
+    values.update(spot_values)
+    context = (context + " " + spot_sentence).strip()
     return Reading(key="fspread:brent_wti", title=f"Brent minus WTI on futures, {ym} delivery", period=d,
-                   units="USD/bbl", series_ids=ids, values=values, context=context,
+                   units="USD/bbl", series_ids=ids + spot_ids, values=values, context=context,
                    note=(f"Both legs are the {ym} delivery contract, the nearest month both still trade, so the spread "
                          "compares like with like. The percentile ranks today against this contract pair's own "
                          "history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent."))
@@ -368,7 +403,7 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
 def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
                spreads: list[float], freights: list[float]) -> tuple[float, float, float, str]:
     """(spread percentile, freight percentile, score from -2 to +2, verdict)."""
-    spread_pct, freight_pct = _rank(spreads, brent - wti), _rank(freights, freight)
+    spread_pct, freight_pct = _rank(spreads, round(brent - wti, 6)), _rank(freights, freight)
     parts = [(spread_pct - 50) / 50, (50 - freight_pct) / 50, max(-1.0, min(1.0, (m12 - m1) / m1 / 0.1))]
     score = round(sum(parts) / len(parts) * 2, 2)
     verdict = ("strongly favours" if score >= 1 else "tilts towards" if score >= 0.3 else
@@ -377,50 +412,64 @@ def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
 
 
 def _crude_arb_inputs(source: DataSource):
-    """Latest date with every input, the inputs on it, and the histories behind the percentiles."""
-    pairs = aligned(source, [BRENT_SPOT, CRUDE], 366 * HISTORY_YEARS)
+    """Latest date with every input, the delivery month, the inputs on that date, and the histories behind
+    the percentiles. Brent and WTI are futures of one delivery month (the nearest both still trade), so the
+    spread compares like with like and is as recent as the futures."""
+    parts = futures_spread_parts(source)
+    if parts is None:
+        return None
+    ym = parts[0]
+    legs = aligned(source, [f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D"], 366 * HISTORY_YEARS)
     freight = source.history(FREIGHT, start=_since(366 * HISTORY_YEARS))
     m1 = dict(source.history("ICE.BRENT.M1.D", start=_since(60)))
     m12 = dict(source.history("ICE.BRENT.M12.D", start=_since(60)))
-    dates = {d for d, _ in pairs} & {d for d, _ in freight} & set(m1) & set(m12)
-    if not dates or len(pairs) < 60 or len(freight) < 60:
+    dates = {d for d, _ in legs} & {d for d, _ in freight} & set(m1) & set(m12)
+    if not dates or len(freight) < 60 or max(dates) < _since(10):
         return None
     d = max(dates)
-    spread_hist = [(dd, round(v[0] - v[1], 6)) for dd, v in pairs if dd <= d]
+    spread_hist = [(dd, round(v[0] - v[1], 6)) for dd, v in legs if dd <= d]
     freight_hist = [(dd, v) for dd, v in freight if dd <= d]
-    brent, wti = dict(pairs)[d]
-    return d, brent, wti, dict(freight)[d], m1[d], m12[d], spread_hist, freight_hist
+    brent, wti = dict(legs)[d]
+    return d, ym, brent, wti, dict(freight)[d], m1[d], m12[d], spread_hist, freight_hist
 
 
-ARB_NOTE = ("+2 = wide spread, cheap freight, contango; -2 = narrow spread, dear freight, backwardation. Freight is the "
-            "Breakwave tanker ETF, a proxy, not a route rate; no physical differentials or port costs are included.")
+ARB_NOTE = ("A price indicator, not an executable arbitrage. +2 = wide spread, cheap freight, contango; -2 = narrow "
+            "spread, dear freight, backwardation. The spread is Brent minus WTI on futures of one delivery month, ranked "
+            "against that contract pair's own history (up to three years). Freight is the Breakwave tanker ETF, a proxy, "
+            "not a route rate; no physical differentials or port costs are included.")
 
 
 def arbitrage(source: DataSource, route: str) -> Reading | None:
     """Whether the prices favour moving a barrel from the US to Europe. No route freight rates or physical
-    differentials are in the data, so this is the price side of the arbitrage, not the full economics."""
+    differentials are in the data, so this is a price indicator, not the full economics. The crude route
+    uses futures of one delivery month and sets the spot spread beside it."""
     if route == "us_crude_to_europe":
         got = _crude_arb_inputs(source)
         if got is None:
             return None
-        d, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
+        d, ym, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
         spread_pct, freight_pct, score, verdict = _arb_score(
             brent, wti, fr, m1, m12, [v for _, v in spread_hist], [v for _, v in freight_hist])
         values = {
             "brent": brent, "wti": wti, "brent_minus_wti": round(brent - wti, 6), "spread_percentile": spread_pct,
+            "spread_observations": len(spread_hist),
             "freight_proxy": fr, "freight_percentile": freight_pct,
             "curve_M1": m1, "curve_M12": m12, "curve_M12_minus_M1": round(m12 - m1, 6),
             "score": score, "percentile_years": HISTORY_YEARS,
         }
-        s_extra, s_context = spell(spread_hist, "spread_", "The Brent-WTI spread")
+        s_extra, s_context = spell(spread_hist, "spread_", "The futures spread")
         f_extra, f_context = spell(freight_hist, "freight_", "The freight proxy")
         values.update(s_extra)
         values.update(f_extra)
+        spot_values, spot_sentence, spot_ids = spot_vs_futures(source, ym)
+        values.update(spot_values)
         return Reading(
-            key=f"arb:{route}", title="US crude to Europe: Brent-WTI spread, tanker freight proxy, Brent curve",
+            key=f"arb:{route}",
+            title=f"US crude to Europe, price indicator: Brent-WTI on {ym} futures, tanker freight proxy, Brent curve",
             period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
-            series_ids=[BRENT_SPOT, CRUDE, FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"], values=values,
-            note=f"score {verdict} US crude exports: " + ARB_NOTE, context=s_context + " " + f_context)
+            series_ids=[f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D", FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"] + spot_ids,
+            values=values, note=f"score {verdict} US crude exports: " + ARB_NOTE,
+            context=" ".join(x for x in (s_context, f_context, spot_sentence) if x))
     if route == "distillate_us_to_europe":
         rows = aligned(source, [GASOIL, NYH_DIESEL], 366 * HISTORY_YEARS)
         if len(rows) < 60 or rows[-1][0] < _since(60):
@@ -458,7 +507,7 @@ def arbitrage_scenario(source: DataSource, route: str, brent_change: float, wti_
     got = _crude_arb_inputs(source)
     if got is None:
         return None
-    d, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
+    d, ym, brent, wti, fr, m1, m12, spread_hist, freight_hist = got
     spreads, freights = [v for _, v in spread_hist], [v for _, v in freight_hist]
     o_spread_pct, o_freight_pct, o_score, _ = _arb_score(brent, wti, fr, m1, m12, spreads, freights)
     brent2, wti2, fr2 = brent + brent_change, wti + wti_change, fr * (1 + freight_change_pct / 100)
@@ -476,9 +525,10 @@ def arbitrage_scenario(source: DataSource, route: str, brent_change: float, wti_
         key=f"scenario:arb:{route}:{_num(brent_change)}:{_num(wti_change)}:{_num(freight_change_pct)}",
         title="What if: US crude to Europe with changed prices",
         period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
-        series_ids=[BRENT_SPOT, CRUDE, FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"], values=values, hypothetical=True,
-        note=(f"Hypothetical. The stated changes are applied to the prices of {d} and the score is recomputed against "
-              f"the same three-year history; the curve is left as it is. In the scenario the score {verdict} US crude "
+        series_ids=[f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D", FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"],
+        values=values, hypothetical=True,
+        note=(f"Hypothetical. The stated changes are applied to the {ym} futures prices of {d} and the score is "
+              f"recomputed against the same history; the curve is left as it is. In the scenario the score {verdict} US crude "
               "exports. " + ARB_NOTE),
         context="Numbers labelled scenario are not market observations; numbers labelled observed are.")
 

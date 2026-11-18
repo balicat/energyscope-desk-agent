@@ -50,6 +50,9 @@ How to work
 - A reading's `context` says whether the level is unusual and when it was last seen. Use it: say how unusual
   the level is, how long it has been so, and when it was last like this, in your own words but with its numbers
   and dates unchanged.
+- When a context sets two measures side by side (the spot spread against the futures spread), they are both
+  true and measure different things. If they point different ways, say so: give both numbers with their dates
+  and where the context says the difference comes from. Do not pick one silently.
 - A reading marked hypothetical is a what-if. Open with the condition ("If Brent rose 5 dollars ...") and keep
   what would happen apart from what is observed. Never state a scenario_ number as a fact about the market.
 - Otherwise find series with search_series, then read them with get_latest, get_change or get_spread, and copy
@@ -176,7 +179,9 @@ def get_curve(ctx: RunContext[Deps], market: Literal["brent", "wti", "oman", "rb
 def get_futures_spread(ctx: RunContext[Deps]) -> Reading:
     """Brent minus WTI on futures of the same delivery month (the nearest month both still trade), with its
     percentile against that contract pair's history and whether it is unusual. This is the spread a trader
-    means by 'the Brent-WTI spread'; use get_spread on the two spot series only when spot is asked for."""
+    means by 'the Brent-WTI spread'; use get_spread on the two spot series only when spot is asked for.
+    Its context also gives the spot spread on the latest date spot prices exist and where the difference
+    between the two comes from, so one call answers 'why do spot and futures disagree'."""
     ctx.deps.emit("get_futures_spread", {})
     return _keep(ctx, readings.futures_spread(ctx.deps.source), "No recent futures for both Brent and WTI.")
 
@@ -273,8 +278,9 @@ def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline",
 
 @agent.tool
 def get_arbitrage(ctx: RunContext[Deps], route: Literal["us_crude_to_europe", "distillate_us_to_europe"]) -> Reading:
-    """The price side of a transatlantic arbitrage. us_crude_to_europe: Brent minus WTI and its three-year
-    percentile, a tanker freight proxy and its percentile, the Brent curve slope, and a score from -2 to +2.
+    """A price indicator for a transatlantic arbitrage, not an executable one. us_crude_to_europe: Brent minus
+    WTI on futures of one delivery month and its percentile, a tanker freight proxy and its percentile, the
+    Brent curve slope, a score from -2 to +2, and the spot spread beside the futures spread.
     distillate_us_to_europe: ICE gasoil against New York Harbor diesel in dollars per gallon, with its percentile.
     Neither includes route freight rates or physical differentials; say so."""
     ctx.deps.emit("get_arbitrage", {"route": route})

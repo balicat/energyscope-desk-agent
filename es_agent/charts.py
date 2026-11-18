@@ -45,9 +45,11 @@ def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
                         "points": [[m, r.values[m]] for m in months], "lines": []})
         elif kind == "arb" and rest == "us_crude_to_europe":
             d = r.period
-            spread = [(dd, v) for dd, v in readings.spread_history(source, readings.BRENT_SPOT, readings.CRUDE) if dd <= d]
+            parts = readings.futures_spread_parts(source)
+            spread = [(dd, v) for dd, v in parts[1] if dd <= d] if parts else []
             freight = [(dd, v) for dd, v in source.history(readings.FREIGHT, start=clock.today() - dt.timedelta(days=days)) if dd <= d]
-            out.append(_line("Brent minus WTI, spot", "Dollars per Barrel", spread, _bands(r.values, "spread_")))
+            out.append(_line(f"Brent minus WTI on futures, {parts[0]} delivery" if parts else "", "Dollars per Barrel",
+                             spread, _bands(r.values, "spread_")))
             out.append(_line("Tanker freight proxy (Breakwave tanker ETF)", "index points", freight, _bands(r.values, "freight_")))
         elif kind == "arb":
             hist = [(dd, round(v[0] / readings.GALLONS_PER_TONNE_GASOIL - v[1], 6))
