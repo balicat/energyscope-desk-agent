@@ -60,6 +60,19 @@ _sessions = Sessions()
 _source = None
 
 
+def _load_counts() -> None:
+    """Carry the public counts across restarts: they are rebuilt from the question log."""
+    try:
+        with open(LOG, encoding="utf-8") as f:
+            rows = [json.loads(line) for line in f if line.strip()]
+    except (OSError, ValueError):
+        return
+    answered = [r for r in rows if r.get("status") == 200 and isinstance(r.get("answer"), dict) and "checked" in r["answer"]]
+    if answered:
+        _checks.update(answers=len(answered), failed=sum(not r["answer"]["checked"] for r in answered), since=answered[0]["at"][:10])
+        _seconds.extend(r["answer"].get("seconds", 0) for r in answered[-200:])
+
+
 class Refused(Exception):
     def __init__(self, status: int, message: str):
         self.status, self.message = status, message
@@ -267,6 +280,7 @@ def main() -> None:
                "fixture": lambda: FixtureSource(os.environ.get("LIBRARIAN_FIXTURE", "fixtures/series.json"))}[SOURCE_KIND]()
     if SOURCE_KIND == "fixture":
         os.environ.setdefault("LIBRARIAN_TODAY", _source.as_of)
+    _load_counts()
     print(f"librarian on http://{HOST}:{PORT}  model={MODEL}  source={SOURCE_KIND}", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
 
