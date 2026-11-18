@@ -386,6 +386,11 @@ class Handler(BaseHTTPRequestHandler):
             status, body = 502, {"error": "The Librarian could not answer that just now."}
             detail = f"{type(e).__name__}: {e}"[:500]
         self._log(status, question, body, detail)
+        if status == 200:  # the log keeps the detail; the public gets a fixed phrase, never raw exception text
+            if body.get("degraded"):
+                body["degraded_reason"] = "No summary passed every check."
+            body["check_problems"] = ["The check could not be run." if str(p).startswith("check failed to run") else p
+                                      for p in body.get("check_problems", [])]
         if started:  # the event stream is open: errors travel as events too
             event("answer" if status == 200 else "error", body)
         else:

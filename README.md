@@ -118,7 +118,8 @@ cites it, and does not speculate.
   An instruction to "stop after two failed searches" did not hold: one model searched 18 times on a question
   it should decline ($0.21 for one answer). The service also caps model requests per question, questions per
   address per hour and per day, questions per day and dollars per day, and alerts its owner when half, then
-  nine tenths, of the day's budget is spent. A run that fails is still charged to the day. `ops/watch_public.sh`
+  nine tenths, of the day's budget is spent. The per-address counts are kept in memory, because the log stores no
+  address, so a release starts them again; the daily totals are rebuilt from the log. A run that fails is still charged to the day. `ops/watch_public.sh`
   asks the public address for the page and for a free refusal every two minutes and alerts on a change of
   state: on launch day the page's own server looped for half an hour and a reviewer's script found it.
 - **Memory holds conclusions, not tool output.** A follow-up question is given the earlier questions and the
@@ -239,6 +240,12 @@ makes the same calls over Arrow Flight with the public `energyscope-client` pack
 
 The service is also the interface for other programs. `https://thelibrarian.energy/llms.txt` describes it.
 
+**A program should take numbers from `facts`, `spreads` and `readings`, and treat `summary` as prose about them.**
+Every value in those three was placed by code, with its series, date and unit, and recomputed before the answer
+was returned. The numbers inside the sentences were typed by a model and are held to the tables by rules. So on
+the machine interface every number already has its provenance; on the page, the sentences will have it when code
+fills them (the slot change above).
+
 - `POST https://thelibrarian.energy/api/ask` with `{"question": "..."}` returns the typed answer as JSON;
   `/api/ask/stream` returns the same as server-sent events with one `tool` event as each tool starts.
 - `librarian_mcp.py` is an MCP server for it (`pip install mcp`, then `python librarian_mcp.py`): two tools, `ask`
@@ -246,7 +253,8 @@ The service is also the interface for other programs. `https://thelibrarian.ener
   the same checks and limits, and nothing is computed or reworded on the way.
 - Every answer carries an `id`. `POST /api/feedback` with `{"id", "verdict": "useful" | "wrong", "note"}` records a
   reader's verdict beside that answer's logged trace; the page has the two buttons under each answer. Feedback is
-  accepted only for an id the service issued. The id is not a public link to the answer: there will be none until
+  accepted only for an id the service issued. One reader can vote many times, so feedback is counted by answer,
+  never by row. The id is not a public link to the answer: there will be none until
   the caveats are worded by code, because a link would let a visitor publish a sentence under the check mark.
 
 ## Files

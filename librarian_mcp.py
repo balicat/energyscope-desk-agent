@@ -31,10 +31,11 @@ mcp = MCPServer(
     "the-librarian",
     instructions=(
         "The Librarian answers oil and gas market questions from EnergyScope data (EIA, futures curves, positioning, "
-        "storage, tanker transits). Every number in an answer was computed by code and recomputed from the data before "
-        "the answer was returned; `checked` says whether that recomputation matched. Quote its numbers with their dates "
-        "and units as given, pass on its caveats, and do not add figures of your own. It has no news, no route freight "
-        "rates and no physical differentials, and it does not forecast."
+        "storage, tanker transits). TAKE NUMBERS FROM `facts`, `spreads` AND `readings`: every value there was placed by "
+        "code, with its series, date and unit, and recomputed from the data before the answer was returned (`checked` says "
+        "whether that recomputation matched). Treat `summary` as prose about those values: its sentences were written by a "
+        "model and are held by rules, not proved. Pass on the caveats, and do not add figures of your own. It has no news, "
+        "no route freight rates and no physical differentials, and it does not forecast."
     ),
 )
 
@@ -49,11 +50,16 @@ def _post(path: str, body: dict) -> dict:
             return {"error": json.loads(e.read()).get("error", str(e)), "status": e.code}
         except ValueError:
             return {"error": str(e), "status": e.code}
+    except (urllib.error.URLError, TimeoutError, OSError) as e:  # no answer at all: say so in the same shape
+        return {"error": f"The Librarian could not be reached: {e}", "status": 0}
 
 
 @mcp.tool()
 def ask(question: str) -> dict:
     """Ask The Librarian one oil or gas market question in plain English (under 300 characters).
+
+    Take numbers from `facts`, `spreads` and `readings`, never from `summary`: those values were placed by
+    code with their series, date and units; the summary is a model's prose about them.
 
     Returns the typed answer: `summary` (the sentences), `facts`, `spreads` and `readings` (the numbers,
     each with its series, date and units), `caveats` (some written by code: stale inputs, evidence
