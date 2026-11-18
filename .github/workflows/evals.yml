@@ -18,5 +18,5 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Suite on frozen data, answers must match the golden file
         run: python run_evals.py --source fixture --gate --golden check
-      - name: Control run, validator off, exactly two assertions must fail
-        run: python run_evals.py --source fixture --no-guard --expect-failures 2
+      - name: Control run, validator off, exactly three assertions must fail
+        run: python run_evals.py --source fixture --no-guard --expect-failures 3

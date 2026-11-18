@@ -10,7 +10,9 @@
   "summary": "No EnergyScope series matched the question."
  },
  "arb_us_europe": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "arb:us_crude_to_europe"
   ],
@@ -121,10 +123,12 @@
    }
   ],
   "spreads": [],
-  "summary": "Brent futures curve (NYMEX BZ, settles on ICE Brent) on 2026-11-16: M1 92.44, M2 90.03, M3 88.00, M4 86.27, M5 84.80, M6 83.50, M7 82.32, M8 81.25, M9 80.27, M10 79.38, M11 78.60, M12 77.89, M1_minus_M2 2.41, M1_minus_M12 14.55, M1_minus_M12_a_week_earlier 13.60."
+  "summary": "Brent futures curve (NYMEX BZ, settles on ICE Brent) on 2026-11-16: M1 92.44, M2 90.03, M3 88.00, M4 86.27, M5 84.80, M6 83.50, M7 82.32, M8 81.25, M9 80.27, M10 79.38, M11 78.60, M12 77.89, M1_minus_M2 2.41, M1_minus_M12 14.55, M1_minus_M12_a_week_earlier 13.60. The curve is in backwardation."
  },
  "brent_vs_wti": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [],
   "facts": [
    {
@@ -157,7 +161,9 @@
   "summary": "Europe Brent Spot Price FOB, Daily was 92.14 Dollars per Barrel on 2026-11-11. Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11."
  },
  "brent_wti_spread": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [],
   "facts": [],
   "readings": [],
@@ -177,7 +183,9 @@
   "summary": "Europe Brent Spot Price FOB, Daily was 92.14 and Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11: a spread of 2.52."
  },
  "crack_321": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RWTC.D, PET.EER_EPMRU_PF4_RGC_DPG.D, PET.EER_EPD2F_PF4_Y35NY_DPG.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "crack:3-2-1"
   ],
@@ -310,7 +318,9 @@
   "summary": "European Union gas storage \u2014 storage fullness (gas in storage / working gas volume) was 70.15 % on 2026-11-16."
  },
  "follow_up": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D ends on 2026-11-11 (7 days ago)."
+  ],
   "cites": [],
   "facts": [
    {
@@ -406,7 +416,9 @@
   "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-18: crack 41.16, crude 85.22, gasoline_per_gallon 2.50, distillate_per_gallon 4.03, gallons_per_barrel 42.00, crack_percentile 87.90, observations 755.00, crack_p10 16.64, crack_p90 44.98."
  },
  "futures_spread": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "fspread:brent_wti"
   ],
@@ -453,7 +465,9 @@
   "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-17: brent 93.07, wti 84.65, brent_minus_wti 8.42, spread_percentile 96.40, observations 754.00, spread_p10 3.61, spread_p90 6.69, spread_spell_days 70.00, spread_previous_spell_days 0.00, spread_previous_spell_extreme 6.69, spread_days_since_previous_spell 117.00, spot_brent 92.14, spot_wti 89.62, spot_brent_minus_wti 2.52, spot_spread_percentile 17.40, futures_spread_on_spot_date 7.33, spot_minus_futures_spread -4.81, spot_brent_minus_its_future -0.62, spot_wti_minus_its_future 4.19."
  },
  "henry_hub_percentile": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: NG.RNGWHHD.D ends on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "percentile:NG.RNGWHHD.D:3"
   ],
@@ -509,7 +523,9 @@
   "summary": "Strait of Hormuz \u2014 daily tanker transits was 0.00 vessels/day on 2026-11-15."
  },
  "no_cross_unit_spread": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RWTC.D ends on 2026-11-11 (7 days ago)."
+  ],
   "cites": [],
   "facts": [
    {
@@ -590,7 +606,7 @@
    }
   ],
   "spreads": [],
-  "summary": "Oman crude futures curve (GME OQD) on 2026-11-17: M1 89.77, M2 90.06, M3 87.77, M4 85.86, M5 84.26, M6 82.85, M7 81.58, M8 80.42, M9 79.38, M10 78.45, M11 77.62, M12 76.87, M1_minus_M2 -0.29, M1_minus_M12 12.90, M1_minus_M12_a_week_earlier 13.85."
+  "summary": "Oman crude futures curve (GME OQD) on 2026-11-17: M1 89.77, M2 90.06, M3 87.77, M4 85.86, M5 84.26, M6 82.85, M7 81.58, M8 80.42, M9 79.38, M10 78.45, M11 77.62, M12 76.87, M1_minus_M2 -0.29, M1_minus_M12 12.90, M1_minus_M12_a_week_earlier 13.85. The curve is in backwardation."
  },
  "out_of_scope": {
   "caveats": [
@@ -613,7 +629,9 @@
   "summary": "No EnergyScope series matched the question."
  },
  "spot_vs_futures": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "fspread:brent_wti"
   ],
@@ -702,7 +720,9 @@
   "summary": "Baker Hughes Weekly \u2014 United States, all rigs was 601.00 Rigs on 2026-11-13, up 53.00 (9.67%) from 548.00 on 2025-11-06, 365 days earlier."
  },
  "week_surprises": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: ICE_COT.BRENT.MM_Net ends on 2026-11-03 (15 days ago)."
+  ],
   "cites": [
    "surprises:week"
   ],
@@ -746,7 +766,9 @@
   "summary": "Most unusual moves over a week, from a watchlist of 18 series on 2026-11-17: Tanker freight proxy: latest 647.86, Tanker freight proxy: change 111.94, Tanker freight proxy: z-score 2.03, US distillate stocks: latest 103330.00, US distillate stocks: change 4071.00, US distillate stocks: z-score 1.51, Brent fund net position: latest 171603.00, Brent fund net position: change -48466.00, Brent fund net position: z-score -1.28, ICE gasoil: latest 1210.50, ICE gasoil: change -70.25, ICE gasoil: z-score -1.02, US commercial crude stocks: latest 414417.00, US commercial crude stocks: change 4657.00, US commercial crude stocks: z-score 0.97."
  },
  "week_watch": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D, PET.EER_EPMRU_PF4_RGC_DPG.D end on 2026-11-11 (7 days ago)."
+  ],
   "cites": [
    "watch:week"
   ],
@@ -839,7 +861,9 @@
   "summary": "If the stated changes happened, hypothetically: What if: US crude to Europe with changed prices on 2026-11-17: brent_change 5.00, wti_change 0.00, freight_change_pct -20.00, observed_brent_minus_wti 8.42, observed_spread_percentile 96.40, observed_freight_proxy 647.86, observed_freight_percentile 94.40, observed_score -0.64, scenario_brent 98.07, scenario_wti 84.65, scenario_brent_minus_wti 13.42, scenario_spread_percentile 100.00, scenario_freight_proxy 518.29, scenario_freight_percentile 93.20, scenario_score -0.58, score_change 0.06."
  },
  "wti_30d": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-18: PET.RWTC.D ends on 2026-11-11 (7 days ago)."
+  ],
   "cites": [],
   "facts": [
    {
@@ -908,7 +932,7 @@
    }
   ],
   "spreads": [],
-  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.22, M2 83.96, M3 82.61, M4 81.14, M5 79.80, M6 78.30, M7 77.05, M8 75.98, M9 74.94, M10 74.08, M11 73.33, M12 72.34, M1_minus_M2 1.26, M1_minus_M12 12.88, M1_minus_M12_a_week_earlier 11.54."
+  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.22, M2 83.96, M3 82.61, M4 81.14, M5 79.80, M6 78.30, M7 77.05, M8 75.98, M9 74.94, M10 74.08, M11 73.33, M12 72.34, M1_minus_M2 1.26, M1_minus_M12 12.88, M1_minus_M12_a_week_earlier 11.54. The curve is in backwardation."
  },
  "wti_positioning": {
   "caveats": [],

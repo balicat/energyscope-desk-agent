@@ -1,7 +1,7 @@
 """Eval suite: desk questions scored on grounding, series choice, abstention and tool budget.
 
     python run_evals.py                                  # offline: scripted model, Parquet lake
-    python run_evals.py --no-guard --expect-failures 2   # control: validator off, the evals must catch the bad number
+    python run_evals.py --no-guard --expect-failures 3   # control: validator off, the evals must catch the planted errors
     python run_evals.py --model anthropic:claude-haiku-5-5 --gate      # live model; exit 1 on any failed assertion
     python run_evals.py --source fixture --gate --golden check         # CI: frozen data, no lake, no key
 
@@ -58,7 +58,7 @@ SUITE = [
      [("search_series", {"query": "Brent spot price"}), ("search_series", {"query": "WTI spot price"}),
       ("get_spread", {"series_a": BRENT, "series_b": WTI})], False),
     ("brent_curve", "Is the Brent futures curve in backwardation or contango?", [["ICE.BRENT.M1.D"]],
-     [("get_curve", {"market": "brent"})], False),
+     [("get_curve", {"market": "brent"})], True),
     ("crack_321", "What is the 3-2-1 crack spread right now?", [[WTI]],
      [("get_crack_spread", {"kind": "3-2-1"})], False),
     ("crude_vs_5y", "How do US commercial crude stocks compare with the five-year average for this time of year?", [US_CRUDE],
@@ -166,9 +166,18 @@ class ScenarioLabelled(Evaluator[str, DeskAnswer]):
         return EvaluationReason(ok, "scenario stated as a condition" if ok else "scenario numbers presented without a condition")
 
 
+@dataclass
+class DirectionRight(Evaluator[str, DeskAnswer]):
+    """The prose points the same way as the data: backwardation or contango, rose or fell."""
+
+    def evaluate(self, ctx):
+        bad = metrics.direction_problems(ctx.output)
+        return EvaluationReason(not bad, "; ".join(bad) if bad else "direction words agree with the data")
+
+
 def build_dataset() -> Dataset:
     cases = [Case(name=n, inputs=q, metadata={"expect": e}) for n, q, e, _, _ in SUITE]
-    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), MaxToolCalls(max_calls=6)])
+    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), DirectionRight(), MaxToolCalls(max_calls=6)])
 
 
 def make_task(model_name: str, enforce: bool = True):
@@ -184,7 +193,8 @@ def make_task(model_name: str, enforce: bool = True):
     return task
 
 
-HARD = ("Grounded", "SummaryTraceable", "ScenarioLabelled")  # a wrong, untraceable or unlabelled what-if number: never tolerated
+# A wrong, untraceable or unlabelled what-if number, or a wrong direction word: never tolerated
+HARD = ("Grounded", "SummaryTraceable", "ScenarioLabelled", "DirectionRight")
 
 
 def tally(report) -> tuple[int, int, int, list[tuple[str, str, str]]]:

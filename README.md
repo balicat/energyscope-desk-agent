@@ -33,6 +33,12 @@ cites it, and does not speculate.
   spot spread minus futures spread = (spot Brent minus its future) minus (spot WTI minus its future). On
   11 Nov that was -0.62 and +4.19: spot WTI stood well above its January future, spot Brent slightly below its
   own. Code writes the sentence; it states the arithmetic and no cause.
+- **Code says when a number is old.** EIA spot prices are published about a week behind futures. After the answer
+  is written, code compares each series it used with how often that series is published (daily, weekly, monthly)
+  and adds a caveat naming any that are behind and their last date. The model cannot leave it out.
+- **Direction words are checked too.** A curve called contango when it is in backwardation, or a rise described
+  only with falling words, is rejected like a wrong number. The rule is narrow on purpose: it fires only when the
+  prose uses the wrong word and never the right one.
 - **A what-if is labelled as one.** Scenario tools apply stated price changes to the latest observed prices and
   recompute in code. The reading is marked hypothetical, the page shows a badge, and an evaluator fails any
   answer that states a scenario number without its condition.
@@ -76,17 +82,17 @@ says so and uses a tanker ETF as a proxy), and no news.
 
 ## Evaluation
 
-Twenty-nine questions, five evaluators each (145 assertions): `Grounded` (recompute from source),
+Twenty-nine questions, six evaluators each (174 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
-a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
+a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `DirectionRight` (the prose points the same way as the data: backwardation or contango, rose or fell), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, why spot and futures spreads disagree, the week's surprises and watch list, "when was it last this high", seasonal and
 percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
 a follow-up, a cross-unit "spread" that must not be computed, a prompt injection and two out-of-scope questions.
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **145/145**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **143/145** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **174/174**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **171/174** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **145/145** | the latest release run (29 cases). The run before it, on 28 cases, scored 140/140; the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
@@ -128,7 +134,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # No lake, no key, no cost: frozen data and a scripted stand-in for the model
 .venv/bin/python run_evals.py --source fixture --gate --golden check
-.venv/bin/python run_evals.py --source fixture --no-guard --expect-failures 2
+.venv/bin/python run_evals.py --source fixture --no-guard --expect-failures 3
 LIBRARIAN_SOURCE=fixture .venv/bin/python serve.py          # the service, offline, on :8790
 
 # Live model (any Pydantic AI model string)

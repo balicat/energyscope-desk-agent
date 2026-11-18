@@ -5,8 +5,8 @@ answer from the tool results it actually received. It exercises the real
 tools, the typed output, the validator and the evals with no API key; it
 does not measure model judgement (that is what the live run is for).
 
-With sloppy=True the first answer misquotes one number, so the run shows the
-output validator rejecting it and the retry fixing it.
+With sloppy=True the first answer is wrong (one number misquoted, or a curve given the
+opposite shape), so the run shows the output validator rejecting it and the retry fixing it.
 """
 
 from __future__ import annotations
@@ -60,7 +60,8 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
             cites.append(body["key"])
             shown = ", ".join(f"{k} {v:.2f}" for k, v in body["values"].items())
             lead = "If the stated changes happened, hypothetically: " if body.get("hypothetical") else ""
-            lines.append(f"{lead}{body['title']} on {body['period']}: {shown}.")
+            shape = f" The curve is in {body['note'].split(' ')[0]}." if r.tool_name == "get_curve" else ""
+            lines.append(f"{lead}{body['title']} on {body['period']}: {shown}.{shape}")
     if not facts and not spreads and not cites:
         return {"facts": [], "summary": "No EnergyScope series matched the question.",
                 "caveats": [f"search_series found nothing suitable for: {question}"]}
@@ -88,6 +89,12 @@ def scripted(plan: list[tuple[str, dict]], sloppy: bool = False) -> FunctionMode
         answer = _answer(returns, str(question))
         if sloppy and not rejected and answer["facts"]:
             answer["facts"][0]["latest_value"] = round(answer["facts"][0]["latest_value"] * 1.05, 2)
+        elif sloppy and not rejected:  # no facts: a curve reading, described with the opposite shape
+            flip = {"in backwardation.": "in contango.", "in contango.": "in backwardation."}
+            for a, b in flip.items():
+                if a in answer["summary"]:
+                    answer["summary"] = answer["summary"].replace(a, b)
+                    break
         return ModelResponse(parts=[ToolCallPart(output_tool, answer)])
 
     return FunctionModel(fn, model_name="scripted")

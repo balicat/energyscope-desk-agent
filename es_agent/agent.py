@@ -68,6 +68,8 @@ How to answer
   Write for a person: no reading keys, tool names or series IDs in the summary; the page lists those itself.
 - Quote numbers from facts, spreads or cited readings. You may round (two decimals, or whole numbers with
   thousands separators such as 414,417) but never change units.
+- Say which way things moved in plain words (rose, fell, backwardation, contango) and get the direction from
+  the sign of the number, never from memory.
 - Report what the data shows. Do not predict, and do not explain causes the data cannot show. When a question
   needs data you lack (route freight rates, physical differentials, news), say which in caveats.
 - Earlier turns of the conversation, when given, are context only: any number you quote must come from a tool
@@ -299,6 +301,11 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         else:
             problems.append(f"cites {key!r}, which no tool returned in this run. Keys available: {sorted(ctx.deps.readings)}.")
     answer.cites = [r.key for r in answer.readings]
+    # Code, not the model, says when an input is behind: one caveat naming the series and their last dates.
+    used = [f.series_id for f in answer.facts] + [x for s in answer.spreads for x in (s.series_a, s.series_b)]
+    used += [x for r in answer.readings for x in r.series_ids]
+    stale = readings.stale_inputs(ctx.deps.source, used)
+    answer.caveats = [c for c in answer.caveats if not c.startswith("Not current as of ")] + ([stale] if stale else [])
     if not ctx.deps.enforce:
         return answer
     for f in answer.facts:
@@ -323,6 +330,7 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     bad = metrics.untraceable_numbers(answer)
     if bad:
         problems.append(f"Summary numbers {bad} match no value in facts, spreads or cited readings. Quote those values, no conversions, and cite every reading you quote.")
+    problems += [p[0].upper() + p[1:] + "." for p in metrics.direction_problems(answer)]
     if not answer.facts and not answer.spreads and not answer.readings and not answer.caveats:
         problems.append("No facts and no caveat: say why nothing was found.")
     if problems:

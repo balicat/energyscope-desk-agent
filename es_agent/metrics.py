@@ -64,6 +64,39 @@ def close(a: float | None, b: float | None) -> bool:
     return math.isclose(a, b, rel_tol=1e-3, abs_tol=0.01)
 
 
+_UP = {"up", "rose", "risen", "rise", "rising", "higher", "increase", "increased", "gain", "gained", "climbed",
+       "above", "more", "build", "built", "grew", "added"}
+_DOWN = {"down", "fell", "fallen", "fall", "falling", "lower", "decrease", "decreased", "decline", "declined",
+         "dropped", "drop", "below", "less", "fewer", "draw", "drew", "shrank", "lost"}
+
+
+def direction_problems(answer: DeskAnswer) -> list[str]:
+    """Direction words in the summary that contradict the data.
+
+    Two rules, both narrow on purpose. A curve called contango when every cited curve is in
+    backwardation (or the reverse). A change described only with falling words when every change
+    in the facts is a rise (or the reverse). A summary that uses the right word anywhere passes,
+    so "not contango but backwardation" and mixed moves are never flagged.
+    """
+    text = answer.summary.lower()
+    words = set(re.findall(r"[a-z]+", text))
+    problems = []
+    shapes = {r.note.split(" ")[0] for r in answer.readings if r.key.startswith("curve:")} & {"backwardation", "contango"}
+    if len(shapes) == 1:
+        right = shapes.pop()
+        wrong = "contango" if right == "backwardation" else "backwardation"
+        if wrong[:9] in text and right[:9] not in text:
+            problems.append(f"the summary says {wrong}; the curve is in {right}")
+    signs = {c > 0 for f in answer.facts if (c := f.change_abs) is not None and c != 0}
+    if len(signs) == 1:
+        rose = signs.pop()
+        right, wrong = (_UP, _DOWN) if rose else (_DOWN, _UP)
+        if words & wrong and not words & right:
+            problems.append(f"the summary uses {sorted(words & wrong)} but every change in the facts is "
+                            f"{'a rise' if rose else 'a fall'}; say so in plain words")
+    return problems
+
+
 _ISO = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 _NUM = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
 

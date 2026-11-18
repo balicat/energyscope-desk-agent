@@ -727,6 +727,36 @@ def watch(source: DataSource, window: str) -> Reading | None:
         context=context)
 
 
+# Days a series may trail today before an answer must say so, by how often it is published.
+# Daily allows a weekend and a holiday; weekly allows a holiday-delayed release; monthly data
+# is published two to three months in arrears.
+STALE_AFTER_DAYS = {"D": 4, "W": 14, "M": 100, "Q": 200, "A": 800}
+
+
+def stale_inputs(source: DataSource, series_ids: list[str]) -> str:
+    """A sentence naming every series whose latest value is older than its publishing rhythm allows,
+    or "" when all are current. Written by code and added to the answer's caveats by the validator,
+    so a week-old spot price cannot pass as today's."""
+    today = clock.today()
+    behind: dict[dt.date, list[str]] = {}
+    for sid in dict.fromkeys(series_ids):
+        hit = source.meta(sid)
+        freq = (hit.frequency if hit else "") or sid.rsplit(".", 1)[-1]
+        limit = STALE_AFTER_DAYS.get(freq)
+        hist = source.history(sid, start=today - dt.timedelta(days=900)) if limit else []
+        if hist and (today - hist[-1][0]).days > limit:
+            behind.setdefault(hist[-1][0], []).append(sid)
+    if not behind:
+        return ""
+    parts = []
+    for d in sorted(behind)[:3]:
+        ids = behind[d]
+        names = ", ".join(ids[:4]) + (f" and {len(ids) - 4} more" if len(ids) > 4 else "")
+        parts.append(f"{names} {'ends' if len(ids) == 1 else 'end'} on {d} ({(today - d).days} days ago)")
+    more = f"; {len(behind) - 3} more dates not listed" if len(behind) > 3 else ""
+    return f"Not current as of {today}: " + "; ".join(parts) + more + "."
+
+
 def compute(source: DataSource, key: str) -> Reading | None:
     """Rebuild a reading from its key."""
     kind, _, rest = key.partition(":")
