@@ -80,6 +80,10 @@ How to answer
   the sign of the number, never from memory.
 - Write every date as YYYY-MM-DD and take it from a tool result; never write a month name, a weekday or a
   quarter. Caveats follow the same rules as the summary: no number or date that a tool did not return.
+- Caveats are for the reader: what the data cannot show, what is old, what was left out of the comparison.
+  Never mention tools, reading keys, series IDs, the facts list, or what was not requested.
+- After a number, give its unit as the tool gives it. When a tool result has an `also` figure (stocks in
+  million barrels), use it when the question asks in that unit: quote it with that unit, never convert yourself.
 - Report what the data shows. Do not predict, and do not explain causes the data cannot show. When a question
   needs data you lack (route freight rates, physical differentials, news), say which in caveats.
 - Earlier turns of the conversation, when given, are context only: any number you quote must come from a tool
@@ -361,7 +365,8 @@ def tables_only(deps: Deps) -> DeskAnswer:
     facts = []
     for o in deps.ledger.values():
         if isinstance(o, Observation):
-            facts.append(SeriesFact(series_id=o.series_id, name=o.name, units=o.units, latest_period=o.period, latest_value=o.value))
+            facts.append(SeriesFact(series_id=o.series_id, name=o.name, units=o.units, latest_period=o.period,
+                                    latest_value=o.value, also=o.also))
         else:
             facts.append(SeriesFact(**o.model_dump()))
     answer = DeskAnswer(
@@ -392,7 +397,12 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     ]
     # The model's caveats are held to the same tracing as the summary: one that states a number or a
     # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
-    answer.caveats = prose.clean_caveats(answer) + code_caveats(ctx.deps.source, answer)
+    kept = prose.clean_caveats(answer)
+    if not kept and not (answer.facts or answer.spreads or answer.readings):
+        # A refusal has nothing but its caveat. Keep the reason even if it is clumsily worded, as long
+        # as it states no number or date of its own.
+        kept = prose.clean_caveats(answer, plumbing=False)
+    answer.caveats = kept + code_caveats(ctx.deps.source, answer)
     if not ctx.deps.enforce:
         return answer
     for f in answer.facts:
@@ -400,6 +410,7 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         if src is None:
             problems.append(f"{f.series_id} (lookback {f.lookback_days}) was not returned by any tool call in this run.")
             continue
+        f.also = dict(src.also)  # code copies the converted figure in; the model does not type it
         latest_p = src.period if isinstance(src, Observation) else src.latest_period
         latest_v = src.value if isinstance(src, Observation) else src.latest_value
         if f.latest_period != latest_p or not metrics.close(f.latest_value, latest_v):

@@ -20,6 +20,7 @@ class Observation(BaseModel):
     units: str
     period: dt.date
     value: float
+    also: dict[str, float] = Field(default_factory=dict, description="Written by code: the same value in the unit people ask for, e.g. million_barrels. Quote it with that unit.")
 
 
 class Change(BaseModel):
@@ -33,6 +34,7 @@ class Change(BaseModel):
     base_value: float
     change_abs: float
     change_pct: float
+    also: dict[str, float] = Field(default_factory=dict, description="Written by code: the latest value in the unit people ask for.")
 
 
 class Spread(BaseModel):
@@ -80,6 +82,7 @@ class SeriesFact(BaseModel):
     base_value: float | None = None
     change_abs: float | None = None
     change_pct: float | None = None
+    also: dict[str, float] = Field(default_factory=dict, description="Leave empty. Code copies it from the tool result.")
 
 
 class DeskAnswer(BaseModel):

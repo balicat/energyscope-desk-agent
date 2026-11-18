@@ -137,8 +137,9 @@ def pool_of(answer: DeskAnswer) -> Pool:
         if f.lookback_days is not None:
             p.counts.append(f.lookback_days)
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
+        p.amounts += list(f.also.values())
         p.text(f.name, f.series_id)
-        p.label(f.units, f.name)
+        p.label(f.units, f.name, " ".join(f.also))
     for s in answer.spreads:
         p.amounts += [s.value_a, s.value_b, s.spread]
         for k, v in s.extras.items():
@@ -227,11 +228,21 @@ def untraceable(answer: DeskAnswer) -> list[str]:
     return [b for text in [answer.summary, *model_caveats(answer)] for b in text_problems(text, pool)]
 
 
-def clean_caveats(answer: DeskAnswer) -> list[str]:
-    """The model's caveats, minus any that states a number or date no tool returned. A caveat is
-    where a number goes when the summary may not hold it, so code removes it there too."""
+# A caveat is for the reader. One that talks about the machinery (reading keys, the facts list, tool
+# names, series IDs) tells a visitor nothing and is removed.
+_PLUMBING = re.compile(r"\b(?:facts|series facts?|series lookups?|cited readings?|reading keys?|tool calls?|tool results?|"
+                       r"get_[a-z_]+|search_series|(?:was|were|been) (?:not )?requested|not asked for)\b|"
+                       r"\b[a-z]+:[a-z_0-9]+\b|\b[A-Z][A-Z_]+\.[A-Z0-9_.-]+\b")
+
+
+def clean_caveats(answer: DeskAnswer, plumbing: bool = True) -> list[str]:
+    """The model's caveats, minus any that states a number or date no tool returned, points a
+    direction the data does not, or talks about the machinery. A caveat is where a number goes
+    when the summary may not hold it, so the summary's rules apply there too."""
     pool = pool_of(answer)
-    return [c for c in model_caveats(answer) if not text_problems(c, pool)]
+    return [c for c in model_caveats(answer)
+            if not text_problems(c, pool) and not direction_problems(answer, c)
+            and not (plumbing and _PLUMBING.search(c))]
 
 
 # ---- direction -------------------------------------------------------------------------------
@@ -312,9 +323,11 @@ def _slope_problems(answer: DeskAnswer, words: set[str]) -> list[str]:
     return []
 
 
-def direction_problems(answer: DeskAnswer) -> list[str]:
-    """Direction words that contradict the data, and quoted changes with no direction at all."""
-    lowered = [w.lower() for w in re.findall(r"[A-Za-z]+", answer.summary)]
+def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]:
+    """Direction words that contradict the data, and quoted changes with no direction at all.
+    Reads the summary, or `text` when one of the model's caveats is being checked."""
+    text = answer.summary if text is None else text
+    lowered = [w.lower() for w in re.findall(r"[A-Za-z]+", text)]
     all_words = set(lowered)
     problems = _shape_problems(answer, lowered) + _slope_problems(answer, all_words)
     changes = [c for f in answer.facts if (c := f.change_abs) is not None and c != 0]
@@ -329,7 +342,7 @@ def direction_problems(answer: DeskAnswer) -> list[str]:
         problems.append("the summary says unchanged; the facts show a change")
     moves, levels = _signed(answer)
     pool = pool_of(answer)
-    clean = _blank_dates(answer.summary)
+    clean = _blank_dates(text)
     for sentence in re.split(r"(?<=[.!?;:])\s+", clean):
         found = list(_TOKEN.finditer(sentence))
         toks = [("num", m.group().rstrip(",")) if m.lastgroup == "num" else ("word", m.group().lower()) for m in found]

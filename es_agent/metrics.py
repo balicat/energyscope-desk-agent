@@ -15,11 +15,22 @@ from . import prose
 from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
 
 
+def also_in(units: str, value: float) -> dict[str, float]:
+    """The same value in the unit people ask for. EIA publishes stocks in thousand barrels; a person asks
+    for million barrels. The conversion is done here so the model has a figure to quote and never divides."""
+    key = unit_key(units)
+    if key == "thousand barrel":
+        return {"million_barrels": round(value / 1000, 3)}
+    if key == "thousand barrel per day":
+        return {"million_barrels_per_day": round(value / 1000, 3)}
+    return {}
+
+
 def latest_obs(hit: SeriesHit, history: list[tuple[dt.date, float]]) -> Observation | None:
     if not history:
         return None
     d, v = history[-1]
-    return Observation(series_id=hit.series_id, name=hit.name, units=hit.units, period=d, value=v)
+    return Observation(series_id=hit.series_id, name=hit.name, units=hit.units, period=d, value=v, also=also_in(hit.units, v))
 
 
 def change_over(hit: SeriesHit, history: list[tuple[dt.date, float]], lookback_days: int) -> Change | None:
@@ -36,6 +47,7 @@ def change_over(hit: SeriesHit, history: list[tuple[dt.date, float]], lookback_d
         series_id=hit.series_id, name=hit.name, units=hit.units, lookback_days=lookback_days,
         latest_period=d1, latest_value=v1, base_period=d0, base_value=v0,
         change_abs=round(v1 - v0, 6), change_pct=round((v1 - v0) / v0 * 100, 6) if v0 else math.nan,
+        also=also_in(hit.units, v1),
     )
 
 

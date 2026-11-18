@@ -149,6 +149,20 @@ def _model_for(question: str):
     return scripted(*PLANS[question])
 
 
+def _cost(usage, messages) -> float:
+    """Dollars spent on a run. A finished run carries its cost; a run that failed does not, and it is
+    the dearest kind (every retry is a model request), so it is summed from the responses received."""
+    if usage is not None and getattr(usage, "cost", None):
+        return float(usage.cost)
+    total = 0.0
+    for m in messages:
+        try:
+            total += float(m.cost().total_price)
+        except Exception:
+            pass  # a request, or a response the price table does not know
+    return total
+
+
 def answer(question: str, session: str | None = None, emit=lambda tool, args: None) -> dict:
     t0 = time.time()
     model = _model_for(question)
@@ -170,6 +184,10 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
             # Every attempt at a summary failed a check, or the request budget ran out. The numbers the
             # tools returned were computed by code and can still be shown; the sentences cannot.
             if not (deps.ledger or deps.spreads or deps.readings):
+                with _state_lock:  # nothing to show, but the requests were paid for: book them
+                    _roll_day()
+                    _day["usd"] += _cost(None, messages)
+                    _alert_if_due()
                 raise
             degraded = f"{type(e).__name__}: {e}"[:300]
             output, usage = tables_only(deps), None
@@ -190,7 +208,7 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
     except Exception:
         out["charts"] = []
     seconds = round(time.time() - t0, 2)
-    usd = float(getattr(usage, "cost", None) or 0)
+    usd = _cost(usage, messages)
     with _state_lock:
         _roll_day()
         _day["usd"] += usd

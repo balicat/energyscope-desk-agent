@@ -73,12 +73,25 @@ cites it, and does not speculate.
     word must be the reading's own and not negated. A high percentile may not be called low.
   A caveat that fails is removed by code. `prose_controls.py` plants 36 such errors and must reject every one, and
   must pass 14 correct sentences and every recorded answer; it runs in CI and in the release gate.
-- **What the tick does not prove.** Two true values, or two true dates, attached to the wrong nouns (Brent's price
-  given as WTI's); and claims made in words alone ("a record high", "has narrowed" where no earlier value was
-  returned). Four such answers are kept in `prose_controls.py` as known limits. A short number such as "2" matches
-  any returned value from 1.5 to 2.5, so the chance of an accidental match grows with the number of values an
-  answer cites. The page says what was checked: the sources were recomputed, and every number and date in the
-  text matches one of them.
+- **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
+  list of rules about English, and English is larger than the list. The reviewer measured it with test sentences
+  the rules had not been shown, true tables under wrong prose:
+
+  | Held-out set | Wrong sentences accepted | Right sentences refused |
+  |---|---|---|
+  | round 1, before any prose rule beyond numbers | 11 of 11 | 0 |
+  | round 2, after the first fix | 12 of 17 | 1 |
+  | round 3, after the second fix | 14 of 15 | 5 of 8 |
+
+  Each release closed the cases it had been shown; the next unseen set got through at about the same rate, and
+  the false refusals rose. So the rules catch the errors they were written for and should not be read as proof
+  of the wording. Still open by design: two true values or dates attached to the wrong nouns, and claims made in
+  words alone ("a record high"); four such answers are kept in `prose_controls.py` as known limits. The page
+  says what was checked: the sources were recomputed, every number and date in the text matches one of them,
+  and the wording around the numbers is checked by rules, not proved.
+  The reviewer's proposed fix is this project's own rule taken one step further, and it is the planned next
+  change: the model writes sentences with slots instead of digits, code fills each slot from a reading (value,
+  unit, date and the direction phrase), and the one remaining prose rule is that no digit appears outside a slot.
 - **A strict rule should degrade, not fail.** When every attempt at a summary fails a check, the visitor is not
   given an error. The tools' numbers were computed by code, so the page shows them with a line saying that no
   summary passed, and no sentence from the model.
@@ -98,7 +111,9 @@ cites it, and does not speculate.
   An instruction to "stop after two failed searches" did not hold: one model searched 18 times on a question
   it should decline ($0.21 for one answer). The service also caps model requests per question, questions per
   address per hour and per day, questions per day and dollars per day, and alerts its owner when half, then
-  nine tenths, of the day's budget is spent.
+  nine tenths, of the day's budget is spent. A run that fails is still charged to the day. `ops/watch_public.sh`
+  asks the public address for the page and for a free refusal every two minutes and alerts on a change of
+  state: on launch day the page's own server looped for half an hour and a reviewer's script found it.
 - **Memory holds conclusions, not tool output.** A follow-up question is given the earlier questions and the
   sentences that answered them. Any number it quotes must be fetched again in the current run, so a stale
   number cannot come through with a clean trace.
@@ -170,6 +185,8 @@ How the suite got here, including the failures:
 | 18 Nov | 186/186 on Haiku | an outside review asked how Dubai compares with Brent: 7 tool calls, 4 of them searches, and a ticked answer that subtracted a monthly-average contract from a dated future. `get_spread` now refuses the pairing and benchmark IDs are in the instructions; the same question now takes 1 call and 19,000 tokens, down from 45,000; 31 cases |
 | 18 Nov | blocked, then 186/186 on a second run; not released | the first prose rules (caveats, dates, signs). One question ran out of retries on the first live run; a second run passed and nobody knew which question it had been. Never released: the reviewer objected to running a gate twice, and found more holes offline |
 | 18 Nov | 186/186 on Haiku, 0 retries, one live run | second round of prose rules; three curve shapes; futures spreads must share a delivery month; a tables-only answer when no summary passes; the gate now counts retries, names any question that runs out, and allows one rerun on record. Of 23 real answers in the service log replayed through the new rules, 1 would have been sent back: it called the front of the Oman curve a small contango, which was true and which the old reading had mislabelled |
+| 18 Nov | 186/186 on Haiku, 0 retries, one live run | the scorecard counts groups, with bands and base rates from eight years of data, after the reviewer's 417-week backtest |
+| 18 Nov | outage, about 35 minutes | not the agent: the page's nginx config. A `www` redirect placed first became the default server and redirected the bare domain to itself. `nginx -t` passed; the release health check asked the lab server, not the public address. Found by the reviewer's script. Now: a routing test before every page push, a public-address check at the end of every release, and a two-minute watchdog |
 
 ## Release gate
 
