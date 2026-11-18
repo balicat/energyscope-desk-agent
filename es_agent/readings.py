@@ -29,6 +29,7 @@ CURVES = {
     "rbob": ("RBOB gasoline futures curve (NYMEX RB)", [f"NYMEX.RBOB.M{i}.D" for i in range(1, 13)]),
     "heating_oil": ("Heating oil (ULSD) futures curve (NYMEX HO)", [f"NYMEX.HO.M{i}.D" for i in range(1, 13)]),
 }
+CURVE_LABELS = {"brent": "Brent", "wti": "WTI", "oman": "Oman", "rbob": "RBOB gasoline", "heating_oil": "heating oil"}
 CRUDE, GASOLINE, DISTILLATE = "PET.RWTC.D", "PET.EER_EPMRU_PF4_RGC_DPG.D", "PET.EER_EPD2F_PF4_Y35NY_DPG.D"
 CRACKS = ("3-2-1", "gasoline", "distillate")
 GALLONS_PER_BARREL = 42
@@ -226,11 +227,20 @@ def curve(source: DataSource, market: str) -> Reading | None:
     if slope * front < 0:
         note = (f"mixed: {shape(front)} at the front (M1 {'above' if front > 0 else 'below'} M2) and {shape(slope)} "
                 f"across the curve (M1 {'above' if slope > 0 else 'below'} M{n})")
+        words = {"shape": (f"the {CURVE_LABELS[market]} curve is mixed: in {shape(front)} at the front (M1 {'above' if front > 0 else 'below'} M2) "
+                           f"and in {shape(slope)} across the curve (M1 {'above' if slope > 0 else 'below'} M{n})")}
     else:
         note = "backwardation (front above back)" if slope > 0 else "contango (front below back)" if slope < 0 else "flat"
+        words = {"shape": f"the {CURVE_LABELS[market]} curve is " + ("flat" if not slope else "in " + note)}
+    name = CURVE_LABELS[market]
+    label_of = {f"M{i + 1}": f"{name} M{i + 1}" for i in range(n)}
+    label_of.update({"M1_minus_M2": f"{name} M1|M2", f"M1_minus_M{n}": f"{name} M1|M{n}",
+                     f"M1_minus_M{n}_a_week_earlier": f"{name} M1|M{n}", "M1_latest": f"{name} M1"})
+    date_of: dict[str, dt.date] = {}
     earlier = [(dd, v) for dd, v in rows if dd <= d - dt.timedelta(days=7)]
     context = ""
     if earlier:
+        date_of[f"M1_minus_M{n}_a_week_earlier"] = earlier[-1][0]
         was = round(earlier[-1][1][0] - earlier[-1][1][-1], 6)
         values[f"M1_minus_M{n}_a_week_earlier"] = was
         if was * slope < 0:
@@ -238,13 +248,15 @@ def curve(source: DataSource, market: str) -> Reading | None:
         else:
             move = "has steepened" if abs(slope) > abs(was) else "has flattened" if abs(slope) < abs(was) else "has not moved"
         context = f"M1 minus M{n} was {was:.2f} on {earlier[-1][0]} and is {slope:.2f} now: the curve {move} over the week."
+        words["move"] = f"the {name} curve {move.rstrip(',')} over the week, since {earlier[-1][0]}"
     newer = [(dd, v) for dd, v in source.history(ids[0], start=d) if dd > d]
     if newer:  # the front month has a later date than the row with every month
         values["M1_latest"] = newer[-1][1]
+        date_of["M1_latest"] = newer[-1][0]
         context = (context + f" The latest date with all {n} months is {d}; M1 alone has {newer[-1][0]} at "
                              f"{newer[-1][1]:.2f}.").strip()
     return Reading(key=f"curve:{market}", title=title, period=d, units=source.meta(ids[0]).units,
-                   series_ids=ids, values=values, note=note, context=context)
+                   series_ids=ids, values=values, note=note, context=context, words=words, label_of=label_of, date_of=date_of)
 
 
 def crack(source: DataSource, kind: str) -> Reading | None:
@@ -271,7 +283,11 @@ def crack(source: DataSource, kind: str) -> Reading | None:
     return Reading(key=f"crack:{kind}", title=f"{kind} crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil",
                    period=d, units="Dollars per Barrel", series_ids=[CRUDE, GASOLINE, DISTILLATE], values=values,
                    note="products minus crude, spot prices; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude",
-                   context=context)
+                   context=context, window_of={"crack_percentile": f"of its last {HISTORY_YEARS} years"},
+                   label_of={"crack": f"the {kind} crack spread", "crack_percentile": f"the {kind} crack spread", "crude": "WTI spot",
+                             "gasoline_per_gallon": "Gulf Coast gasoline", "gasoline_per_barrel": "Gulf Coast gasoline",
+                             "distillate_per_gallon": "New York Harbor heating oil",
+                             "distillate_per_barrel": "New York Harbor heating oil"})
 
 
 def _add_months(ym: str, k: int) -> str:
@@ -305,7 +321,7 @@ def futures_spread_parts(source: DataSource) -> tuple[str, History] | None:
     return (ym, [(d, round(v[0] - v[1], 6)) for d, v in rows]) if len(rows) >= 20 else None
 
 
-def spot_vs_futures(source: DataSource, ym: str) -> tuple[dict[str, float], str, list[str]]:
+def spot_vs_futures(source: DataSource, ym: str) -> tuple[dict[str, float], str, list[str], tuple[dict, dict, dict]]:
     """The spot Brent-WTI spread beside the futures spread of one delivery month, on the latest date
     that has all four prices, and where the difference comes from.
 
@@ -315,7 +331,7 @@ def spot_vs_futures(source: DataSource, ym: str) -> tuple[dict[str, float], str,
     """
     rows = aligned(source, [BRENT_SPOT, CRUDE, f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D"], 366 * HISTORY_YEARS)
     if len(rows) < 20 or rows[-1][0] < _since(30):
-        return {}, "", []
+        return {}, "", [], ({}, {}, {})
     d, (bs, ws, bf, wf) = rows[-1]
     spot, fut = round(bs - ws, 6), round(bf - wf, 6)
     b_gap, w_gap = round(bs - bf, 6), round(ws - wf, 6)
@@ -334,7 +350,12 @@ def spot_vs_futures(source: DataSource, ym: str) -> tuple[dict[str, float], str,
                 f"while the {ym} futures spread was {fut:.2f}. The {abs(spot - fut):.2f} difference is the gap between "
                 f"spot and futures in each market: spot Brent stood {side(b_gap)} its {ym} future and spot WTI "
                 f"{side(w_gap)} its own.")
-    return values, sentence, [BRENT_SPOT, CRUDE]
+    label_of = {"spot_brent": "spot Brent", "spot_wti": "spot WTI", "spot_brent_minus_wti": "spot Brent|spot WTI",
+                "spot_spread_percentile": "the spot Brent-WTI spread", "futures_spread_on_spot_date": f"the {ym} futures spread",
+                "spot_minus_futures_spread": "the spot spread|the futures spread",
+                "spot_brent_minus_its_future": f"spot Brent|its {ym} future", "spot_wti_minus_its_future": f"spot WTI|its {ym} future"}
+    meta = (label_of, {"spot_spread_percentile": "of its last three years"}, {k: d for k in label_of})
+    return values, sentence, [BRENT_SPOT, CRUDE], meta
 
 
 def futures_spread(source: DataSource) -> Reading | None:
@@ -349,14 +370,18 @@ def futures_spread(source: DataSource) -> Reading | None:
               "spread_percentile": _rank([v for _, v in hist], spread), "observations": len(hist)}
     extra, context = spell(hist, "spread_", "The futures spread")
     values.update(extra)
-    spot_values, spot_sentence, spot_ids = spot_vs_futures(source, ym)
+    spot_values, spot_sentence, spot_ids, (spot_labels, spot_windows, spot_dates) = spot_vs_futures(source, ym)
     values.update(spot_values)
     context = (context + " " + spot_sentence).strip()
     return Reading(key="fspread:brent_wti", title=f"Brent minus WTI on futures, {ym} delivery", period=d,
                    units="USD/bbl", series_ids=ids + spot_ids, values=values, context=context,
                    note=(f"Both legs are the {ym} delivery contract, the nearest month both still trade, so the spread "
                          "compares like with like. The percentile ranks today against this contract pair's own "
-                         "history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent."))
+                         "history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent."),
+                   label_of={"brent": f"the Brent {ym} future", "wti": f"the WTI {ym} future",
+                             "brent_minus_wti": f"the Brent {ym} future|the WTI {ym} future",
+                             "spread_percentile": "the futures spread", **spot_labels},
+                   window_of={"spread_percentile": "of this contract pair's own history", **spot_windows}, date_of=spot_dates)
 
 
 def futures_crack_parts(source: DataSource, kind: str) -> tuple[str, list] | None:
@@ -388,7 +413,11 @@ def futures_crack(source: DataSource, kind: str) -> Reading | None:
                    series_ids=[f"NYMEX.WTI.{ym}.D", f"NYMEX.RBOB.{ym}.D", f"NYMEX.HO.{ym}.D"], values=values,
                    note=(f"All three legs are the {ym} delivery contract. Products minus crude; "
                          "3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude. The percentile ranks today against "
-                         "this contract set's own history (up to three years)."), context=context)
+                         "this contract set's own history (up to three years)."), context=context,
+                   window_of={"crack_percentile": "of this contract set's own history"},
+                   label_of={"crack": f"the {kind} crack spread on {ym} futures", "crack_percentile": f"the {kind} crack spread on {ym} futures",
+                             "crude": f"the WTI {ym} future", "gasoline_per_gallon": f"the RBOB {ym} future",
+                             "distillate_per_gallon": f"the heating oil {ym} future"})
 
 
 def _same_date(d: dt.date, years_back: int) -> dt.date:
@@ -435,7 +464,12 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | No
     }
     return Reading(key=f"seasonal:{series_id}:{years}", title=f"{hit.name}: latest against the same time of year, previous {years} years",
                    period=d1, units=hit.units, series_ids=[series_id], values=values,
-                   note="above the range" if v1 > max(prior) else "below the range" if v1 < min(prior) else "inside the range")
+                   note=(where := "above the range" if v1 > max(prior) else "below the range" if v1 < min(prior) else "inside the range"),
+                   words={"range": f"the latest value is {where} of the same time of year in the previous {years} years"},
+                   label_of={"latest": (me := short(series_id, hit.name)), "difference": me, "difference_pct": me,
+                             "prior_average": f"the average for the same time of year in the previous {years} years",
+                             "prior_low": f"the lowest for the same time of year in the previous {years} years",
+                             "prior_high": f"the highest for the same time of year in the previous {years} years"})
 
 
 def positioning(source: DataSource, market: str) -> Reading | None:
@@ -467,7 +501,12 @@ def positioning(source: DataSource, market: str) -> Reading | None:
     return Reading(key=f"positioning:{market}", title=f"{label}: managed-money positioning", period=d, units="contracts",
                    series_ids=ids, values=values,
                    note="net_percentile ranks the latest net position against the last percentile_weeks weekly reports",
-                   context=context)
+                   context=context,
+                   label_of={"managed_money_net": (net_name := f"the managed-money net position in {label}"),
+                             "net_change_on_week": net_name, "net_percentile": net_name,
+                             "managed_money_long": f"managed-money longs in {label}",
+                             "managed_money_short": f"managed-money shorts in {label}", "open_interest": f"open interest in {label}"},
+                   window_of={"net_change_on_week": "on the week", "net_percentile": f"of the last {len(sample)} weekly reports"})
 
 
 def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | None:
@@ -496,7 +535,11 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
     values.update(extra)
     return Reading(key=f"percentile:{series_id}:{years}", title=f"{hit.name}: latest against its last {years} years",
                    period=d, units=hit.units, series_ids=[series_id], values=values,
-                   note="percentile 0 = lowest of the window, 100 = highest", context=context)
+                   note="percentile 0 = lowest of the window, 100 = highest", context=context,
+                   label_of={"latest": (me := short(series_id, hit.name)), "percentile": me, "z_score": me,
+                             "low": f"the lowest of its last {years} years", "high": f"the highest of its last {years} years",
+                             "average": f"the average of its last {years} years"},
+                   window_of={"percentile": f"of its last {years} years", "z_score": f"against its last {years} years"})
 
 
 def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
@@ -532,10 +575,30 @@ def _crude_arb_inputs(source: DataSource):
     return d, ym, brent, wti, dict(freight)[d], m1[d], m12[d], spread_hist, freight_hist
 
 
+FREIGHT_UNIT = "dollars, the tanker fund's closing price"
+ARB_UNITS = {"*": "Dollars per Barrel", **{k: FREIGHT_UNIT for k in (
+    "freight_proxy", "freight_p10", "freight_p90", "freight_previous_spell_extreme", "observed_freight_proxy", "scenario_freight_proxy")}}
 ARB_NOTE = ("A price indicator, not an executable arbitrage. +2 = wide spread, cheap freight, contango; -2 = narrow "
             "spread, dear freight, backwardation. The spread is Brent minus WTI on futures of one delivery month, ranked "
             "against that contract pair's own history (up to three years). Freight is the Breakwave tanker ETF, a proxy, "
             "not a route rate; no physical differentials or port costs are included.")
+
+
+def _arb_labels(ym: str) -> dict[str, str]:
+    pair = f"the Brent {ym} future|the WTI {ym} future"
+    return {"brent": f"the Brent {ym} future", "wti": f"the WTI {ym} future", "brent_minus_wti": pair,
+            "spread_percentile": "the futures spread", "freight_proxy": "the tanker freight proxy",
+            "freight_percentile": "the tanker freight proxy", "curve_M1": "Brent M1", "curve_M12": "Brent M12",
+            "curve_M12_minus_M1": "Brent M12|Brent M1", "score": "the arbitrage score",
+            # the what-if reading: what was assumed, what is observed, what would follow
+            "brent_change": "Brent", "wti_change": "WTI", "freight_change_pct": "the tanker freight proxy",
+            "observed_brent_minus_wti": pair, "observed_spread_percentile": "the observed futures spread",
+            "observed_freight_proxy": "the observed tanker freight proxy",
+            "observed_freight_percentile": "the observed tanker freight proxy", "observed_score": "the observed arbitrage score",
+            "scenario_brent": f"the Brent {ym} future", "scenario_wti": f"the WTI {ym} future", "scenario_brent_minus_wti": pair,
+            "scenario_spread_percentile": "the futures spread", "scenario_freight_proxy": "the tanker freight proxy",
+            "scenario_freight_percentile": "the tanker freight proxy", "scenario_score": "the arbitrage score",
+            "score_change": "the arbitrage score"}
 
 
 def arbitrage(source: DataSource, route: str) -> Reading | None:
@@ -560,7 +623,7 @@ def arbitrage(source: DataSource, route: str) -> Reading | None:
         f_extra, f_context = spell(freight_hist, "freight_", "The freight proxy")
         values.update(s_extra)
         values.update(f_extra)
-        spot_values, spot_sentence, spot_ids = spot_vs_futures(source, ym)
+        spot_values, spot_sentence, spot_ids, (spot_labels, spot_windows, spot_dates) = spot_vs_futures(source, ym)
         values.update(spot_values)
         return Reading(
             key=f"arb:{route}",
@@ -568,7 +631,11 @@ def arbitrage(source: DataSource, route: str) -> Reading | None:
             period=d, units="Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
             series_ids=[f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D", FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"] + spot_ids,
             values=values, note=f"score {verdict} US crude exports: " + ARB_NOTE,
-            context=" ".join(x for x in (s_context, f_context, spot_sentence) if x))
+            context=" ".join(x for x in (s_context, f_context, spot_sentence) if x),
+            words={"verdict": f"the score {verdict} US crude exports"}, unit_of=ARB_UNITS,
+            label_of={**_arb_labels(ym), **spot_labels}, date_of=spot_dates,
+            window_of={"spread_percentile": "of that contract pair's own history",
+                       "freight_percentile": f"of its last {HISTORY_YEARS} years", **spot_windows})
     if route == "distillate_us_to_europe":
         rows = aligned(source, [GASOIL, NYH_DIESEL], 366 * HISTORY_YEARS)
         if len(rows) < 60 or rows[-1][0] < _since(60):
@@ -590,7 +657,12 @@ def arbitrage(source: DataSource, route: str) -> Reading | None:
             series_ids=[GASOIL, NYH_DIESEL], values=values,
             note=("europe_minus_us is the price gap a cargo would earn before freight; a high percentile means Europe is "
                   "paying up relative to the last three years. ICE gasoil is a futures price, New York diesel a spot "
-                  "price; no freight is included."), context=context)
+                  "price; no freight is included."), context=context, unit_of={"*": "Dollars per Gallon"},
+            label_of={"ice_gasoil_per_tonne": "ICE gasoil", "ice_gasoil_per_gallon": "ICE gasoil",
+                      "new_york_diesel_per_gallon": "New York Harbor diesel",
+                      "europe_minus_us_per_gallon": "ICE gasoil|New York Harbor diesel",
+                      "difference_percentile": "the Europe-minus-US gap"},
+            window_of={"difference_percentile": f"of its last {HISTORY_YEARS} years"})
     return None
 
 
@@ -629,7 +701,12 @@ def arbitrage_scenario(source: DataSource, route: str, brent_change: float, wti_
         note=(f"Hypothetical. The stated changes are applied to the {ym} futures prices of {d} and the score is "
               f"recomputed against the same history; the curve is left as it is. In the scenario the score {verdict} US crude "
               "exports. " + ARB_NOTE),
-        context="Numbers labelled scenario are not market observations; numbers labelled observed are.")
+        context="Numbers labelled scenario are not market observations; numbers labelled observed are.",
+        words={"verdict": f"in the scenario the score {verdict} US crude exports"}, unit_of=ARB_UNITS, label_of=_arb_labels(ym),
+        window_of={**{k: "in the scenario" for k in ("brent_change", "wti_change", "freight_change_pct")},
+                   **{k: "of that contract pair's own history" for k in ("observed_spread_percentile", "scenario_spread_percentile")},
+                   **{k: f"of its last {HISTORY_YEARS} years" for k in ("observed_freight_percentile", "scenario_freight_percentile")},
+                   "score_change": "in the scenario, against the observed score"})
 
 
 def crack_scenario(source: DataSource, kind: str, crude_change: float, gasoline_change_pct: float,
@@ -659,7 +736,16 @@ def crack_scenario(source: DataSource, kind: str, crude_change: float, gasoline_
         series_ids=[CRUDE, GASOLINE, DISTILLATE], values=values, hypothetical=True,
         note=(f"Hypothetical. The stated changes are applied to the spot prices of {d}; percentiles rank against the "
               "last three years of the observed crack."),
-        context="Numbers labelled scenario are not market observations; numbers labelled observed are.")
+        context="Numbers labelled scenario are not market observations; numbers labelled observed are.",
+        label_of={"crude_change": "WTI spot", "gasoline_change_pct": "Gulf Coast gasoline",
+                  "distillate_change_pct": "New York Harbor heating oil", "observed_crack": f"the observed {kind} crack spread",
+                  "observed_crack_percentile": f"the observed {kind} crack spread", "scenario_crude": "WTI spot",
+                  "scenario_gasoline_per_gallon": "Gulf Coast gasoline", "scenario_distillate_per_gallon": "New York Harbor heating oil",
+                  "scenario_crack": f"the {kind} crack spread", "scenario_crack_percentile": f"the {kind} crack spread",
+                  "crack_change": f"the {kind} crack spread"},
+        window_of={**{k: "in the scenario" for k in ("crude_change", "gasoline_change_pct", "distillate_change_pct")},
+                   **{k: f"of its last {HISTORY_YEARS} years" for k in ("observed_crack_percentile", "scenario_crack_percentile")},
+                   "crack_change": "in the scenario, against the observed crack"})
 
 
 # The desk's watchlist: what "what moved?" looks across. Labels carry no digits, so they never
@@ -684,6 +770,20 @@ WATCHLIST = [
     ("WTI fund net position", "CFTC.WTI.MM_Net"),
     ("Brent fund net position", "ICE_COT.BRENT.MM_Net"),
 ]
+# Short names for the series a desk asks about; any other series is called by its publisher's name.
+SHORT = {sid: label for label, sid in WATCHLIST}
+SHORT.update({
+    "NYMEX.WTI.M1.D": "WTI front-month future", "NYMEX.DUBAI.FRONT.D": "Dubai front-month average-price future",
+    "GME.OMAN.M1.D": "Oman front-month future", "GME.OMAN.MARKER.D": "Oman Marker Price",
+    "NYMEX.RBOB.M1.D": "RBOB gasoline front-month future", "NYMEX.HO.M1.D": "heating oil front-month future",
+    "PORTWATCH.HORMUZ.TANKERS.D": "Strait of Hormuz tanker transits", "PET.WCRSTUS1.W": "US crude stocks including the SPR",
+})
+
+
+def short(series_id: str, name: str) -> str:
+    return SHORT.get(series_id) or name
+
+
 SURPRISE_WINDOWS = {"week": 7, "month": 30}
 SURPRISE_YEARS, SURPRISE_TOP, STALE_DAYS = 2, 5, 21
 
@@ -725,18 +825,23 @@ def surprises(source: DataSource, window: str) -> Reading | None:
     top = _unusual_moves(source, days)[:SURPRISE_TOP]
     if not top:
         return None
-    values, parts = {}, []
+    values, parts, unit_of = {}, [], {}
+    window_of, date_of = {}, {}
     for _, label, sid, units, (d, v), change, z in top:
         values[f"{label}: latest"] = v
         values[f"{label}: change"] = round(change, 6)
         values[f"{label}: z-score"] = round(z, 2)
+        unit_of[f"{label}: latest"] = unit_of[f"{label}: change"] = units
+        window_of[f"{label}: change"] = f"over {days} days"
+        window_of[f"{label}: z-score"] = f"against two years of its {days}-day changes"
+        date_of.update({f"{label}: {field}": d for field in ("latest", "change", "z-score")})
         parts.append(f"{label} ({units}, {d.isoformat()})")
     return Reading(
         key=f"surprises:{window}", title=f"Most unusual moves over a {window}, from a watchlist of {len(WATCHLIST)} series",
         period=max(t[4][0] for t in top), units="each series in its own units", series_ids=[t[2] for t in top], values=values,
         note=(f"Change over {days} days, ranked by z-score against two years of {days}-day changes in the same series; "
               "beyond plus or minus two is unusual. Not a miss against forecasts: the data holds no consensus. "
-              "Units and dates: " + "; ".join(parts) + "."))
+              "Units and dates: " + "; ".join(parts) + "."), unit_of=unit_of, window_of=window_of, date_of=date_of)
 
 
 WATCH_STOCKS = [("US commercial crude stocks", "PET.WCESTUS1.W"), ("US gasoline stocks", "PET.WGTSTUS1.W"),
@@ -762,11 +867,13 @@ def watch(source: DataSource, window: str) -> Reading | None:
     values: dict[str, float] = {}
     flags: list[str] = []
     ids: list[str] = []
+    unit_of: dict[str, str] = {}
     latest = None
 
     for _, label, sid, units, (d, v), change, z in _unusual_moves(source, days)[:3]:
         if abs(z) >= 1.5:
             values[f"{label}: change"] = round(change, 6)
+            unit_of[f"{label}: change"] = units
             values[f"{label}: z-score"] = round(z, 2)
             flags.append(f"{label} moved {change:+.2f} {units} (z-score {z:+.2f}, to {d})")
             ids.append(sid)
@@ -787,6 +894,7 @@ def watch(source: DataSource, window: str) -> Reading | None:
         n = len(CURVES["brent"][1])
         now, was = c.values[f"M1_minus_M{n}"], c.values.get(f"M1_minus_M{n}_a_week_earlier")
         values["Brent curve: front minus back"] = now
+        unit_of["Brent curve: front minus back"] = unit_of["Brent curve: front minus back a week earlier"] = c.units
         if was is not None:
             values["Brent curve: front minus back a week earlier"] = was
             if abs(now - was) >= 1:
@@ -823,7 +931,7 @@ def watch(source: DataSource, window: str) -> Reading | None:
         note=("A flag is a fact from the data that is outside its usual range: an unusual move, a stretched position, "
               "a curve that changed shape, stocks outside their five-year range, or two related prices diverging. "
               "No forecasts, no news, no ranking by importance."),
-        context=context)
+        context=context, slot_values=False, words={f"flag_{i}": f for i, f in enumerate(flags, 1)})
 
 
 # Days a series may trail today before an answer must say so, by how often it is published.
@@ -1098,7 +1206,11 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
     plain = {"structure": "time structure", "stocks": "US crude stocks", "refining": "refining demand"}
     said = ", ".join(f"{plain[g]} {word[v]}, {sum(ln['verdict'] == v for ln in lines if ln['group'] == g)} of "
                      f"{sum(ln['group'] == g for ln in lines)} lines" for g, v in groups.items() if g != "sentiment")
+    words = {"balance": f"the evidence {balance}", "groups": said}
+    for ln in lines:
+        words[f"line_{ln['name']}"] = f"{ln['text'].split(' (', 1)[0]} ({ln['date']}) [{word[ln['verdict']]}]"
     return Reading(
+        words=words, slot_values=False,
         key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against, in groups",
         period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels (stated on each line)",
         series_ids=list(dict.fromkeys(i for ln in lines for i in ln["ids"])), values=values,

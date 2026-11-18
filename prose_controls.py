@@ -1,195 +1,297 @@
-"""Control for the prose checks: answers whose tables are true and whose sentences are wrong.
+"""Control for the summary: what the model may write, and what it may not.
 
     python prose_controls.py        # exit 1 if any expectation below is not met
 
-The eval suite's control run plants a wrong number in the facts. This plants errors in the
-wording, where the tables cannot help: a wrong date, a flipped sign, a number in a caveat. Each
-case says what must happen. No model, no data, no cost; it runs in CI and in the release gate.
+Since 18 Nov 2026 a summary is a template: the model places slots and code writes every figure
+(es_agent/slots.py). This file holds the cases that rule must decide, each with what must happen.
+No model, no data, no cost; it runs in CI and in the release gate.
 
-The first eleven wrong answers came from an adversarial review of the live service on 18 Nov 2026
-(a second Claude session given the job of breaking it), and more from its second, held-out set.
-Four kinds are still accepted and are kept here marked LIMIT, so the gap stays visible: the checks
-cannot tell that two true values or dates have been attached to the wrong nouns, or judge a claim
-made in words alone.
+- TYPED: the forty wrong sentences of the earlier control (thirty-six that the old prose rules
+  rejected and four they could not). Every one must now be rejected, because none of them can be
+  written without typing a figure.
+- WRONG: templates that break a rule: an address the run never earned, a brace that is not a slot,
+  the usual ways of abusing a format string, a number in words, a date in words, a direction or a
+  verdict in the model's own word, two figures joined into a ratio.
+- RIGHT: templates that must pass, so that the rules cannot be tightened into refusing good answers.
+- WRITES: what code prints for a slot, character for character.
+- LIMIT: wrong, and still accepted. The free words between slots are the model's. They are listed
+  here so the gap stays visible; if one starts to be caught, this file fails until it is moved.
+- TAMPERED: a true answer built from the frozen data, then altered after the fact in four ways (a
+  value in a table, a character of the summary, an added caveat, a typed figure in the template).
+  The check that runs on every live answer must refuse each. The model can no longer mistype a
+  table, so this is where a wrong table is planted.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-import json
+import os
 import sys
 
-from es_agent import metrics
-from es_agent.models import DeskAnswer, Reading, SeriesFact, Spread
+from es_agent import slots
+from es_agent.models import Reading, SeriesFact, Spread
 
 D = dt.date(2026, 11, 17)
 brent = SeriesFact(series_id="ICE.BRENT.M1.D", name="Brent futures M1", units="USD/bbl", latest_period=D, latest_value=93.07)
-wti = SeriesFact(series_id="NYMEX.WTI.M1.D", name="WTI futures M1", units="USD/bbl", latest_period=D, latest_value=88.10)
-wti_up = SeriesFact(series_id="PET.RWTC.D", name="WTI spot", units="USD/bbl", latest_period=D, latest_value=88.10,
-                    lookback_days=7, base_period=dt.date(2026, 11, 10), base_value=86.90, change_abs=1.20, change_pct=1.380898)
+wti_up = SeriesFact(series_id="PET.RWTC.D", name="Cushing, OK WTI Spot Price FOB", units="Dollars per Barrel", latest_period=D,
+                    latest_value=88.10, lookback_days=7, base_period=dt.date(2026, 11, 10), base_value=86.90, change_abs=1.20,
+                    change_pct=1.380898)
+flat = SeriesFact(series_id="X.FLAT.D", name="A flat series", units="USD/bbl", latest_period=D, latest_value=50.0, lookback_days=7,
+                  base_period=dt.date(2026, 11, 10), base_value=50.0, change_abs=0.0, change_pct=0.0)
+tiny = SeriesFact(series_id="X.TINY.D", name="A {braced} series", units="USD/bbl", latest_period=D, latest_value=50.00001,
+                  lookback_days=7, base_period=dt.date(2026, 11, 10), base_value=50.0, change_abs=0.00001, change_pct=0.00002)
 stocks = SeriesFact(series_id="PET.WCESTUS1.W", name="US ending stocks excluding SPR of crude oil", units="Thousand Barrels",
-                    latest_period=dt.date(2026, 11, 13), latest_value=414417.0)
-margin = SeriesFact(series_id="X.GAL.D", name="A margin", units="USD/gal", latest_period=D, latest_value=0.02)
-freight = Reading(key="percentile:SHIP.BWET.D:3", title="Tanker freight proxy against its last 3 years", period=D, units="USD",
-                  series_ids=["SHIP.BWET.D"], values={"latest": 31.4, "percentile": 96.0, "years": 3, "spell_days": 110},
-                  context="It has been above the 90th percentile line (25.10) since 2026-07-30, 110 days, allowing for brief dips back.")
+                    latest_period=dt.date(2026, 11, 13), latest_value=414417.0, also={"million_barrels": 414.417})
+gap = Spread(series_a="PET.RBRTE.D", name_a="Brent spot", series_b="PET.RWTC.D", name_b="WTI spot", units="USD/bbl",
+             period=dt.date(2026, 11, 11), value_a=87.48, value_b=88.10, spread=-0.62,
+             extras={"percentile": 17.4, "percentile_years": 3})
+curve = Reading(key="curve:brent", title="Brent futures curve", period=D, units="USD/bbl", series_ids=["ICE.BRENT.M1.D", "ICE.BRENT.M12.D"],
+                values={"M1": 93.07, "M12": 77.26, "M1_minus_M2": 1.41, "M1_minus_M12": 15.81, "M1_minus_M12_a_week_earlier": 13.60},
+                note="backwardation (front above back)",
+                context="M1 minus M12 was 13.60 on 2026-11-10 and is 15.81 now: the curve has steepened over the week.",
+                words={"shape": "the Brent curve is in backwardation (front above back)",
+                       "move": "the Brent curve has steepened over the week, since 2026-11-10"},
+                label_of={"M1": "Brent M1", "M12": "Brent M12", "M1_minus_M2": "Brent M1|M2", "M1_minus_M12": "Brent M1|M12",
+                          "M1_minus_M12_a_week_earlier": "Brent M1|M12"},
+                date_of={"M1_minus_M12_a_week_earlier": dt.date(2026, 11, 10)})
 funds = Reading(key="positioning:wti", title="WTI crude (NYMEX): managed-money positioning", period=dt.date(2026, 11, 10),
                 units="contracts", series_ids=["CFTC.WTI.MM_Net"],
-                values={"managed_money_net": 151200.0, "net_change_on_week": 12000.0, "net_percentile": 6.8, "percentile_weeks": 156})
-gap = Spread(series_a="PET.RBRTE.D", name_a="Brent spot", series_b="PET.RWTC.D", name_b="WTI spot", units="USD/bbl",
-             period=dt.date(2026, 11, 11), value_a=87.48, value_b=88.10, spread=-0.62)
-brent_curve = Reading(key="curve:brent", title="Brent futures curve", period=D, units="USD/bbl",
-                    series_ids=["ICE.BRENT.M1.D", "ICE.BRENT.M12.D"],
-                    values={"M1": 93.07, "M12": 77.26, "M1_minus_M2": 1.41, "M1_minus_M12": 15.81, "M1_minus_M12_a_week_earlier": 13.60},
-                    note="backwardation (front above back)",
-                    context="M1 minus M12 was 13.60 on 2026-11-10 and is 15.81 now: the curve has steepened over the week.")
-fut = Spread(series_a="ICE.BRENT.2027-01.D", name_a="Brent 2027-01", series_b="NYMEX.WTI.2027-01.D", name_b="WTI 2027-01",
-             units="USD/bbl", period=D, value_a=93.07, value_b=84.65, spread=8.42,
-             extras={"percentile": 96.4, "percentile_years": 3, "spell_days": 70, "days_since_previous_spell": 117},
-             context="The spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back.")
-curve = Reading(key="evidence:x", title="Curves", period=D, units="USD/bbl", series_ids=["ICE.BRENT.M1.D"],
-                values={"brent_M1_minus_M12": 14.55, "us_stocks_vs_5y_pct": -4.47})
+                values={"managed_money_net": 151200.0, "net_change_on_week": 12000.0, "net_percentile": 6.8, "percentile_weeks": 156},
+                label_of={"managed_money_net": "the managed-money net position in WTI", "net_change_on_week": "the managed-money net position in WTI",
+                          "net_percentile": "the managed-money net position in WTI"},
+                window_of={"net_change_on_week": "on the week", "net_percentile": "of the last 156 weekly reports"})
+arb = Reading(key="arb:us_crude_to_europe", title="US crude to Europe, price indicator", period=D, units="mixed",
+              series_ids=["ICE.BRENT.2027-01.D", "NYMEX.WTI.2027-01.D"], values={"score": -0.64, "spread_percentile": 99.6},
+              words={"verdict": "the score tilts against US crude exports"}, unit_of={"*": "Dollars per Barrel"},
+              label_of={"score": "the arbitrage score", "spread_percentile": "the futures spread"},
+              window_of={"spread_percentile": "of that contract pair's own history"})
+what_if = Reading(key="scenario:crack:3-2-1:+5:+0:-10", title="What if", period=D, units="Dollars per Barrel", series_ids=["PET.RWTC.D"],
+                  values={"crude_change": 5.0, "observed_crack": 38.37, "scenario_crack": 27.68}, hypothetical=True,
+                  label_of={"crude_change": "WTI spot", "observed_crack": "the observed 3-2-1 crack spread", "scenario_crack": "the 3-2-1 crack spread"},
+                  window_of={"crude_change": "in the scenario"})
+TABLE = slots.table([brent, wti_up, flat, tiny, stocks], [gap], [curve, funds, arb, what_if])
+NO_ARB = slots.table([brent, wti_up, stocks], [gap], [curve, funds])
 
-WRONG = [  # (what is wrong, the answer); every one must be rejected
-    ("a date that differs from the code-written history sentence",
-     dict(readings=[freight], summary="Freight is at the 96th percentile and has been above the 90th percentile line since 2026-01-05, 110 days.")),
-    ("an invented year",
-     dict(readings=[freight], summary="Freight is at the 96th percentile of 3 years, the highest since 2014.")),
-    ("an invented quantity written with a thousands separator, which used to read as a year",
-     dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels, a build of 2,000 thousand barrels on the week.")),
-    ("an invented price in the range of years",
-     dict(facts=[brent], summary="Brent is at 93.07 USD/bbl; gasoil is near 2050 dollars per tonne.")),
-    ("a positioning change given the opposite direction",
-     dict(readings=[funds], summary="Funds cut their net long in WTI by 12,000 contracts to 151,200, percentile 6.8 over 156 weeks.")),
-    ("a spread with its sign flipped",
-     dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl above WTI spot on 2026-11-11: 87.48 against 88.10.")),
-    ("a percentage quoted as dollars, and a count of days quoted as a price move",
-     dict(facts=[wti_up], summary="WTI rose 1.38 USD/bbl on the week, and is up 7 dollars on the month.")),
-    ("a fabricated number in a caveat",
-     dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.",
-          caveats=["Brent was about 4.75 USD/bbl above Dubai and 31% above its level a year ago."])),
-    ("a small value off by half",
-     dict(facts=[margin], summary="The margin is 0.03 USD/gal.")),
-    ("a fall claimed for a rise, with a level word elsewhere in the sentence",
-     dict(facts=[wti_up], summary="WTI fell 1.20 USD/bbl on the week to 88.10, still above 86.90.")),
-    ("a fall claimed for a rise, with 'more' elsewhere",
-     dict(facts=[wti_up], summary="WTI fell 1.20 USD/bbl on the week to 88.10, more than Brent did.")),
-    ("a fall claimed for a rise, with a build mentioned",
-     dict(facts=[wti_up], summary="WTI dropped 1.20 USD/bbl on the week to 88.10 as stocks built.")),
-    ("a date written in words",
-     dict(readings=[freight], summary="Freight is at the 96th percentile and has been high since 30 July.")),
-    ("a quarter",
-     dict(readings=[freight], summary="Freight is at the 96th percentile, its highest since Q1.")),
-    ("a count of lines that is not a count",
-     dict(readings=[freight], summary="Freight is at the 96th percentile after 31 days above the line.")),
-    ("a curve gap pointing the wrong way",
-     dict(readings=[curve], summary="Brent M1 is 14.55 below M12.")),
-    ("stocks on the wrong side of their average",
-     dict(readings=[curve], summary="US crude stocks are 4.47% above the five-year average.")),
-    ("a verb that is on no list (slid), for a rise",
-     dict(facts=[wti_up], summary="WTI slid 1.20 USD/bbl on the week to 88.10.")),
-    ("another unlisted verb, on the percentage",
-     dict(facts=[wti_up], summary="WTI tumbled 1.38% on the week.")),
-    ("'unchanged' for a rise",
-     dict(facts=[wti_up], summary="WTI was unchanged on the week at 88.10 USD/bbl.")),
-    ("a premium given to the wrong side",
-     dict(spreads=[fut], summary="WTI trades at a premium of 8.42 USD/bbl to Brent: 84.65 against 93.07.")),
-    ("a curve's shape denied",
-     dict(readings=[brent_curve], summary="The Brent curve is not in backwardation: M1 is 93.07 and M12 is 77.26.")),
-    ("the wrong shape, with the right word used about another market",
-     dict(readings=[brent_curve], summary="The Brent curve is in contango, M1 93.07 against M12 77.26, unlike the backwardation in WTI.")),
-    ("flattened where the reading says steepened",
-     dict(readings=[brent_curve], summary="The Brent curve is in backwardation and has flattened over the week.")),
-    ("a high percentile called low",
-     dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, which is near the low end of its range.")),
-    ("a fabricated number glued to a currency code",
-     dict(facts=[brent], summary="Brent futures settled at USD97.72 a barrel.")),
-    ("a fabricated number behind an abbreviation",
-     dict(facts=[brent], summary="Brent futures settled at c.97.72 a barrel.")),
-    ("a number spelled out",
-     dict(facts=[brent], summary="Brent futures are near ninety-eight dollars a barrel.")),
-    ("a true number with an invented scale",
-     dict(facts=[brent], summary="Brent futures are at 93.07 million dollars.")),
-    ("a true number in the wrong scale",
-     dict(facts=[stocks], summary="US crude stocks are 414,417 million barrels.")),
-    ("a true number in the wrong unit",
-     dict(facts=[brent], summary="Brent is 93.07 dollars per tonne.")),
-    ("a true value given today's date",
-     dict(facts=[brent], summary="Brent futures settled at 93.07 USD/bbl on 2026-11-18.")),
-    ("a bare year that is the year of a returned date",
-     dict(readings=[freight], summary="Freight is at 31.40, its highest level since 2026.")),
-    ("a wrong date in a caveat",
-     dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.", caveats=["The last report was released on 2026-10-02."])),
-    ("a price misquoted by 5%",
-     dict(facts=[brent], summary="Brent futures are at 97.72 USD/bbl.")),
-    ("falling words only, when every change is a rise",
-     dict(facts=[wti_up], summary="WTI fell 1.20 USD/bbl on the week to 88.10.")),
+B, W, C = "{ICE.BRENT.M1.D.value}", "{PET.RWTC.D.7d.change}", "{curve:brent.M1_minus_M12}"
+
+TYPED = [  # the earlier control's wrong sentences: none can be written any more
+    "Freight is at the 96th percentile and has been above the 90th percentile line since 2026-01-05, 110 days.",
+    "Freight is at the 96th percentile of 3 years, the highest since 2014.",
+    "US crude stocks are 414,417 thousand barrels, a build of 2,000 thousand barrels on the week.",
+    "Brent is at 93.07 USD/bbl; gasoil is near 2050 dollars per tonne.",
+    "Funds cut their net long in WTI by 12,000 contracts to 151,200, percentile 6.8 over 156 weeks.",
+    "Brent spot was 0.62 USD/bbl above WTI spot on 2026-11-11: 87.48 against 88.10.",
+    "WTI rose 1.38 USD/bbl on the week, and is up 7 dollars on the month.",
+    "Brent was about 4.75 USD/bbl above Dubai and 31% above its level a year ago.",
+    "The margin is 0.03 USD/gal.",
+    "WTI fell 1.20 USD/bbl on the week to 88.10, still above 86.90.",
+    "WTI fell 1.20 USD/bbl on the week to 88.10, more than Brent did.",
+    "WTI dropped 1.20 USD/bbl on the week to 88.10 as stocks built.",
+    "Freight is at the 96th percentile and has been high since 30 July.",
+    "Freight is at the 96th percentile, its highest since Q1.",
+    "Freight is at the 96th percentile after 31 days above the line.",
+    "Brent M1 is 14.55 below M12.",
+    "US crude stocks are 4.47% above the five-year average.",
+    "WTI slid 1.20 USD/bbl on the week to 88.10.",
+    "WTI tumbled 1.38% on the week.",
+    "WTI was unchanged on the week at 88.10 USD/bbl.",
+    "WTI trades at a premium of 8.42 USD/bbl to Brent: 84.65 against 93.07.",
+    "The Brent curve is not in backwardation: M1 is 93.07 and M12 is 77.26.",
+    "The Brent curve is in contango, M1 93.07 against M12 77.26, unlike the backwardation in WTI.",
+    "The Brent curve is in backwardation and has flattened over the week.",
+    "Tanker freight is at 31.40, percentile 96 of 3 years, which is near the low end of its range.",
+    "Brent futures settled at USD97.72 a barrel.",
+    "Brent futures settled at c.97.72 a barrel.",
+    "Brent futures are near ninety-eight dollars a barrel.",
+    "Brent futures are at 93.07 million dollars.",
+    "US crude stocks are 414,417 million barrels.",
+    "Brent is 93.07 dollars per tonne.",
+    "Brent futures settled at 93.07 USD/bbl on 2026-11-18.",
+    "Freight is at 31.40, its highest level since 2026.",
+    "The last report was released on 2026-10-02.",
+    "Brent futures are at 97.72 USD/bbl.",
+    "WTI fell 1.20 USD/bbl on the week to 88.10.",
+    # the four the old rules accepted, and listed as limits
+    "WTI futures are at 93.07 USD/bbl and Brent futures at 88.10.",
+    "US crude stocks are 414,417 thousand barrels, a record high, roughly double their ten-year average.",
+    "The Brent-WTI spread for the same delivery month is 8.42 USD/bbl and has narrowed sharply.",
+    "Freight is at percentile 96, above the line since 2024-02-12; the previous spell ended 2026-07-30.",
 ]
 
-RIGHT = [  # correct prose that the rules must not reject
-    dict(facts=[wti_up], summary="WTI rose 1.20 USD/bbl (1.38%) over 7 days to 88.10 on 2026-11-17, from 86.90 on 2026-11-10."),
-    dict(facts=[wti_up], summary="WTI was 88.10 USD/bbl on 2026-11-17, up 1.20 from 86.90, still below Brent.", caveats=["One week of data only."]),
-    dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl below WTI spot on 2026-11-11: 87.48 against 88.10."),
-    dict(spreads=[gap], summary="WTI spot was 0.62 USD/bbl above Brent spot on 2026-11-11."),
-    dict(readings=[funds], summary="Funds added 12,000 contracts on the week, taking their net long to 151,200, percentile 6.8 of 156 weeks."),
-    dict(readings=[freight], summary="Freight is at the 96th percentile of 3 years and has been above the 90th percentile line since 2026-07-30, 110 days."),
-    dict(readings=[curve], summary="Brent M1 is 14.55 above M12, and US crude stocks are 4.47% below the five-year average."),
-    dict(readings=[curve], summary="M12 is 14.55 below M1 on the Brent curve."),
-    dict(facts=[stocks], summary="US crude stocks were 414,417 thousand barrels on 2026-11-13."),
-    dict(facts=[wti_up], summary="The change over 7 days was +1.20 USD/bbl, to 88.10."),
-    dict(facts=[stocks, brent], summary="No spread is given: one is a price in dollars per barrel and the other is reported in thousand barrels."),
-    dict(spreads=[fut], summary="Brent trades at a premium of 8.42 USD/bbl to WTI for 2027-01 delivery: 93.07 against 84.65."),
-    dict(spreads=[fut], summary="The spread is 8.42 USD/bbl, percentile 96.4 of 3 years; the previous spell above the line ended 117 days earlier."),
-    dict(readings=[brent_curve], summary="The Brent curve is in backwardation, not contango: M1 93.07 against M12 77.26, and it has steepened over the week."),
-    dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, near the high end of its range."),
+WRONG = [  # (what is wrong, the template, the table); every one must be rejected
+    ("an address no tool returned", "Dubai: {NYMEX.DUBAI.FRONT.D.value}.", TABLE),
+    ("a real series with a field that does not exist", "Brent: {ICE.BRENT.M1.D.price}.", TABLE),
+    ("an address of the right shape for a lookback the run never asked for", "WTI: {PET.RWTC.D.30d.change}.", TABLE),
+    ("a slot with a format specification", "Brent: {ICE.BRENT.M1.D.value:>20}.", TABLE),
+    ("a slot with a conversion", "Brent: {ICE.BRENT.M1.D.value!r}.", TABLE),
+    ("an attribute walk, as a format string would allow", "Brent: {ICE.BRENT.M1.D.value.__class__}.", TABLE),
+    ("a positional field", "Brent: {0}.", TABLE),
+    ("an empty slot", "Brent: {}.", TABLE),
+    ("a nested brace", "Brent: {{ICE.BRENT.M1.D.value}}.", TABLE),
+    ("a doubled brace as an escape", "Brent: {{7*7}}.", TABLE),
+    ("an opening brace that never closes", f"Brent: {B[:-1]}.", TABLE),
+    ("a closing brace alone", f"Brent: {B} }} and more.", TABLE),
+    ("a filter that would let the model choose the word", "WTI: {PET.RWTC.D.7d.change|fell}.", TABLE),
+    ("a space inside the address", "Brent: { ICE.BRENT.M1.D.value }.", TABLE),
+    ("a figure typed beside a slot", f"Brent: {B}, about 4.75 over Dubai.", TABLE),
+    ("a contract code typed as a name", f"The front of the curve, M1: {C}.", TABLE),
+    ("a ratio typed as a name", f"The 3-2-1 margin is firm, and {B}.", TABLE),
+    ("a year", f"The widest since 2022: {C}.", TABLE),
+    ("a full-width digit", f"About ９ dollars wider: {C}.", TABLE),
+    ("a superscript digit", f"Squared² for effect: {C}.", TABLE),
+    ("a vulgar fraction", f"Up by ½ on the day: {C}.", TABLE),
+    ("a number in words", f"Nearly ninety-eight dollars: {B}.", TABLE),
+    ("a window in words", f"Against its five-year norm: {B}.", TABLE),
+    ("a multiple in words", f"Stocks have doubled: {B}.", TABLE),
+    ("a scale word after a slot", f"Stocks: {B} million.", TABLE),
+    ("a dollar in words", f"A dollar more than last week: {B}.", TABLE),
+    ("a month", f"The widest since July: {C}.", TABLE),
+    ("a weekday", f"As of Tuesday: {B}.", TABLE),
+    ("today in words", f"Today: {B}.", TABLE),
+    ("this morning", f"As of this morning: {B}.", TABLE),
+    ("a change verb in the model's own word", f"Brent fell: {B}.", TABLE),
+    ("a change verb the old lists missed, now listed", f"Brent tumbled: {B}.", TABLE),
+    ("a comparative", f"Brent is higher: {B}.", TABLE),
+    ("a curve shape in the model's own word", f"The curve is in contango: {C}.", TABLE),
+    ("a trader's synonym for a curve shape", f"The curve is inverted: {C}.", TABLE),
+    ("a scorecard verdict in the model's own word", f"The market is tight: {C}.", TABLE),
+    ("an arbitrage verdict in the model's own word", "The arbitrage is open: {arb:us_crude_to_europe.score}.", TABLE),
+    ("a sign typed before a slot", f"Brent: -{B}.", TABLE),
+    ("a slot glued to a letter", f"Brent: {B}s.", TABLE),
+    ("a letter glued before a slot", f"Brent: x{B}.", TABLE),
+    ("two figures joined by a slash", f"The ratio: {B} / {C}.", TABLE),
+    ("two figures joined by a dash", f"The range: {B} - {C}.", TABLE),
+    ("two figures with nothing between them", f"Brent: {B}{C}.", TABLE),
+    ("a percent sign glued after a slot", f"Brent: {B}%.", TABLE),
 ]
 
-LIMIT = [  # wrong, and still accepted: what the checks cannot see
-    ("two true values attached to the wrong nouns",
-     dict(facts=[brent, wti], summary="WTI futures are at 93.07 USD/bbl and Brent futures at 88.10.")),
-    ("claims made in words alone",
-     dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels, a record high, roughly double their ten-year average.")),
-    ("a change claimed in words where no earlier value was returned",
-     dict(spreads=[fut], summary="The Brent-WTI spread for the same delivery month is 8.42 USD/bbl and has narrowed sharply.")),
-    ("two true dates attached to the wrong events",
-     dict(readings=[Reading(key="percentile:X:3", title="Freight", period=D, units="USD", series_ids=["SHIP.BWET.D"],
-                            values={"latest": 31.4, "percentile": 96.0},
-                            context="Above the line since 2026-07-30; the previous spell ended 2024-02-12.")],
-          summary="Freight is at percentile 96, above the line since 2024-02-12; the previous spell ended 2026-07-30.")),
+RIGHT = [  # templates that must pass
+    (f"Brent is firm: {B}.", TABLE),
+    (f"{B}. {W}.", TABLE),
+    (f"Yes: {{curve:brent.shape}}, with {C}. {{curve:brent.move}}.", TABLE),
+    (f"The prices side by side: {B}, and {W}.", TABLE),
+    ("Funds are cautious: {positioning:wti.managed_money_net}; {positioning:wti.net_percentile}.", TABLE),
+    (f"The front of the curve is well bid ({C}).", TABLE),
+    ("Brent spot against WTI spot: {PET.RBRTE.D-minus-PET.RWTC.D.gap}, and {PET.RBRTE.D-minus-PET.RWTC.D.percentile}.", TABLE),
+    ("Not on this indicator: {arb:us_crude_to_europe.verdict}, with {arb:us_crude_to_europe.score}.", TABLE),
+    ("Open interest is a term a positioning answer may use when no arbitrage was read: {positioning:wti.managed_money_net}.", NO_ARB),
+    ("If the assumed changes happened: {scenario:crack:3-2-1:+5:+0:-10.scenario_crack}, against {scenario:crack:3-2-1:+5:+0:-10.observed_crack}.", TABLE),
+    ("Stocks in the unit asked for: {PET.WCESTUS1.W.million_barrels}.", TABLE),
+    ("The data does not hold a carbon price.", TABLE),
+    (f"The week-earlier reading for comparison: {{curve:brent.M1_minus_M12_a_week_earlier}}; now {C}.", TABLE),
+    ("{curve:brent.context}", TABLE),
+]
+
+WRITES = [  # (template, what the page prints)
+    (f"Brent: {B}.", "Brent: Brent front-month future at 93.07 dollars per barrel (2026-11-17)."),
+    (f"{W}.", "WTI spot up 1.20 dollars per barrel (1.38%) over 7 days, from 86.90 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    (f"{B}, and {W}.",  # one date, printed once
+     "Brent front-month future at 93.07 dollars per barrel (2026-11-17), and WTI spot up 1.20 dollars per barrel (1.38%) over 7 days, "
+     "from 86.90 dollars per barrel on 2026-11-10."),
+    (f"Now {C}; before, {{curve:brent.M1_minus_M12_a_week_earlier}}; and again {C}.",  # the date is printed whenever it changes
+     "Now Brent M1 15.81 dollars per barrel above M12 (2026-11-17); before, Brent M1 13.60 dollars per barrel above M12 (2026-11-10); "
+     "and again Brent M1 15.81 dollars per barrel above M12 (2026-11-17)."),
+    ("{curve:brent.shape}. {curve:brent.move}.",  # a statement that opens a sentence is capitalised
+     "The Brent curve is in backwardation (front above back). The Brent curve has steepened over the week, since 2026-11-10."),
+    ("{X.FLAT.D.7d.change}.", "A flat series unchanged over 7 days, from 50.00 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    ("{X.TINY.D.7d.change}.", "A (braced) series almost unchanged over 7 days, from 50.00 dollars per barrel on 2026-11-10 (2026-11-17)."),
+    ("{PET.RBRTE.D-minus-PET.RWTC.D.gap}.", "Brent spot 0.62 dollars per barrel below WTI spot (2026-11-11)."),
+    ("{PET.WCESTUS1.W.value}; {PET.WCESTUS1.W.million_barrels}.",
+     "US commercial crude stocks at 414,417 thousand barrels (2026-11-13); US commercial crude stocks at 414.42 million barrels."),
+    ("{positioning:wti.net_change_on_week}; {positioning:wti.net_percentile}.",
+     "The managed-money net position in WTI up 12,000 contracts on the week (2026-11-10); the managed-money net position in WTI at the 7th "
+     "percentile of the last 156 weekly reports."),
+    ("{arb:us_crude_to_europe.spread_percentile}.", "The futures spread above the 99th percentile of that contract pair's own history (2026-11-17)."),
+    ("{arb:us_crude_to_europe.score}.", "The arbitrage score at -0.64 on a scale from -2 to +2 (2026-11-17)."),
+    ("{scenario:crack:3-2-1:+5:+0:-10.scenario_crack}.", "The 3-2-1 crack spread at 27.68 dollars per barrel (hypothetical) (2026-11-17)."),
+    ("Unknown stays visible: {NO.SUCH.value}.", "Unknown stays visible: {NO.SUCH.value}."),
+]
+
+LIMIT = [  # wrong, and still accepted: the words between slots are the model's
+    ("the wrong noun in the model's words: it now reads as a contradiction, and is not refused", f"WTI is weak: {B}."),
+    ("a claim in words alone", f"A record, and well beyond anything seen before: {B}."),
+    ("a cause the data cannot show", f"Because of the cartel's decision: {B}."),
+    ("a negation in front of a slot", f"It is not the case that {B}."),
+    ("a change verb that is on no list", f"Brent slid: {B}."),
+    ("relative time in words", f"This week and for the rest of the year: {B}."),
+    ("a dictated sentence shorter than the echo rule's twelve words", f"Analysts expect a rally by spring. {B}."),
 ]
 
 
-def problems(kw: dict) -> list[str]:
-    a = DeskAnswer(**{"facts": [], **kw})
-    a.summary = metrics.tidy(a.summary)
-    return metrics.untraceable_numbers(a) + metrics.direction_problems(a)
+def tampered() -> int:
+    """A true answer, altered after the fact: verify() must refuse every alteration. Returns expectations not met."""
+    from es_agent import readings
+    from es_agent.agent import Deps, compose
+    from es_agent.models import Draft
+    from es_agent.sources import FixtureSource
+    from es_agent.verify import verify
+
+    source = FixtureSource("fixtures/series.json")
+    os.environ.setdefault("LIBRARIAN_TODAY", source.as_of)
+    reading = readings.compute(source, "curve:brent")
+    answer, problems = compose(Deps(source=source, readings={reading.key: reading}),
+                               Draft(summary="{curve:brent.shape}, with {curve:brent.M1_minus_M2}."))
+    failed = 0
+    if problems or verify(answer, source):
+        print(f"REFUSED   the untouched answer: {problems or verify(answer, source)}")
+        failed += 1
+
+    def altered(**changes):
+        return answer.model_copy(deep=True, update=changes)
+
+    value = altered()
+    value.readings[0].values["M1_minus_M2"] += 1.0
+    digit = next(ch for ch in answer.summary if ch.isdigit())
+    cases = [
+        ("a value in a table", value, "reading curve:brent differs"),
+        ("a character of the summary", altered(summary=answer.summary.replace(digit, str((int(digit) + 1) % 10), 1)), "summary: differs"),
+        ("a caveat that code did not write", altered(caveats=answer.caveats + ["Analysts expect a rally by spring."]), "caveats:"),
+        ("a figure typed into the template", altered(template=answer.template + " About 4.75 over Dubai."), "summary: digit"),
+    ]
+    for label, doctored, expect in cases:
+        found = [p for p in verify(doctored, source) if p.startswith(expect)]
+        print(f"{'refused  ' if found else 'ACCEPTED '} tampered: {label}")
+        failed += not found
+    return failed
 
 
 def main() -> int:
     failed = 0
-    for label, kw in WRONG:
-        found = problems(kw)
+    for text in TYPED:
+        found = slots.template_problems(text, TABLE)
+        if not found:
+            print(f"ACCEPTED a typed sentence: {text}")
+        failed += not found
+    if not failed:
+        print(f"rejected  all {len(TYPED)} typed sentences of the earlier control")
+    for label, template, table in WRONG:
+        found = slots.template_problems(template, table)
         print(f"{'rejected ' if found else 'ACCEPTED '} {label}")
         failed += not found
-    for kw in RIGHT:
-        found = problems(kw)
+    for template, table in RIGHT:
+        found = slots.template_problems(template, table)
         if found:
-            print(f"REJECTED a correct answer: {kw['summary']}\n          -> {found}")
+            print(f"REJECTED a correct template: {template}\n          -> {found}")
         failed += bool(found)
-    for label, kw in LIMIT:
-        found = problems(kw)
+    for template, expected in WRITES:
+        got = slots.render(template, TABLE)[0]
+        if got != expected:
+            print(f"WROTE     {got!r}\n expected {expected!r}")
+        failed += got != expected
+    for label, template in LIMIT:
+        found = slots.template_problems(template, TABLE)
         print(f"{'now caught: move it to WRONG' if found else 'limit    '} {label}")
         failed += bool(found)
-    with open("results/golden.json", encoding="utf-8") as f:
-        golden = json.load(f)
-    for name, body in golden.items():
-        a = DeskAnswer(**body)
-        found = metrics.untraceable_numbers(a) + metrics.direction_problems(a)
-        if found:
-            print(f"REJECTED the recorded answer {name}: {found}")
-        failed += bool(found)
-    print(f"{len(WRONG)} wrong answers, {len(RIGHT)} right answers, {len(golden)} recorded answers, {len(LIMIT)} known limits; "
-          f"{failed} expectation(s) not met")
+    ends = {0.4: "below the 1st percentile", 1.0: "at the 1st percentile", 11.2: "at the 11th percentile", 12.0: "at the 12th percentile",
+            13.4: "at the 13th percentile", 21.6: "at the 22nd percentile", 43.0: "at the 43rd percentile", 99.0: "at the 99th percentile",
+            99.6: "above the 99th percentile", 100.0: "at the highest of the window, the 100th percentile"}
+    for v, expected in ends.items():
+        if slots.percentile(v) != expected:
+            print(f"WROTE     percentile {v}: {slots.percentile(v)!r}, expected {expected!r}")
+            failed += 1
+    failed += tampered()
+    print(f"{len(TYPED)} typed sentences, {len(WRONG)} wrong templates, {len(RIGHT)} right templates, {len(WRITES)} renderings, "
+          f"4 tampered answers, {len(LIMIT)} known limits; {failed} expectation(s) not met")
     return 1 if failed else 0
 
 

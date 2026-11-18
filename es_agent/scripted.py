@@ -1,12 +1,12 @@
 """Offline stand-in for an LLM.
 
-A FunctionModel that follows a fixed plan of tool calls, then writes the
-answer from the tool results it actually received. It exercises the real
-tools, the typed output, the validator and the evals with no API key; it
-does not measure model judgement (that is what the live run is for).
+A FunctionModel that follows a fixed plan of tool calls, then writes a draft from the slots the
+tools actually offered. It exercises the real tools, the slot table, the validator and the evals
+with no API key; it does not measure model judgement (that is what the live run is for).
 
-With sloppy=True the first answer is wrong (one number misquoted, or a curve given the
-opposite shape), so the run shows the output validator rejecting it and the retry fixing it.
+With sloppy=True the first draft is wrong in the two ways a model can still be wrong: it types a
+figure instead of placing a slot, or it writes a curve's shape in its own word. The run shows the
+validator rejecting it and the retry fixing it; with the validator off, the evaluators must catch it.
 """
 
 from __future__ import annotations
@@ -30,73 +30,96 @@ def _plain(x):
     return x
 
 
-def _answer(returns: list[ToolReturnPart], question: str) -> dict:
-    facts, spreads, cites, lines = [], [], [], []
+def _sheets(returns: list[ToolReturnPart]) -> list[tuple[str, dict]]:
+    out = []
     for r in returns:
         body = _plain(r.content)
-        if r.tool_name == "get_latest":
-            for o in body:
-                facts.append({k: o[k] for k in ("series_id", "name", "units", "value", "period")})
-                facts[-1]["latest_value"] = facts[-1].pop("value")
-                facts[-1]["latest_period"] = facts[-1].pop("period")
-                lines.append(f"{o['name']} was {o['value']:.2f} {o['units']} on {o['period']}.")
-        elif r.tool_name == "get_change":
-            c = body
-            facts.append({k: c[k] for k in ("series_id", "name", "units", "latest_period", "latest_value",
-                                             "lookback_days", "base_period", "base_value", "change_abs", "change_pct")})
-            way = "up" if c["change_abs"] >= 0 else "down"
-            lines.append(
-                f"{c['name']} was {c['latest_value']:.2f} {c['units']} on {c['latest_period']}, {way} "
-                f"{abs(c['change_abs']):.2f} ({abs(c['change_pct']):.2f}%) from {c['base_value']:.2f} "
-                f"on {c['base_period']}, {c['lookback_days']} days earlier."
-            )
-        elif r.tool_name == "get_spread":
-            spreads.append(body)
-            lines.append(
-                f"{body['name_a']} was {body['value_a']:.2f} and {body['name_b']} was {body['value_b']:.2f} "
-                f"{body['units']} on {body['period']}: a spread of {body['spread']:.2f}."
-            )
-        elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning", "get_percentile", "get_arbitrage", "get_surprises", "get_watch", "get_arbitrage_scenario", "get_crack_scenario", "get_futures_spread", "get_futures_crack", "get_evidence"):
-            cites.append(body["key"])
-            # A change is written with its direction, as the prose rules require of any model.
-            shown = ", ".join(f"{k} {'up' if v > 0 else 'down'} {abs(v):.2f}" if "change" in k and v else f"{k} {v:.2f}"
-                              for k, v in body["values"].items())
-            lead = "If the stated changes happened, hypothetically: " if body.get("hypothetical") else ""
-            shape = f" The curve is in {body['note'].split(' ')[0].rstrip(':')}." if r.tool_name == "get_curve" else ""
-            lines.append(f"{lead}{body['title']} on {body['period']}: {shown}.{shape}")
-    if not facts and not spreads and not cites:
-        return {"facts": [], "summary": "No EnergyScope series matched the question.",
-                "caveats": ["No series in the data answers this question."]}
-    return {"facts": facts, "spreads": spreads, "cites": cites, "summary": " ".join(lines), "caveats": []}
+        for sh in body if isinstance(body, list) else [body]:
+            if isinstance(sh, dict) and "figures" in sh:
+                out.append((r.tool_name, sh))
+    return out
+
+
+# Which of a reading's slots a code-written answer places, by kind of reading. A trailing * matches any ending.
+_PICK = {
+    "curve": ("shape", "M1_minus_M2", "M1_minus_M1*", "move"),
+    "crack": ("crack", "crack_percentile"), "fcrack": ("crack", "crack_percentile"),
+    "fspread": ("brent_minus_wti", "spread_percentile", "spot_brent_minus_wti", "spot_spread_percentile"),
+    "seasonal": ("latest", "difference", "difference_pct", "range"),
+    "positioning": ("managed_money_net", "net_change_on_week", "net_percentile"),
+    "percentile": ("latest", "percentile"),
+    "arb": ("verdict", "score", "brent_minus_wti", "spread_percentile", "freight_percentile", "europe_minus_us_per_gallon",
+            "difference_percentile"),
+    "surprises": ("*: change",), "watch": ("flag_*",), "evidence": ("balance", "groups", "line_*"),
+    "scenario": ("*_change", "*_change_pct", "observed_score", "observed_crack", "scenario_score", "scenario_crack", "verdict"),
+}
+_WITH_HISTORY = ("crack", "fcrack", "fspread", "positioning", "percentile", "arb")
+
+
+def _picked(src: str, offered: dict) -> list[str]:
+    """The slots of one reading that a brief places, in the order of _PICK; every slot when the kind is not listed."""
+    wanted = _PICK.get(src.split(":", 1)[0])
+    if wanted is None:
+        return list(offered)
+    out = []
+    for w in wanted:
+        for address in offered:
+            field = address[len(src) + 2:-1]
+            hit = field == w or (w.endswith("*") and field.startswith(w[:-1])) or (w.startswith("*") and field.endswith(w[1:]))
+            if hit and address not in out and not field.endswith("_a_week_earlier"):
+                out.append(address)
+    return out or list(offered)
+
+
+def _answer(returns: list[ToolReturnPart], sloppy: bool) -> dict:
+    lines = []
+    for tool, sh in _sheets(returns):
+        src, offered = sh["source"], {**sh["figures"], **sh["statements"]}
+
+        def slot(field: str) -> str:
+            return "{" + src + "." + field + "}"
+
+        if tool == "get_latest":
+            lines.append(f"From the data: {slot('value')}.")
+        elif tool == "get_change":
+            lines.append(f"From the data: {slot('value')}; {slot('change')}.")
+        elif tool == "get_spread":
+            lines.append("From the data: " + "; ".join(a for a in (slot("gap"), slot("percentile")) if a in offered) + ".")
+        else:
+            lead = "If the assumed changes happened: " if any("(hypothetical)" in t for t in offered.values()) else "From the data: "
+            lines.append(lead + "; ".join(_picked(src, offered)) + ".")
+            history = next((a for a in ("{" + src + ".context.1}", "{" + src + ".context}") if a in sh["sentences"]), None)
+            if history and src.split(":", 1)[0] in _WITH_HISTORY:
+                lines.append(history)
+            if sloppy and slot("shape") in offered:  # the curve's shape in the model's own word, and the wrong one
+                wrong = "the curve is in contango" if "backwardation" in offered[slot("shape")] else "the curve is in backwardation"
+                lines[-1] = lines[-1].replace(slot("shape"), wrong)
+    if not lines:
+        return {"summary": "No EnergyScope series matched the question.", "limits": ["not_in_data"]}
+    if sloppy and "value}" in lines[0]:  # a figure typed, not placed
+        lines[0] = "From the data: about 99.50 dollars per barrel" + lines[0].partition(".value}")[2]
+    return {"summary": " ".join(lines), "cites": [], "limits": []}
 
 
 def is_rejection(p) -> bool:
-    """A retry request. Pydantic AI 2.x returns a rejected output as a ToolReturnPart
-    with outcome/retry set; older versions used RetryPromptPart."""
-    if isinstance(p, RetryPromptPart):
-        return True
-    return isinstance(p, ToolReturnPart) and (bool(getattr(p, "retry", None)) or getattr(p, "outcome", None) not in (None, "success"))
+    """A retry request. Pydantic AI has used three shapes for it: RetryPromptPart, a ToolReturnPart with
+    outcome/retry set, and RetryFeedbackPart for a rejected text output. Until 18 Nov 2026 the third was
+    not recognised here, so a live model's retries were counted as none; the validator's own record
+    (Deps.rejections) is now the count, and this is the cross-check."""
+    if isinstance(p, RetryPromptPart) or getattr(p, "retry", None):
+        return True  # RetryFeedbackPart: how a rejected text output comes back (the live model answers in text, not by tool)
+    return isinstance(p, ToolReturnPart) and getattr(p, "outcome", None) not in (None, "success")
 
 
 def scripted(plan: list[tuple[str, dict]], sloppy: bool = False) -> FunctionModel:
     def fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         parts = [p for m in messages if isinstance(m, ModelRequest) for p in m.parts]
-        question = next((p.content for p in parts if p.part_kind == "user-prompt"), "")
         output_tool = info.output_tools[0].name
         returns = [p for p in parts if isinstance(p, ToolReturnPart) and p.tool_name != output_tool]
         rejected = [p for p in parts if is_rejection(p) and p.tool_name == output_tool]
         if len(returns) < len(plan):
             name, args = plan[len(returns)]
             return ModelResponse(parts=[ToolCallPart(name, args)])
-        answer = _answer(returns, str(question))
-        if sloppy and not rejected and answer["facts"]:
-            answer["facts"][0]["latest_value"] = round(answer["facts"][0]["latest_value"] * 1.05, 2)
-        elif sloppy and not rejected:  # no facts: a curve reading, described with the opposite shape
-            flip = {"in backwardation.": "in contango.", "in contango.": "in backwardation."}
-            for a, b in flip.items():
-                if a in answer["summary"]:
-                    answer["summary"] = answer["summary"].replace(a, b)
-                    break
-        return ModelResponse(parts=[ToolCallPart(output_tool, answer)])
+        return ModelResponse(parts=[ToolCallPart(output_tool, _answer(returns, sloppy and not rejected))])
 
     return FunctionModel(fn, model_name="scripted")

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime as dt
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -67,6 +69,14 @@ class Reading(BaseModel):
     context: str = Field("", description="Written by code: whether the level is unusual and when it was last seen.")
     hypothetical: bool = Field(False, description="True for a what-if scenario: its scenario_ values are not observations.")
     counter: str = Field("", description="Written by code: the lines of evidence that point against the balance. Code adds it to the caveats.")
+    words: dict[str, str] = Field(default_factory=dict, description="Written by code: short phrases a summary may place as slots (a curve's shape, a verdict).")
+    # How code writes each value into a sentence (see slots.py). Not part of the published answer: the check
+    # rebuilds every reading from the data, and these with it.
+    unit_of: dict[str, str] = Field(default_factory=dict, exclude=True)    # the unit of a value when they differ; '*' = default
+    label_of: dict[str, str] = Field(default_factory=dict, exclude=True)   # the noun a value is written with; 'A|B' for a gap
+    window_of: dict[str, str] = Field(default_factory=dict, exclude=True)  # what a percentile ranks against, what a change spans
+    date_of: dict[str, dt.date] = Field(default_factory=dict, exclude=True)  # the date of a value when it is not the reading's
+    slot_values: bool = Field(True, exclude=True)                           # False: only its words and sentences are slots
 
 
 class SeriesFact(BaseModel):
@@ -85,22 +95,57 @@ class SeriesFact(BaseModel):
     also: dict[str, float] = Field(default_factory=dict, description="Leave empty. Code copies it from the tool result.")
 
 
-class DeskAnswer(BaseModel):
-    facts: list[SeriesFact] = Field(description="One entry per series used. Empty if no suitable series was found.")
-    spreads: list[Spread] = Field(
-        default_factory=list, description="One entry per get_spread result used, copied unchanged. Usually empty."
+Limit = Literal["not_in_data", "out_of_scope", "no_secrets", "no_forecast", "no_causes", "no_freight", "no_physical",
+                "no_consensus", "partial", "unconfirmed_figure", "us_only"]
+
+
+class Draft(BaseModel):
+    """What the model writes: a template, what it relied on, and which limits apply. Code builds the answer."""
+
+    summary: str = Field(
+        description=(
+            "Two to four plain sentences for a desk analyst, written as a template. Every number, unit, date, direction of a "
+            "change and curve shape is a slot: an address in braces copied exactly from a tool result, e.g. "
+            "{curve:brent.M1_minus_M12}. The page replaces each slot with the text shown beside it in the tool result. "
+            "Type no digit, no spelled-out number and no date yourself."
+        )
     )
     cites: list[str] = Field(
         default_factory=list,
-        description="Keys of the readings used (the 'key' a curve, crack, seasonal or positioning tool returned).",
+        description="The `source` of any tool result you relied on without placing one of its slots. Usually empty.",
     )
-    readings: list[Reading] = Field(
-        default_factory=list, description="Leave empty. The system copies the cited readings in from the tool results."
-    )
-    summary: str = Field(
+    limits: list[Limit] = Field(
+        default_factory=list,
         description=(
-            "Two or three plain sentences for a desk analyst. Quote numbers exactly as they appear in facts, spreads or the cited readings "
-            "(same units, at most 2 decimals, no unit conversion). Write dates as YYYY-MM-DD."
-        )
+            "What the reader must be told, chosen from the list; code writes the sentence. not_in_data: the data does not hold "
+            "what was asked. out_of_scope: not about energy markets. no_secrets: asked for instructions or credentials. "
+            "no_forecast: asked what will happen. no_causes: asked why. no_freight / no_physical: the answer would need route "
+            "freight rates / physical differentials. no_consensus: asked about surprises against expectations. partial: only "
+            "part was answered. unconfirmed_figure: the question quoted a figure the data does not show. us_only: asked about "
+            "the world, answered from US data."
+        ),
     )
-    caveats: list[str] = Field(default_factory=list, description="Data gaps, stale dates, or why nothing was found.")
+
+
+class Part(BaseModel):
+    """One stretch of the summary: the model's own words, or a slot that code filled."""
+
+    text: str
+    slot: str | None = Field(None, description="The address, when code wrote this text.")
+    source: str | None = None
+    series: list[str] = Field(default_factory=list)
+    date: dt.date | None = None
+
+
+class DeskAnswer(BaseModel):
+    """The answer as shown. Built by code from the model's draft and the tool results of the run."""
+
+    facts: list[SeriesFact] = Field(default_factory=list, description="One entry per series the summary draws on, copied from the tool results.")
+    spreads: list[Spread] = Field(default_factory=list, description="Each spread the summary draws on, copied from the tool result.")
+    cites: list[str] = Field(default_factory=list, description="Keys of the readings the summary draws on.")
+    readings: list[Reading] = Field(default_factory=list, description="The readings themselves, copied from the tool results.")
+    summary: str = Field(description="The summary as rendered: the model's words with every slot filled by code.")
+    template: str = Field("", description="The summary as the model wrote it, slots unfilled.")
+    parts: list[Part] = Field(default_factory=list, description="The summary in pieces, so a page can mark which words code wrote.")
+    limits: list[str] = Field(default_factory=list, description="The limits the model chose; their sentences are in caveats.")
+    caveats: list[str] = Field(default_factory=list, description="Every caveat, each worded by code.")

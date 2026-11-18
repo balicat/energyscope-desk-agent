@@ -18,7 +18,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Suite on frozen data, answers must match the golden file
         run: python run_evals.py --source fixture --gate --golden check
-      - name: Prose control, wrong sentences over true tables must all be rejected
+      - name: Control, wrong templates rejected, right ones accepted, tampered answers refused
         run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python prose_controls.py
-      - name: Control run, validator off, exactly three assertions must fail
-        run: python run_evals.py --source fixture --no-guard --expect-failures 3
+      - name: Control run, validator off, exactly two assertions must fail
+        run: python run_evals.py --source fixture --no-guard --expect-failures 2

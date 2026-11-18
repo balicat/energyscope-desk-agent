@@ -1,19 +1,21 @@
 """Eval suite: desk questions scored on grounding, series choice, abstention and tool budget.
 
     python run_evals.py                                  # offline: scripted model, Parquet lake
-    python run_evals.py --no-guard --expect-failures 3   # control: validator off, the evals must catch the planted errors
+    python run_evals.py --no-guard --expect-failures 2   # control: validator off, the evals must catch the planted errors
     python run_evals.py --model anthropic:claude-haiku-5-5 --gate      # live model; exit 1 on any failed assertion
     python run_evals.py --source fixture --gate --golden check         # CI: frozen data, no lake, no key
 
-"Grounded" recomputes every number from the data source, independently of the
-run, so a number that drifted between tool and answer fails even if the
-validator missed it.
+"Grounded" recomputes every number from the data source, independently of the run. "SlotsOnly"
+rebuilds the summary from those recomputed numbers and requires it to equal what was shown, with
+no digit, number word or date word typed by the model. "CodeWords" requires every direction and
+verdict word, and every caveat, to be one that code wrote.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 import os
 import sys
 from dataclasses import dataclass
@@ -23,7 +25,7 @@ from pydantic_ai.messages import ToolCallPart
 from pydantic_evals import Case, Dataset, increment_eval_metric
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, MaxToolCalls
 
-from es_agent import clock, metrics, prose
+from es_agent import clock, prose
 from es_agent.agent import Deps, agent
 from es_agent.memory import Turn, with_context
 from es_agent.models import DeskAnswer
@@ -127,23 +129,34 @@ SOURCE: DataSource | None = None
 RUNS: dict[str, dict] = {}  # per question: retries, what the validator said, whether the retries ran out
 
 
+_CHECKED: dict[int, list[str]] = {}
+
+
+def checked(answer: DeskAnswer) -> list[str]:
+    """verify() once per answer: three evaluators read its result."""
+    if id(answer) not in _CHECKED:
+        _CHECKED[id(answer)] = verify(answer, SOURCE)
+    return _CHECKED[id(answer)]
+
+
 @dataclass
 class Grounded(Evaluator[str, DeskAnswer]):
     """Every fact, spread and reading equals a fresh recomputation from the source."""
 
     def evaluate(self, ctx: EvaluatorContext[str, DeskAnswer]) -> EvaluationReason:
-        problems = [p for p in verify(ctx.output, SOURCE) if not p.startswith(("summary numbers", "direction:"))]
+        problems = [p for p in checked(ctx.output) if not p.startswith(("summary:", "caveats:"))]
         n = len(ctx.output.facts) + len(ctx.output.spreads) + len(ctx.output.readings)
         return EvaluationReason(not problems, "; ".join(problems) if problems else f"{n} items match the source")
 
 
 @dataclass
-class SummaryTraceable(Evaluator[str, DeskAnswer]):
-    """No number or date, in the summary or in a caveat the model wrote, that is not in the facts, spreads or readings."""
+class SlotsOnly(Evaluator[str, DeskAnswer]):
+    """The summary is its template rendered again from recomputed data: no digit, number word or date
+    word typed by the model, no brace that is not a slot, no address the run did not earn."""
 
     def evaluate(self, ctx):
-        bad = metrics.untraceable_numbers(ctx.output)
-        return EvaluationReason(not bad, f"untraceable: {bad}" if bad else "all summary numbers trace to facts")
+        bad = [p for p in checked(ctx.output) if p.startswith("summary:") and not p.startswith("summary: verdict word")]
+        return EvaluationReason(not bad, "; ".join(bad)[:500] if bad else "every figure in the summary was placed by code")
 
 
 @dataclass
@@ -177,29 +190,28 @@ class ScenarioLabelled(Evaluator[str, DeskAnswer]):
 
 
 @dataclass
-class DirectionRight(Evaluator[str, DeskAnswer]):
-    """The prose points the same way as the data: backwardation or contango, rose or fell."""
+class CodeWords(Evaluator[str, DeskAnswer]):
+    """Direction and verdict words (up, above, backwardation, tight, open) come from slots, and every
+    caveat is one code wrote: the model's own word for either would be an unchecked claim."""
 
     def evaluate(self, ctx):
-        bad = metrics.direction_problems(ctx.output)
-        return EvaluationReason(not bad, "; ".join(bad) if bad else "direction words agree with the data")
+        bad = [p for p in checked(ctx.output) if p.startswith(("summary: verdict word", "caveats:"))]
+        return EvaluationReason(not bad, "; ".join(bad)[:500] if bad else "verdict words and caveats are code's")
 
 
 @dataclass
 class OwnWords(Evaluator[str, DeskAnswer]):
-    """Nothing on the page is the visitor's sentence handed back: no caveat or summary repeats the question at length."""
+    """The summary is not the visitor's sentence handed back."""
 
     def evaluate(self, ctx):
         asked = "\n".join(line for line in str(ctx.inputs).splitlines() if not line.startswith("A: "))
-        bad = [c for c in prose.model_caveats(ctx.output) if prose.echoes(c, asked, prose.ECHO_CAVEAT)]
-        if prose.echoes(ctx.output.summary, asked, prose.ECHO_SUMMARY):
-            bad.append(ctx.output.summary)
-        return EvaluationReason(not bad, f"repeats the visitor's words: {bad}" if bad else "the answer is in its own words")
+        bad = prose.echoes(ctx.output.summary, asked, prose.ECHO_SUMMARY)
+        return EvaluationReason(not bad, "repeats the visitor's words at length" if bad else "the answer is in its own words")
 
 
 def build_dataset() -> Dataset:
     cases = [Case(name=n, inputs=q, metadata={"expect": e}) for n, q, e, _, _ in SUITE]
-    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), DirectionRight(), OwnWords(), MaxToolCalls(max_calls=6)])
+    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SlotsOnly(), RightSeries(), ScenarioLabelled(), CodeWords(), OwnWords(), MaxToolCalls(max_calls=6)])
 
 
 def make_task(model_name: str, enforce: bool = True):
@@ -216,20 +228,24 @@ def make_task(model_name: str, enforce: bool = True):
             except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
                 # The validator's own record is used too: inside the evaluation harness the captured messages can be empty.
                 RUNS[question] = {"retries": max(len(said(seen)), len(deps.rejections)), "ran_out": f"{type(e).__name__}: {e}"[:300],
-                                  "validator": said(seen) or [r[:600] for r in deps.rejections]}
+                                  "validator": said(seen) or [r[:600] for r in deps.rejections], "causes": dict(Counter(deps.causes))}
                 raise
         parts = [p for m in result.all_messages() for p in m.parts]
-        RUNS[question] = {"retries": sum(is_rejection(p) for p in parts), "ran_out": None, "validator": said(result.all_messages())}
-        increment_eval_metric("retries", sum(is_rejection(p) for p in parts))
+        # The validator's own record is the count. Until 18 Nov 2026 only the messages were counted, and a live
+        # model's rejections arrive as a part type that count did not know: live runs were reported with no retries.
+        retried = max(len(deps.rejections), sum(is_rejection(p) for p in parts))
+        RUNS[question] = {"retries": retried, "ran_out": None, "validator": [r[:600] for r in deps.rejections] or said(result.all_messages()),
+                          "causes": dict(Counter(deps.causes)), "summary": deps.answer.summary, "limits": deps.answer.limits}
+        increment_eval_metric("retries", retried)
         increment_eval_metric("tool_calls", sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for p in parts))
         increment_eval_metric("tokens", result.usage.total_tokens or 0)
-        return result.output
+        return deps.answer  # built by code from the model's draft
 
     return task
 
 
-# A wrong, untraceable or unlabelled what-if number, or a wrong direction word: never tolerated
-HARD = ("Grounded", "SummaryTraceable", "ScenarioLabelled", "DirectionRight", "OwnWords")
+# A wrong number, a figure or verdict word the model typed, an unlabelled what-if, a sentence handed back: never tolerated
+HARD = ("Grounded", "SlotsOnly", "ScenarioLabelled", "CodeWords", "OwnWords")
 
 
 def tally(report) -> tuple[int, int, int, list[tuple[str, str, str]]]:
@@ -287,8 +303,9 @@ def main() -> int:
         if r["retries"] or r["ran_out"]:
             print(f"RETRIED {n}: {r['retries']} time(s){' and ran out' if r['ran_out'] else ''}: "
                   + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
+    causes = sum((Counter(r.get("causes", {})) for r in by_case.values()), Counter())
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
-          f"ran out: {ran_out or 'none'}")
+          f"ran out: {ran_out or 'none'}; by cause: {dict(causes) or 'none'}")
 
     code = 0
     if args.record_fixture:
@@ -312,7 +329,8 @@ def main() -> int:
         os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
         with open(args.report, "w", encoding="utf-8") as f:
             json.dump({"model": args.model, "data_as_of": str(clock.today()), "passed": passed, "total": total, "errored": errored,
-                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "cases": by_case},
+                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out,
+                       "rejections_by_cause": dict(causes), "cases": by_case},
                       f, indent=1)
     if args.gate:
         hard = [f for f in failed if f[1] in HARD]

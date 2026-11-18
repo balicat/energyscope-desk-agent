@@ -28,7 +28,7 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic_ai import capture_run_messages
-from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
+from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
@@ -72,6 +72,13 @@ _checks = {"answers": 0, "failed": 0, "since": dt.date.today().isoformat()}
 _seconds: deque[float] = deque(maxlen=200)
 _sessions = Sessions()
 _source = None
+# Whether the language model can be reached. It flips on the first refusal by the provider (a spent budget, a bad
+# key, an outage) and back on the first answer; each flip alerts the owner. While it is down the model is asked
+# again only every MODEL_RETRY seconds, and code answers the example questions by itself.
+MODEL_RETRY = int(os.environ.get("LIBRARIAN_MODEL_RETRY", "600"))
+_model = {"ok": MODEL != "scripted", "since": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "error": "", "retry_at": 0.0}
+BY_CODE = ("The language model is not available just now, so only the example questions are answered: for those, code "
+           "writes the answer by itself, with no model. Try an example, or come back later.")
 
 
 def _load_counts() -> None:
@@ -145,14 +152,28 @@ def _admit(address: str) -> None:
         _alert_if_due()
 
 
-def _model_for(question: str):
-    if MODEL != "scripted":
-        return MODEL
-    from run_evals import PLANS  # offline mode can only replay the eval questions
+def _plan_for(question: str):
+    """The fixed tool plan for an example question: what code runs when no model is available."""
+    from run_evals import PLANS
 
     if question not in PLANS:
-        raise Refused(400, "Offline mode: only the evaluation questions can be answered.")
-    return scripted(*PLANS[question])
+        raise Refused(429, BY_CODE)  # not a 5xx: the hosting proxy replaces those with a page of its own
+    return scripted(PLANS[question][0])
+
+
+def _model_state(ok: bool, error: str = "") -> None:
+    with _state_lock:
+        flipped = _model["ok"] != ok
+        _model.update(ok=ok, error=error[:200], retry_at=0.0 if ok else time.time() + MODEL_RETRY)
+        if flipped:
+            _model["since"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    if flipped and NTFY:
+        text = ("The language model answers again." if ok else
+                f"The language model cannot be reached ({error[:120]}). Example questions are answered by code; all others are refused.")
+        try:
+            urllib.request.urlopen(urllib.request.Request(NTFY, data=text.encode(), headers={"Title": "The Librarian"}), timeout=5)
+        except Exception:
+            pass
 
 
 def _cost(usage, messages) -> float:
@@ -171,20 +192,30 @@ def _cost(usage, messages) -> float:
 
 def answer(question: str, session: str | None = None, emit=lambda tool, args: None) -> dict:
     t0 = time.time()
-    model = _model_for(question)
     with _state_lock:
         turns = _sessions.get(session)
+        ask_model = MODEL != "scripted" and (_model["ok"] or time.time() >= _model["retry_at"])
     deps = Deps(source=_source, emit=emit)
-    degraded = None
+    degraded, by_code = None, False
     with _run_lock, capture_run_messages() as messages:
         try:
-            result = agent.run_sync(
-                with_context(question, turns),
-                model=model,
-                deps=deps,
-                usage_limits=UsageLimits(request_limit=MODEL_REQUESTS_PER_QUESTION),
-            )
-            output, usage = result.output, result.usage
+            try:
+                if not ask_model:
+                    raise ModelAPIError(MODEL, "not asked: the provider refused recently")
+                result = agent.run_sync(
+                    with_context(question, turns),
+                    model=MODEL,
+                    deps=deps,
+                    usage_limits=UsageLimits(request_limit=MODEL_REQUESTS_PER_QUESTION),
+                )
+                _model_state(True)
+            except ModelAPIError as e:  # the provider refused or could not be reached: code answers what it can
+                if ask_model:
+                    _model_state(False, f"{type(e).__name__}: {e}")
+                by_code = True
+                deps = Deps(source=_source, emit=emit)
+                result = agent.run_sync(question, model=_plan_for(question), deps=deps)
+            output, usage = deps.answer, result.usage  # the answer code built from the draft
             messages = result.all_messages()
         except (UnexpectedModelBehavior, UsageLimitExceeded) as e:
             # Every attempt at a summary failed a check, or the request budget ran out. The numbers the
@@ -222,7 +253,7 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         _checks["answers"] += 1
         _checks["failed"] += bool(problems)
         _seconds.append(seconds)
-        if not degraded:  # a follow-up must not be handed a sentence that was never checked
+        if not degraded and not by_code:  # a follow-up must not be handed a sentence that was never checked
             _sessions.add(session, question, output.summary)
     # An id for this answer: what a reader's "useful" or "wrong" is recorded against, and what ties it to the
     # logged trace. It is not a public link to the answer.
@@ -233,9 +264,10 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         checked=not problems,
         check_problems=problems,
         trail=trail,
-        retries=sum(is_rejection(p) for p in parts),
-        follow_up=bool(turns),
-        model=MODEL,
+        retries=max(len(deps.rejections), sum(is_rejection(p) for p in parts)),
+        follow_up=bool(turns) and not by_code,
+        model="none: written by code" if by_code else MODEL,
+        by_code=by_code,
         seconds=seconds,
         tokens=(usage.total_tokens or 0) if usage else 0,
         degraded=bool(degraded),
@@ -281,11 +313,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True, "model": MODEL, "source": SOURCE_KIND, "today": _day["count"],
                                  "usd_today": round(_day["usd"], 4), "usd_per_day": USD_PER_DAY, "per_day": PER_DAY,
                                  "per_address_per_hour": PER_ADDRESS_PER_HOUR, "per_address_per_day": PER_ADDRESS_PER_DAY,
-                                 "checked_since_start": dict(_checks)})
+                                 "checked_since_start": dict(_checks),
+                                 "model_available": _model["ok"], "model_state_since": _model["since"], "model_error": _model["error"]})
         elif self.path == "/stats":
             with _state_lock:
                 self._send(200, {"answers": _checks["answers"], "failed_check": _checks["failed"], "since": _checks["since"],
-                                 "median_seconds": round(statistics.median(_seconds), 1) if _seconds else None})
+                                 "median_seconds": round(statistics.median(_seconds), 1) if _seconds else None,
+                                 "model_available": _model["ok"]})
         else:
             self._send(404, {"error": "not found"})
 
@@ -383,7 +417,8 @@ class Handler(BaseHTTPRequestHandler):
         except Refused as r:
             status, body = r.status, {"error": r.message}
         except Exception as e:  # the visitor gets a plain message; the detail goes to the log
-            status, body = 502, {"error": "The Librarian could not answer that just now."}
+            # 424, not 502: the hosting proxy replaces every 5xx with a page of its own, and the visitor never saw this.
+            status, body = 424, {"error": "The Librarian could not answer that just now."}
             detail = f"{type(e).__name__}: {e}"[:500]
         self._log(status, question, body, detail)
         if status == 200:  # the log keeps the detail; the public gets a fixed phrase, never raw exception text

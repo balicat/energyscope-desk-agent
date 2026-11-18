@@ -1,18 +1,15 @@
 """Deterministic calculations and the grounding check.
 
-The model chooses series and writes the sentences; code does the sums.
-`ungrounded()` is shared by the agent's output validator (forces a retry)
-and by the eval (measures the final answer), so both apply one rule.
+The model chooses series and places slots; code does the sums.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import math
-import re
 
 from . import prose
-from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
+from .models import Change, Observation, SeriesHit, Spread
 
 
 def also_in(units: str, value: float) -> dict[str, float]:
@@ -68,28 +65,3 @@ def close(a: float | None, b: float | None) -> bool:
     if a is None or b is None:
         return a is b
     return math.isclose(a, b, rel_tol=1e-3, abs_tol=0.01)
-
-
-_LONG = re.compile(r"(?<![\w.,])(\d[\d,]*\.\d{3,})(?!\d)")
-
-
-def tidy(text: str) -> str:
-    """Round numbers written with three or more decimals to two, as the page's tables do.
-    Numbers below 1 are left alone (a small rate would round to nothing)."""
-    def fix(m: re.Match) -> str:
-        raw = m.group(1)
-        n = float(raw.replace(",", ""))
-        return raw if n < 1 else f"{n:,.2f}" if "," in raw else f"{n:.2f}"
-
-    return _LONG.sub(fix, text)
-
-
-def direction_problems(answer: DeskAnswer) -> list[str]:
-    """Direction words in the summary that contradict the data. See `prose.direction_problems`."""
-    return prose.direction_problems(answer)
-
-
-def untraceable_numbers(answer: DeskAnswer) -> list[str]:
-    """Numbers and dates, in the summary and in the model's own caveats, that trace to nothing a
-    tool returned. See `prose.untraceable`."""
-    return prose.untraceable(answer)
