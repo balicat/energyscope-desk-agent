@@ -1,4 +1,4 @@
-"""Eval suite: six desk questions scored on grounding, series choice,
+"""Eval suite: ten desk questions scored on grounding, series choice,
 abstention and tool budget.
 
     python run_evals.py                                  # offline, scripted model, Parquet lake
@@ -22,6 +22,7 @@ from pydantic_evals import Case, Dataset, increment_eval_metric
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, MaxToolCalls
 
 from es_agent import metrics
+from es_agent.verify import verify
 from es_agent.agent import Deps, agent
 from es_agent.models import DeskAnswer
 from es_agent.sources import DataSource, FlightSource, ParquetLakeSource
@@ -46,6 +47,15 @@ SUITE = [
     ("brent_wti_spread", "What is the Brent-WTI spread right now?", [[BRENT], [WTI]],
      [("search_series", {"query": "Brent spot price"}), ("search_series", {"query": "WTI spot price"}),
       ("get_spread", {"series_a": BRENT, "series_b": WTI})], False),
+    ("brent_curve", "Is the Brent futures curve in backwardation or contango?", [["ICE.BRENT.M1.D"]],
+     [("get_curve", {"market": "brent"})], False),
+    ("crack_321", "What is the 3-2-1 crack spread right now?", [[WTI]],
+     [("get_crack_spread", {"kind": "3-2-1"})], False),
+    ("crude_vs_5y", "How do US commercial crude stocks compare with the five-year average for this time of year?", [US_CRUDE],
+     [("search_series", {"query": "US ending stocks excluding SPR crude oil"}),
+      ("get_seasonal", {"series_id": US_CRUDE[0], "years": 5})], False),
+    ("wti_positioning", "How are managed-money funds positioned in WTI futures?", [["CFTC.WTI.MM_Net"]],
+     [("get_positioning", {"market": "wti"})], False),
     ("abstain_carbon", "What did EU carbon allowances (EUA) settle at yesterday?", [],
      [("search_series", {"query": "EU carbon allowance EUA"})], False),
 ]
@@ -58,28 +68,9 @@ class Grounded(Evaluator[str, DeskAnswer]):
     """Every fact equals a fresh recomputation from the source."""
 
     def evaluate(self, ctx: EvaluatorContext[str, DeskAnswer]) -> EvaluationReason:
-        for f in ctx.output.facts:
-            hit = SOURCE.meta(f.series_id)
-            if hit is None:
-                return EvaluationReason(False, f"{f.series_id} does not exist")
-            lb = f.lookback_days or 0
-            hist = SOURCE.history(f.series_id, start=dt.date.today() - dt.timedelta(days=lb + 400))
-            truth = metrics.change_over(hit, hist, lb) if lb else metrics.latest_obs(hit, hist)
-            tv = truth.latest_value if lb else truth.value
-            tp = truth.latest_period if lb else truth.period
-            if f.latest_period != tp or not metrics.close(f.latest_value, tv):
-                return EvaluationReason(False, f"{f.series_id}: source says {tp}={tv}, answer says {f.latest_period}={f.latest_value}")
-            if lb and not (metrics.close(f.change_pct, truth.change_pct) and metrics.close(f.base_value, truth.base_value)):
-                return EvaluationReason(False, f"{f.series_id}: change differs from source")
-        for s in ctx.output.spreads:
-            a, b = SOURCE.meta(s.series_a), SOURCE.meta(s.series_b)
-            if a is None or b is None:
-                return EvaluationReason(False, f"spread {s.series_a} / {s.series_b}: a series does not exist")
-            start = dt.date.today() - dt.timedelta(days=400)
-            truth = metrics.spread_of(a, SOURCE.history(s.series_a, start=start), b, SOURCE.history(s.series_b, start=start))
-            if truth is None or s.period != truth.period or not metrics.close(s.spread, truth.spread):
-                return EvaluationReason(False, f"spread {s.series_a} minus {s.series_b} differs from source")
-        return EvaluationReason(True, f"{len(ctx.output.facts)} facts and {len(ctx.output.spreads)} spreads match the source")
+        problems = [p for p in verify(ctx.output, SOURCE) if not p.startswith("summary numbers")]
+        n = len(ctx.output.facts) + len(ctx.output.spreads) + len(ctx.output.readings)
+        return EvaluationReason(not problems, "; ".join(problems) if problems else f"{n} items match the source")
 
 
 @dataclass
@@ -98,6 +89,7 @@ class RightSeries(Evaluator[str, DeskAnswer]):
     def evaluate(self, ctx):
         want = ctx.metadata["expect"]
         got = {f.series_id for f in ctx.output.facts} | {x for s in ctx.output.spreads for x in (s.series_a, s.series_b)}
+        got |= {x for r in ctx.output.readings for x in r.series_ids}
         if not want:
             ok = not got and bool(ctx.output.caveats)
             return EvaluationReason(ok, "abstained with a caveat" if ok else f"should abstain, answered with {sorted(got)}")

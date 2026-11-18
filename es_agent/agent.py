@@ -1,4 +1,4 @@
-"""The agent: four tools over EnergyScope data, a typed answer, and a
+"""The agent: eight tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from . import metrics
-from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
+from . import metrics, readings
+from .models import Change, DeskAnswer, Observation, Reading, SeriesHit, Spread
 from .sources import DataSource
 
 
@@ -24,16 +25,25 @@ class Deps:
     # Every number a tool handed to the model, keyed by (series_id, lookback_days or None).
     ledger: dict[tuple[str, int | None], Observation | Change] = field(default_factory=dict)
     spreads: dict[tuple[str, str], Spread] = field(default_factory=dict)  # every spread a tool returned
+    readings: dict[str, Reading] = field(default_factory=dict)  # every computed reading a tool returned, by key
+    searches: int = 0  # search_series calls so far in this run
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
 
+
+SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
 
 INSTRUCTIONS = """\
 You answer energy-market questions for a desk analyst using EnergyScope data.
 - Find series with search_series; prefer daily (D) or weekly (W) series unless asked otherwise.
 - Get numbers only from get_latest or get_change. Never compute or estimate numbers yourself.
 - For the difference between two series (a spread) call get_spread and copy its result into spreads. Never subtract yourself.
+- Curve shape (backwardation, contango): get_curve. Refining margins: get_crack_spread. A level against its
+  usual level for the time of year: get_seasonal. Fund or speculative positioning: get_positioning.
+  These return a reading with a key: list the keys you used in cites and quote the reading's values in the summary.
 - Copy tool values into facts unchanged. In the summary, quote numbers as they appear in facts.
-- If no suitable series exists, return empty facts and say why in caveats. Do not guess.
+- Report what the data shows. Do not predict, and do not explain causes the data cannot show; when a question needs
+  data you lack (freight, physical differentials, news), say which in caveats.
+- If two searches find no suitable series, stop searching: return empty facts and say why in caveats. Do not guess.
 """
 
 agent = Agent(
@@ -46,12 +56,16 @@ agent = Agent(
 
 
 @agent.tool
-def search_series(ctx: RunContext[Deps], query: str, limit: int = 8) -> list[SeriesHit]:
+def search_series(ctx: RunContext[Deps], query: str, limit: int = 8) -> list[SeriesHit] | str:
     """Search EnergyScope series by keywords in the series name, e.g. 'WTI spot price' or 'Cushing ending stocks'.
 
     Names use the publisher's wording (EIA): inventories are 'ending stocks', and commercial crude stocks are
     'ending stocks excluding SPR'. Use few, plain keywords; one or two searches should be enough.
     """
+    ctx.deps.searches += 1
+    if ctx.deps.searches > SEARCH_BUDGET:
+        return (f"Search budget of {SEARCH_BUDGET} used; this search was not run. Answer from what you have, "
+                "or return no facts and say in caveats that the data does not hold it.")
     return ctx.deps.source.search(query, limit)
 
 
@@ -104,12 +118,58 @@ def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
     return sp
 
 
+def _keep(ctx: RunContext[Deps], reading: Reading | None, why: str) -> Reading:
+    if reading is None:
+        raise ModelRetry(why)
+    ctx.deps.readings[reading.key] = reading
+    return reading
+
+
+@agent.tool
+def get_curve(ctx: RunContext[Deps], market: Literal["brent"]) -> Reading:
+    """Futures curve on the latest date: each contract month (M1 = front), M1 minus M2, M1 minus the last month,
+    and whether the curve is in backwardation or contango. Brent only (12 months); there is no WTI curve in the data."""
+    return _keep(ctx, readings.curve(ctx.deps.source, market), f"No complete {market} curve in the last 60 days.")
+
+
+@agent.tool
+def get_crack_spread(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", "distillate"]) -> Reading:
+    """Refining margin in dollars per barrel from spot prices: products (Gulf Coast gasoline, New York Harbor
+    heating oil, converted from gallons) minus WTI crude."""
+    return _keep(ctx, readings.crack(ctx.deps.source, kind), "The three spot prices share no date in the last 60 days.")
+
+
+@agent.tool
+def get_seasonal(ctx: RunContext[Deps], series_id: str, years: int = 5) -> Reading:
+    """Latest value of a series against the average, low and high at the same time of year in the previous
+    `years` years (2 to 10). Use for 'versus the five-year average' or 'is this high for the season'."""
+    if ctx.deps.source.meta(series_id) is None:
+        raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
+    return _keep(ctx, readings.seasonal(ctx.deps.source, series_id, years),
+                 f"{series_id} lacks {years} earlier years of history (or years is outside 2 to 10).")
+
+
+@agent.tool
+def get_positioning(ctx: RunContext[Deps], market: Literal["wti", "brent", "gasoil", "natural_gas", "gasoline"]) -> Reading:
+    """Managed-money (fund) futures positioning from the weekly commitments of traders report: net, long, short,
+    change on the week, open interest, and where the net position ranks against the last three years."""
+    return _keep(ctx, readings.positioning(ctx.deps.source, market), f"No positioning data for {market}.")
+
+
 @agent.output_validator
 def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     """Reject any fact that differs from what a tool returned, and any summary number that traces to no fact."""
+    problems = []
+    # The model cites reading keys; code copies the readings in, so their numbers cannot be mistyped.
+    answer.readings = []
+    for key in dict.fromkeys(answer.cites):
+        if key in ctx.deps.readings:
+            answer.readings.append(ctx.deps.readings[key])
+        else:
+            problems.append(f"cites {key!r}, which no tool returned in this run. Keys available: {sorted(ctx.deps.readings)}.")
+    answer.cites = [r.key for r in answer.readings]
     if not ctx.deps.enforce:
         return answer
-    problems = []
     for f in answer.facts:
         src = ctx.deps.ledger.get((f.series_id, f.lookback_days))
         if src is None:
@@ -131,8 +191,8 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
             problems.append(f"Spread {s.series_a} minus {s.series_b}: tool returned {src.period} {src.value_a} - {src.value_b} = {src.spread}; copy it unchanged.")
     bad = metrics.untraceable_numbers(answer)
     if bad:
-        problems.append(f"Summary numbers {bad} match no value in facts or spreads. Quote those values, no conversions.")
-    if not answer.facts and not answer.spreads and not answer.caveats:
+        problems.append(f"Summary numbers {bad} match no value in facts, spreads or cited readings. Quote those values, no conversions, and cite every reading you quote.")
+    if not answer.facts and not answer.spreads and not answer.readings and not answer.caveats:
         problems.append("No facts and no caveat: say why nothing was found.")
     if problems:
         raise ModelRetry("Fix these and answer again:\n- " + "\n- ".join(problems))

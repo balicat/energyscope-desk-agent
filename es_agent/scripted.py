@@ -31,7 +31,7 @@ def _plain(x):
 
 
 def _answer(returns: list[ToolReturnPart], question: str) -> dict:
-    facts, spreads, lines = [], [], []
+    facts, spreads, cites, lines = [], [], [], []
     for r in returns:
         body = _plain(r.content)
         if r.tool_name == "get_latest":
@@ -56,10 +56,14 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
                 f"{body['name_a']} was {body['value_a']:.2f} and {body['name_b']} was {body['value_b']:.2f} "
                 f"{body['units']} on {body['period']}: a spread of {body['spread']:.2f}."
             )
-    if not facts and not spreads:
+        elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning"):
+            cites.append(body["key"])
+            shown = ", ".join(f"{k} {v:.2f}" for k, v in body["values"].items())
+            lines.append(f"{body['title']} on {body['period']}: {shown}.")
+    if not facts and not spreads and not cites:
         return {"facts": [], "summary": "No EnergyScope series matched the question.",
                 "caveats": [f"search_series found nothing suitable for: {question}"]}
-    return {"facts": facts, "spreads": spreads, "summary": " ".join(lines), "caveats": []}
+    return {"facts": facts, "spreads": spreads, "cites": cites, "summary": " ".join(lines), "caveats": []}
 
 
 def is_rejection(p) -> bool:

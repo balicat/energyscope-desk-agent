@@ -59,7 +59,7 @@ _NUM = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
 
 
 def untraceable_numbers(answer: DeskAnswer) -> list[str]:
-    """Numbers in the summary that match no number in the facts or spreads (after rounding)."""
+    """Numbers in the summary that match no number in the facts, spreads or readings (after rounding)."""
     allowed: list[float] = []
     in_names: set[str] = set()  # "No. 2 Heating Oil", "PADD 3": numbers that are part of a name
     for f in answer.facts:
@@ -68,6 +68,9 @@ def untraceable_numbers(answer: DeskAnswer) -> list[str]:
     for s in answer.spreads:
         allowed += [s.value_a, s.value_b, s.spread]
         in_names |= set(_NUM.findall(f"{s.name_a} {s.series_a} {s.name_b} {s.series_b}"))
+    for r in answer.readings:
+        allowed += list(r.values.values())
+        in_names |= set(_NUM.findall(f"{r.title} {r.note} {r.key} {' '.join(r.series_ids)} {' '.join(r.values)}"))
     bad = []
     for m in _NUM.finditer(_ISO.sub(" ", answer.summary)):
         if m.group() in in_names:

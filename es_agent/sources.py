@@ -54,7 +54,7 @@ class DataSource(Protocol):
 class ParquetLakeSource:
     """Reads <root>/<DATASET>/series_meta.parquet and year=*/data.parquet."""
 
-    def __init__(self, root: str = "/opt/energyscope/data", datasets: tuple[str, ...] = ("PET", "NG")):
+    def __init__(self, root: str = "/opt/energyscope/data", datasets: tuple[str, ...] = ("PET", "NG", "ICE", "CFTC", "ICE_COT")):
         self.root = root
         self.datasets = datasets
         frames = []

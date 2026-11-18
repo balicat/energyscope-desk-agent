@@ -1,5 +1,9 @@
 # EnergyScope desk agent: a Pydantic AI spike
 
+**Live as The Librarian: [thelibrarian.energy](https://thelibrarian.energy).** Ask an oil or gas market question;
+the page shows the answer, the series and values behind it, the tool calls, and whether the numbers passed a
+recomputation from the data.
+
 Built 10 Nov 2026, first run on a live model 18 Nov 2026, against the live [EnergyScope](https://energyscope.io) Parquet lake on my own server
 (Pydantic AI 2.66, pydantic-evals 2.66, Python 3.14).
 
@@ -12,7 +16,7 @@ has to trace back to a tool result, or the answer is sent back.
 
 | Pydantic AI feature | Where |
 |---|---|
-| Tools as typed Python functions (`@agent.tool`) | `es_agent/agent.py`: `search_series`, `get_latest`, `get_change`, `get_spread` |
+| Tools as typed Python functions (`@agent.tool`) | `es_agent/agent.py`: `search_series`, `get_latest`, `get_change`, `get_spread`, `get_curve`, `get_crack_spread`, `get_seasonal`, `get_positioning` |
 | Structured output (`output_type`) | `DeskAnswer` / `SeriesFact` in `es_agent/models.py` |
 | Dependency injection (`deps_type`, `RunContext`) | `Deps` carries the data source and a ledger of every number a tool returned |
 | Output validator + `ModelRetry` | `grounded()` rejects any fact that differs from the ledger and any summary number that traces to no fact |
@@ -29,6 +33,14 @@ Design rules:
   (measures the final answer).
 - **The eval does not trust the run.** `Grounded` recomputes every fact from
   the data source independently of the agent's ledger.
+- **The model cites, code copies.** Curves, crack spreads, seasonal comparisons and positioning come back as a
+  keyed reading (`curve:brent`, `crack:3-2-1`). The model lists the keys it used; the validator copies the
+  readings into the answer, so a twelve-month curve cannot be mistyped, and the key is enough to recompute it.
+- **Budgets live in the tools.** `search_series` stops after four calls in a run and says so. An instruction to
+  "stop after two failed searches" did not hold: one model searched 18 times on a question it should decline
+  ($0.21 for one answer). The budget in code brought that to six calls.
+- **The same check runs on live traffic.** `verify()` is the `Grounded` evaluator's logic; `serve.py` runs it on
+  every answer after it is written, logs the result and returns it to the page.
 - **Abstain, don't guess.** Asked for something the lake does not hold (EU
   carbon allowances), the right answer is no facts plus a caveat, and that is
   scored.
@@ -38,31 +50,49 @@ Design rules:
 
 ## Results (offline, scripted model, real data)
 
-Six cases, four evaluators each: `Grounded`, `SummaryTraceable`,
+Ten cases, four evaluators each: `Grounded`, `SummaryTraceable`,
 `RightSeries`, `MaxToolCalls(6)`.
 
 | Run | Assertions | Notes |
 |---|---|---|
-| guard on (`python run_evals.py`) | **24/24** | `wti_30d` is deliberately sloppy: its first answer misquotes WTI by 5%. The validator rejects it (on 10 Nov: "latest is 2026-11-03 = 99.64, you wrote 104.62"), the retry fixes it: `retries: 1` |
-| guard off (`--no-guard`) | **22/24** | the same bad number gets through the run, and `Grounded` + `SummaryTraceable` both fail it |
+| guard on (`python run_evals.py`) | **40/40** | `wti_30d` is deliberately sloppy: its first answer misquotes WTI by 5%. The validator rejects it (on 10 Nov: "latest is 2026-11-03 = 99.64, you wrote 104.62"), the retry fixes it: `retries: 1` |
+| guard off (`--no-guard`) | **38/40** | the same bad number gets through the run, and `Grounded` + `SummaryTraceable` both fail it |
 
 The control run is the point: it shows the evals catch the error on their own,
 so a green run means something. Full reports: `results/`.
 
-## Results (live, `anthropic:claude-sonnet-5-5`, 18 Nov 2026)
+## Results (live models, 18 Nov 2026)
 
 | Run | Assertions | Notes |
 |---|---|---|
 | first live run, five cases | **19/20** | every number matched the source and the carbon question was declined; `us_crude_yoy` used 8 tool calls against a budget of 6, because "commercial" is not in the publisher's series names and the all-words search returned nothing five times |
 | after the search fix, five cases | **20/20** | search now falls back to names holding most of the query words; 2.6 tool calls and 5.5 s a question on average |
 | with `get_spread`, six cases | **24/24** | 3.2 tool calls and 8.0 s a question on average, about $0.025 each. Report: `results/live-claude-sonnet-5-5.txt` |
+| eight tools, ten cases, first run | **39/40** on both models | the carbon question took 7 to 8 tool calls against a budget of 6 before the model declined |
+| eight tools, ten cases, with the search budget | **40/40** on both models | see the comparison below |
+
+### Two models, one suite
+
+The model is a run-time string, so changing it is one flag; the suite says what the change cost or bought.
+
+| Model | Assertions | Tool calls / question | Seconds / question | Cost / question |
+|---|---|---|---|---|
+| `anthropic:claude-sonnet-5-5` | 40/40 | 2.8 | 7.1 | $0.034 |
+| `anthropic:claude-haiku-5-5` | 40/40 | 2.5 | 5.5 | $0.0017 |
+
+On these ten cases the smaller model scores the same at about a twentieth of the cost, so the public service
+runs on it. What this does not show: ten cases is a small suite, and it scores numbers, series choice,
+abstention and tool budget, not the quality of the prose. Reports: `results/live-*.txt`.
+
 
 Five questions outside the suite, asked through `serve.py`: Henry Hub over a month and US gasoline stocks
 against last year were answered with the series and dates; an election question and a request for the system
 prompt and API key were declined with no tool calls; asked for the Brent-WTI spread, it quoted both prices
 and said it does not compute numbers itself. That gap became the fourth tool, `get_spread` (one series minus
 another on the latest date both have, computed in code), and the sixth eval case. Five questions is a smoke
-test, not a measurement.
+test, not a measurement. Seven more, asked of the smaller model after the new tools went in (arbitrage, gasoline
+margins, gas positioning, seasonal stocks, curve shape, a prompt-injection attempt, a two-part question), all
+passed the live recomputation.
 
 What the offline run does and does not prove: it exercises the real tools,
 data, typed output, validator, retry path and evaluators. It does not measure
@@ -95,11 +125,13 @@ export ENERGYSCOPE_API_KEY=...                # over Arrow Flight instead of the
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/sources.py   DataSource protocol, ParquetLakeSource, FlightSource
 es_agent/metrics.py   change calculations + the grounding rule
-es_agent/agent.py     the agent, four tools, the output validator
+es_agent/readings.py  curve, crack spread, seasonal comparison, positioning; `compute(source, key)` rebuilds any of them
+es_agent/verify.py    recompute an answer from the data (the Grounded eval and the live check)
+es_agent/agent.py     the agent, eight tools, the output validator
 es_agent/scripted.py  offline FunctionModel
 run_evals.py          the eval suite
 ask.py                one question, prints the tool trail and the typed answer
-serve.py              HTTP front (POST /ask) with per-address, per-day and per-question limits
+serve.py              HTTP front (POST /ask): per-address, per-day and per-question limits, and the live check
 results/              eval reports
 ```
 

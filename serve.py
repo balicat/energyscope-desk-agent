@@ -29,6 +29,7 @@ from pydantic_ai.usage import UsageLimits
 from es_agent.agent import Deps, agent
 from es_agent.scripted import is_rejection, scripted
 from es_agent.sources import FlightSource, ParquetLakeSource
+from es_agent.verify import verify
 
 MODEL = os.environ.get("LIBRARIAN_MODEL", "scripted")
 KEY_FILE = os.environ.get("LIBRARIAN_KEY_FILE", "/opt/energyscope/.anthropic_api_key")
@@ -49,6 +50,7 @@ _run_lock = threading.Lock()  # one question at a time: the lake reads and the s
 _state_lock = threading.Lock()
 _by_address: dict[str, deque[float]] = defaultdict(deque)
 _day = {"date": dt.date.today(), "count": 0}
+_checks = {"answers": 0, "failed": 0}  # live answers since start, and how many failed the recomputation
 _source = None
 
 
@@ -101,7 +103,17 @@ def answer(question: str) -> dict:
         if isinstance(p, ToolCallPart) and p.tool_name != "final_result"
     ]
     out = result.output.model_dump(mode="json")
+    # Live check: rebuild every number from the data, independently of the run, and record the result.
+    try:
+        problems = verify(result.output, _source)
+    except Exception as e:
+        problems = [f"check failed to run: {type(e).__name__}: {e}"[:300]]
+    with _state_lock:
+        _checks["answers"] += 1
+        _checks["failed"] += bool(problems)
     out.update(
+        checked=not problems,
+        check_problems=problems,
         trail=trail,
         retries=sum(is_rejection(p) for p in parts),
         model=MODEL,
@@ -142,7 +154,8 @@ class Handler(BaseHTTPRequestHandler):
             with _state_lock:
                 today = _day["count"] if _day["date"] == dt.date.today() else 0
             self._send(200, {"ok": True, "model": MODEL, "source": SOURCE_KIND, "today": today,
-                             "per_day": PER_DAY, "per_address_per_hour": PER_ADDRESS_PER_HOUR})
+                             "per_day": PER_DAY, "per_address_per_hour": PER_ADDRESS_PER_HOUR,
+                             "checked_since_start": dict(_checks)})
         else:
             self._send(404, {"error": "not found"})
 

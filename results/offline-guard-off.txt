@@ -1,46 +1,70 @@
-             Evaluation Summary: scripted (guard off)              
-┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Case ID          ┃ Metrics              ┃ Assertions ┃ Duration ┃
-┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ wti_30d          │ tool_calls: 2        │ ✗✗✔✔       │   74.3ms │
-│                  │ tokens: 498          │            │          │
-│                  │ requests: 3          │            │          │
-│                  │ input_tokens: 390    │            │          │
-│                  │ output_tokens: 108   │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ brent_vs_wti     │ tool_calls: 3        │ ✔✔✔✔       │  291.7ms │
-│                  │ tokens: 816          │            │          │
-│                  │ requests: 4          │            │          │
-│                  │ input_tokens: 663    │            │          │
-│                  │ output_tokens: 153   │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ us_crude_yoy     │ tool_calls: 2        │ ✔✔✔✔       │   75.3ms │
-│                  │ tokens: 723          │            │          │
-│                  │ requests: 3          │            │          │
-│                  │ input_tokens: 599    │            │          │
-│                  │ output_tokens: 124   │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ cushing_4w       │ tool_calls: 2        │ ✔✔✔✔       │   58.5ms │
-│                  │ tokens: 456          │            │          │
-│                  │ requests: 3          │            │          │
-│                  │ input_tokens: 341    │            │          │
-│                  │ output_tokens: 115   │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ brent_wti_spread │ tool_calls: 3        │ ✔✔✔✔       │  101.4ms │
-│                  │ tokens: 803          │            │          │
-│                  │ requests: 4          │            │          │
-│                  │ input_tokens: 655    │            │          │
-│                  │ output_tokens: 148   │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ abstain_carbon   │ tool_calls: 1        │ ✔✔✔✔       │   37.0ms │
-│                  │ tokens: 162          │            │          │
-│                  │ requests: 2          │            │          │
-│                  │ input_tokens: 118    │            │          │
-│                  │ output_tokens: 44    │            │          │
-├──────────────────┼──────────────────────┼────────────┼──────────┤
-│ Averages         │ tool_calls: 2.17     │ 91.7% ✔    │  106.4ms │
-│                  │ tokens: 576.3        │            │          │
-│                  │ requests: 3.17       │            │          │
-│                  │ input_tokens: 461.0  │            │          │
-│                  │ output_tokens: 115.3 │            │          │
-└──────────────────┴──────────────────────┴────────────┴──────────┘
+             Evaluation Summary: scripted (guard off)             
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Case ID          ┃ Metrics             ┃ Assertions ┃ Duration ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ wti_30d          │ tool_calls: 2       │ ✗✗✔✔       │   81.6ms │
+│                  │ tokens: 500         │            │          │
+│                  │ requests: 3         │            │          │
+│                  │ input_tokens: 390   │            │          │
+│                  │ output_tokens: 110  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ brent_vs_wti     │ tool_calls: 3       │ ✔✔✔✔       │  303.1ms │
+│                  │ tokens: 818         │            │          │
+│                  │ requests: 4         │            │          │
+│                  │ input_tokens: 663   │            │          │
+│                  │ output_tokens: 155  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ us_crude_yoy     │ tool_calls: 2       │ ✔✔✔✔       │   85.3ms │
+│                  │ tokens: 725         │            │          │
+│                  │ requests: 3         │            │          │
+│                  │ input_tokens: 599   │            │          │
+│                  │ output_tokens: 126  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ cushing_4w       │ tool_calls: 2       │ ✔✔✔✔       │   62.9ms │
+│                  │ tokens: 458         │            │          │
+│                  │ requests: 3         │            │          │
+│                  │ input_tokens: 341   │            │          │
+│                  │ output_tokens: 117  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ brent_wti_spread │ tool_calls: 3       │ ✔✔✔✔       │  107.5ms │
+│                  │ tokens: 805         │            │          │
+│                  │ requests: 4         │            │          │
+│                  │ input_tokens: 655   │            │          │
+│                  │ output_tokens: 150  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ brent_curve      │ tool_calls: 1       │ ✔✔✔✔       │   21.0ms │
+│                  │ tokens: 314         │            │          │
+│                  │ requests: 2         │            │          │
+│                  │ input_tokens: 237   │            │          │
+│                  │ output_tokens: 77   │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ crack_321        │ tool_calls: 1       │ ✔✔✔✔       │   52.7ms │
+│                  │ tokens: 253         │            │          │
+│                  │ requests: 2         │            │          │
+│                  │ input_tokens: 194   │            │          │
+│                  │ output_tokens: 59   │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ crude_vs_5y      │ tool_calls: 2       │ ✔✔✔✔       │  132.3ms │
+│                  │ tokens: 750         │            │          │
+│                  │ requests: 3         │            │          │
+│                  │ input_tokens: 641   │            │          │
+│                  │ output_tokens: 109  │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ wti_positioning  │ tool_calls: 1       │ ✔✔✔✔       │   14.9ms │
+│                  │ tokens: 234         │            │          │
+│                  │ requests: 2         │            │          │
+│                  │ input_tokens: 182   │            │          │
+│                  │ output_tokens: 52   │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ abstain_carbon   │ tool_calls: 1       │ ✔✔✔✔       │   42.2ms │
+│                  │ tokens: 162         │            │          │
+│                  │ requests: 2         │            │          │
+│                  │ input_tokens: 118   │            │          │
+│                  │ output_tokens: 44   │            │          │
+├──────────────────┼─────────────────────┼────────────┼──────────┤
+│ Averages         │ tool_calls: 1.80    │ 95.0% ✔    │   90.3ms │
+│                  │ tokens: 501.9       │            │          │
+│                  │ requests: 2.80      │            │          │
+│                  │ input_tokens: 402.0 │            │          │
+│                  │ output_tokens: 99.9 │            │          │
+└──────────────────┴─────────────────────┴────────────┴──────────┘

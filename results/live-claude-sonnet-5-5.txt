@@ -1,57 +1,127 @@
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
+/home/dl/librarian/.venv/lib/python3.14/site-packages/pydantic_ai/providers/anthropic.py:315: UserWarning: `dict` fields are not supported by Anthropic in strict mode (including `NativeOutput`, which is automatically selected when thinking is enabled). Anthropic's schema transformation sets `additionalProperties` to `false`, which forces the model to return `{}`. Use a `list` of `tuple[str, str]`, or a `TypedDict` or `dataclass` with explicit `key` and `value` fields, or set `output_type=PromptedOutput(...)`.
+  warnings.warn(
               Evaluation Summary: anthropic:claude-sonnet-5-5               
 ┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┓
 ┃ Case ID          ┃ Metrics                       ┃ Assertions ┃ Duration ┃
 ┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━┩
-│ wti_30d          │ tool_calls: 3                 │ ✔✔✔✔       │    10.7s │
-│                  │ tokens: 11,891                │            │          │
+│ wti_30d          │ tool_calls: 3                 │ ✔✔✔✔       │     8.6s │
+│                  │ tokens: 17,140                │            │          │
 │                  │ requests: 8                   │            │          │
-│                  │ input_tokens: 22,856          │            │          │
-│                  │ output_tokens: 926            │            │          │
-│                  │ cost: 0.0275                  │            │          │
+│                  │ input_tokens: 33,336          │            │          │
+│                  │ output_tokens: 944            │            │          │
+│                  │ cost: 0.0381                  │            │          │
 ├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ brent_vs_wti     │ tool_calls: 3                 │ ✔✔✔✔       │     7.6s │
-│                  │ tokens: 9,498                 │            │          │
-│                  │ requests: 6                   │            │          │
-│                  │ input_tokens: 18,072          │            │          │
-│                  │ output_tokens: 924            │            │          │
-│                  │ cost: 0.0227                  │            │          │
-│                  │ thinking_tokens: 21           │            │          │
-│                  │ reasoning.output_tokens: 21   │            │          │
-├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ us_crude_yoy     │ tool_calls: 2                 │ ✔✔✔✔       │     7.5s │
-│                  │ tokens: 9,497                 │            │          │
-│                  │ requests: 6                   │            │          │
-│                  │ input_tokens: 18,070          │            │          │
-│                  │ output_tokens: 924            │            │          │
-│                  │ cost: 0.0227                  │            │          │
-├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ cushing_4w       │ tool_calls: 2                 │ ✔✔✔✔       │     6.2s │
-│                  │ tokens: 8,715                 │            │          │
-│                  │ requests: 6                   │            │          │
-│                  │ input_tokens: 16,556          │            │          │
-│                  │ output_tokens: 874            │            │          │
-│                  │ cost: 0.0209                  │            │          │
-├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ brent_wti_spread │ tool_calls: 4                 │ ✔✔✔✔       │     8.7s │
-│                  │ tokens: 9,998                 │            │          │
-│                  │ requests: 6                   │            │          │
-│                  │ input_tokens: 18,620          │            │          │
-│                  │ output_tokens: 1,376          │            │          │
-│                  │ cost: 0.0255                  │            │          │
-├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ abstain_carbon   │ tool_calls: 5                 │ ✔✔✔✔       │     7.5s │
-│                  │ tokens: 12,751                │            │          │
+│ brent_vs_wti     │ tool_calls: 4                 │ ✔✔✔✔       │     8.7s │
+│                  │ tokens: 18,589                │            │          │
 │                  │ requests: 8                   │            │          │
-│                  │ input_tokens: 24,636          │            │          │
-│                  │ output_tokens: 866            │            │          │
-│                  │ cost: 0.0290                  │            │          │
+│                  │ input_tokens: 35,794          │            │          │
+│                  │ output_tokens: 1,384          │            │          │
+│                  │ cost: 0.0427                  │            │          │
 ├──────────────────┼───────────────────────────────┼────────────┼──────────┤
-│ Averages         │ tool_calls: 3.17              │ 100.0% ✔   │     8.0s │
-│                  │ tokens: 10,391.7              │            │          │
-│                  │ requests: 6.67                │            │          │
-│                  │ input_tokens: 19,801.7        │            │          │
-│                  │ output_tokens: 981.7          │            │          │
-│                  │ cost: 0.0247                  │            │          │
-│                  │ thinking_tokens: 21.0         │            │          │
-│                  │ reasoning.output_tokens: 21.0 │            │          │
+│ us_crude_yoy     │ tool_calls: 4                 │ ✔✔✔✔       │     9.9s │
+│                  │ tokens: 23,891                │            │          │
+│                  │ requests: 10                  │            │          │
+│                  │ input_tokens: 46,414          │            │          │
+│                  │ output_tokens: 1,368          │            │          │
+│                  │ cost: 0.0533                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ cushing_4w       │ tool_calls: 3                 │ ✔✔✔✔       │     6.3s │
+│                  │ tokens: 17,348                │            │          │
+│                  │ requests: 8                   │            │          │
+│                  │ input_tokens: 33,624          │            │          │
+│                  │ output_tokens: 1,072          │            │          │
+│                  │ cost: 0.0390                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ brent_wti_spread │ tool_calls: 4                 │ ✔✔✔✔       │     7.6s │
+│                  │ tokens: 18,609                │            │          │
+│                  │ requests: 8                   │            │          │
+│                  │ input_tokens: 35,794          │            │          │
+│                  │ output_tokens: 1,424          │            │          │
+│                  │ cost: 0.0429                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ brent_curve      │ tool_calls: 2                 │ ✔✔✔✔       │     7.5s │
+│                  │ tokens: 12,921                │            │          │
+│                  │ requests: 6                   │            │          │
+│                  │ input_tokens: 24,754          │            │          │
+│                  │ output_tokens: 1,088          │            │          │
+│                  │ cost: 0.0302                  │            │          │
+│                  │ thinking_tokens: 87           │            │          │
+│                  │ reasoning.output_tokens: 87   │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ crack_321        │ tool_calls: 1                 │ ✔✔✔✔       │     4.0s │
+│                  │ tokens: 8,294                 │            │          │
+│                  │ requests: 4                   │            │          │
+│                  │ input_tokens: 15,832          │            │          │
+│                  │ output_tokens: 756            │            │          │
+│                  │ cost: 0.0196                  │            │          │
+│                  │ thinking_tokens: 60           │            │          │
+│                  │ reasoning.output_tokens: 60   │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ crude_vs_5y      │ tool_calls: 3                 │ ✔✔✔✔       │     7.1s │
+│                  │ tokens: 13,720                │            │          │
+│                  │ requests: 6                   │            │          │
+│                  │ input_tokens: 26,466          │            │          │
+│                  │ output_tokens: 974            │            │          │
+│                  │ cost: 0.0313                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ wti_positioning  │ tool_calls: 2                 │ ✔✔✔✔       │     6.7s │
+│                  │ tokens: 12,489                │            │          │
+│                  │ requests: 6                   │            │          │
+│                  │ input_tokens: 24,184          │            │          │
+│                  │ output_tokens: 794            │            │          │
+│                  │ cost: 0.0282                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ abstain_carbon   │ tool_calls: 2                 │ ✔✔✔✔       │     4.1s │
+│                  │ tokens: 8,023                 │            │          │
+│                  │ requests: 4                   │            │          │
+│                  │ input_tokens: 15,504          │            │          │
+│                  │ output_tokens: 542            │            │          │
+│                  │ cost: 0.0182                  │            │          │
+├──────────────────┼───────────────────────────────┼────────────┼──────────┤
+│ Averages         │ tool_calls: 2.80              │ 100.0% ✔   │     7.1s │
+│                  │ tokens: 15,102.4              │            │          │
+│                  │ requests: 6.80                │            │          │
+│                  │ input_tokens: 29,170.2        │            │          │
+│                  │ output_tokens: 1,034.6        │            │          │
+│                  │ cost: 0.0343                  │            │          │
+│                  │ thinking_tokens: 73.5         │            │          │
+│                  │ reasoning.output_tokens: 73.5 │            │          │
 └──────────────────┴───────────────────────────────┴────────────┴──────────┘

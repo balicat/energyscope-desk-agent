@@ -49,6 +49,18 @@ class Spread(BaseModel):
     spread: float
 
 
+class Reading(BaseModel):
+    """A computed result from one tool call: a curve, a crack spread, a seasonal comparison, positioning."""
+
+    key: str = Field(description="Identifies the computation, e.g. 'curve:brent'. Cite this key in the answer.")
+    title: str
+    period: dt.date
+    units: str
+    series_ids: list[str]
+    values: dict[str, float]
+    note: str = ""
+
+
 class SeriesFact(BaseModel):
     """One line of the answer. Every number must come from a tool result."""
 
@@ -69,9 +81,16 @@ class DeskAnswer(BaseModel):
     spreads: list[Spread] = Field(
         default_factory=list, description="One entry per get_spread result used, copied unchanged. Usually empty."
     )
+    cites: list[str] = Field(
+        default_factory=list,
+        description="Keys of the readings used (the 'key' a curve, crack, seasonal or positioning tool returned).",
+    )
+    readings: list[Reading] = Field(
+        default_factory=list, description="Leave empty. The system copies the cited readings in from the tool results."
+    )
     summary: str = Field(
         description=(
-            "Two or three plain sentences for a desk analyst. Quote numbers exactly as they appear in facts or spreads "
+            "Two or three plain sentences for a desk analyst. Quote numbers exactly as they appear in facts, spreads or the cited readings "
             "(same units, at most 2 decimals, no unit conversion). Write dates as YYYY-MM-DD."
         )
     )
