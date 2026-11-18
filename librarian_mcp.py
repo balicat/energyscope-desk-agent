@@ -7,8 +7,8 @@ Claude Desktop or Claude Code, in the MCP configuration:
 
     {"mcpServers": {"the-librarian": {"command": "python", "args": ["/path/to/librarian_mcp.py"]}}}
 
-It is a thin client of the public HTTP API, so the same checks and the same limits apply (six
-questions an hour and twenty a day from one address). Nothing here computes or rewrites: the tool
+It is a thin client of the public HTTP API, so the same checks and the same limits apply (30
+questions an hour and 100 a day from one address). Nothing here computes or rewrites: the tool
 returns the service's typed answer unchanged, including `checked`, the caveats code wrote, and the
 trail of tool calls.
 """
