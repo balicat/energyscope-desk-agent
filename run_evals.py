@@ -202,6 +202,19 @@ def build_dataset() -> Dataset:
     return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), DirectionRight(), OwnWords(), MaxToolCalls(max_calls=6)])
 
 
+def spent(messages) -> float:
+    """Dollars a run cost, summed from the model's own responses, so a run that failed is counted too.
+    Until 18 Nov 2026 the gate did not count its own spending; its live runs used up the key's monthly
+    limit and the public service, which shares the key, stopped answering for ten minutes."""
+    total = 0.0
+    for m in messages:
+        try:
+            total += float(m.cost().total_price)
+        except Exception:
+            pass  # a request, or a response the price table does not know
+    return total
+
+
 def make_task(model_name: str, enforce: bool = True):
     async def task(question: str) -> DeskAnswer:
         model = scripted(*PLANS[question]) if model_name == "scripted" else model_name
@@ -216,11 +229,15 @@ def make_task(model_name: str, enforce: bool = True):
             except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
                 # The validator's own record is used too: inside the evaluation harness the captured messages can be empty.
                 RUNS[question] = {"retries": max(len(said(seen)), len(deps.rejections)), "ran_out": f"{type(e).__name__}: {e}"[:300],
-                                  "validator": said(seen) or [r[:600] for r in deps.rejections]}
+                                  "validator": said(seen) or [r[:600] for r in deps.rejections], "usd": round(spent(seen), 5)}
                 raise
         parts = [p for m in result.all_messages() for p in m.parts]
-        RUNS[question] = {"retries": sum(is_rejection(p) for p in parts), "ran_out": None, "validator": said(result.all_messages())}
-        increment_eval_metric("retries", sum(is_rejection(p) for p in parts))
+        # The validator's own record is the count. Until 18 Nov 2026 only the messages were counted, and a live
+        # model's rejections arrive as a part type that count did not know: live runs were reported with no retries.
+        retried = max(len(deps.rejections), sum(is_rejection(p) for p in parts))
+        RUNS[question] = {"retries": retried, "ran_out": None, "validator": [r[:600] for r in deps.rejections] or said(result.all_messages()),
+                          "usd": round(spent(result.all_messages()), 5)}
+        increment_eval_metric("retries", retried)
         increment_eval_metric("tool_calls", sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for p in parts))
         increment_eval_metric("tokens", result.usage.total_tokens or 0)
         return result.output
@@ -287,6 +304,8 @@ def main() -> int:
         if r["retries"] or r["ran_out"]:
             print(f"RETRIED {n}: {r['retries']} time(s){' and ran out' if r['ran_out'] else ''}: "
                   + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
+    usd = sum(r.get("usd", 0.0) for r in by_case.values())
+    print(f"cost: ${usd:.4f} for this run, from the model's own usage figures")
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
           f"ran out: {ran_out or 'none'}")
 
@@ -312,7 +331,7 @@ def main() -> int:
         os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
         with open(args.report, "w", encoding="utf-8") as f:
             json.dump({"model": args.model, "data_as_of": str(clock.today()), "passed": passed, "total": total, "errored": errored,
-                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "cases": by_case},
+                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "usd": round(usd, 4), "cases": by_case},
                       f, indent=1)
     if args.gate:
         hard = [f for f in failed if f[1] in HARD]

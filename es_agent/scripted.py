@@ -71,11 +71,13 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
 
 
 def is_rejection(p) -> bool:
-    """A retry request. Pydantic AI 2.x returns a rejected output as a ToolReturnPart
-    with outcome/retry set; older versions used RetryPromptPart."""
-    if isinstance(p, RetryPromptPart):
+    """A retry request. Pydantic AI has used three shapes for it: RetryPromptPart, a ToolReturnPart with
+    outcome/retry set, and RetryFeedbackPart for a rejected text output. Until 18 Nov 2026 the third was
+    not recognised here, so a live model's retries were counted as none; the validator's own record
+    (Deps.rejections) is now the count, and this is the cross-check."""
+    if isinstance(p, RetryPromptPart) or getattr(p, "retry", None):
         return True
-    return isinstance(p, ToolReturnPart) and (bool(getattr(p, "retry", None)) or getattr(p, "outcome", None) not in (None, "success"))
+    return isinstance(p, ToolReturnPart) and getattr(p, "outcome", None) not in (None, "success")
 
 
 def scripted(plan: list[tuple[str, dict]], sloppy: bool = False) -> FunctionModel:

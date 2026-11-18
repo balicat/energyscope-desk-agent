@@ -36,7 +36,7 @@ from .models import DeskAnswer
 # Caveats written by code start with one of these. The validator removes any the model wrote with
 # the same opening and appends its own, so the prefix marks text that needs no tracing.
 CODE_CAVEATS = ("Not current as of ", "Against the balance of the evidence: ", "Not like for like: ",
-                "Average-price contract: ")
+                "Average-price contract: ", "Shorter history: ")
 
 _ISO = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 _DIGITS = re.compile(r"\d[\d,]*(?:\.\d+)?")

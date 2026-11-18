@@ -28,7 +28,7 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic_ai import capture_run_messages
-from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
+from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
@@ -233,7 +233,7 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         checked=not problems,
         check_problems=problems,
         trail=trail,
-        retries=sum(is_rejection(p) for p in parts),
+        retries=max(len(deps.rejections), sum(is_rejection(p) for p in parts)),  # the validator's own record
         follow_up=bool(turns),
         model=MODEL,
         seconds=seconds,
@@ -382,8 +382,14 @@ class Handler(BaseHTTPRequestHandler):
                 body = answer(question, session)
         except Refused as r:
             status, body = r.status, {"error": r.message}
+        except ModelAPIError as e:  # the provider refused or could not be reached (a spent budget, an outage)
+            status, body = 429, {"error": "The language model is not available just now. Please try again in a few minutes.",
+                                 "model_available": False}
+            detail = f"{type(e).__name__}: {e}"[:500]
         except Exception as e:  # the visitor gets a plain message; the detail goes to the log
-            status, body = 502, {"error": "The Librarian could not answer that just now."}
+            # Not a 5xx: the hosting proxy replaces every 5xx with a page of its own, so on 18 Nov 2026 the visitor
+            # never saw this sentence and a program received HTML.
+            status, body = 424, {"error": "The Librarian could not answer that just now."}
             detail = f"{type(e).__name__}: {e}"[:500]
         self._log(status, question, body, detail)
         if status == 200:  # the log keeps the detail; the public gets a fixed phrase, never raw exception text

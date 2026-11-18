@@ -494,9 +494,14 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
     }
     extra, context = spell(hist)
     values.update(extra)
+    # The window is the one the data has. A series that begins inside the window asked for is ranked against its
+    # own shorter history, and the answer must not say "of its last ten years": code says so in a caveat.
+    short = hist[0][0] > _since(366 * years) + dt.timedelta(days=45)
     return Reading(key=f"percentile:{series_id}:{years}", title=f"{hit.name}: latest against its last {years} years",
                    period=d, units=hit.units, series_ids=[series_id], values=values,
-                   note="percentile 0 = lowest of the window, 100 = highest", context=context)
+                   note="percentile 0 = lowest of the window, 100 = highest", context=context,
+                   counter=(f"Shorter history: {series_id} begins on {hist[0][0]}, so its percentile, low, high and average are "
+                            f"taken over the {(d - hist[0][0]).days} days since then, not over {years} years.") if short else "")
 
 
 def _arb_score(brent: float, wti: float, freight: float, m1: float, m12: float,
