@@ -52,7 +52,7 @@ cites it, and does not speculate.
 | `search_series` | series by keyword, optionally within one dataset; four calls a run |
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
 | `get_spread` | one series minus another on the latest shared date; refuses if units differ |
-| `get_curve` | Brent, WTI, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
+| `get_curve` | Brent, WTI, Oman, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
