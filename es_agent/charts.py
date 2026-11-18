@@ -53,6 +53,15 @@ def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
             hist = [(dd, round(v[0] / readings.GALLONS_PER_TONNE_GASOIL - v[1], 6))
                     for dd, v in readings.aligned(source, [readings.GASOIL, readings.NYH_DIESEL], days)]
             out.append(_line("ICE gasoil minus New York Harbor diesel", "Dollars per Gallon", hist, _bands(r.values, "difference_")))
+        elif kind == "fspread":
+            parts = readings.futures_spread_parts(source)
+            if parts:
+                out.append(_line(r.title, r.units, parts[1], _bands(r.values, "spread_")))
+        elif kind == "fcrack":
+            parts = readings.futures_crack_parts(source, rest)
+            if parts:
+                hist = [(dd, round(readings.crack_value(rest, *v), 6)) for dd, v in parts[1]]
+                out.append(_line(r.title, r.units, hist, _bands(r.values, "crack_")))
         elif kind == "crack":
             out.append(_line(f"{rest} crack spread", "Dollars per Barrel", readings.crack_history(source, rest), _bands(r.values, "crack_")))
         elif kind == "percentile":

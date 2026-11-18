@@ -54,7 +54,7 @@ SUITE = [
       ("get_change", {"series_id": US_CRUDE[0], "lookback_days": 365})], False),
     ("cushing_4w", "Cushing crude stocks: latest level and the four-week change.", [[CUSHING]],
      [("search_series", {"query": "Cushing ending stocks crude"}), ("get_change", {"series_id": CUSHING, "lookback_days": 28})], False),
-    ("brent_wti_spread", "What is the Brent-WTI spread right now?", [[BRENT], [WTI]],
+    ("brent_wti_spread", "What is the Brent-WTI spread right now?", [[BRENT, "ICE.BRENT.*"], [WTI, "NYMEX.WTI.*"]],
      [("search_series", {"query": "Brent spot price"}), ("search_series", {"query": "WTI spot price"}),
       ("get_spread", {"series_a": BRENT, "series_b": WTI})], False),
     ("brent_curve", "Is the Brent futures curve in backwardation or contango?", [["ICE.BRENT.M1.D"]],
@@ -92,6 +92,12 @@ SUITE = [
      [("get_arbitrage_scenario", {"brent_change": 5, "wti_change": 0, "freight_change_pct": -20})], False),
     ("week_watch", "What should I be paying attention to in oil this week?", [WATCH + ["ICE.BRENT.M1.D"]],
      [("get_watch", {"window": "week"})], False),
+    ("wti_curve", "Is the WTI futures curve in backwardation or contango?", [["NYMEX.WTI.M1.D"]],
+     [("get_curve", {"market": "wti"})], False),
+    ("futures_spread", "What is the Brent-WTI spread on futures, and is it unusual?", [["ICE.BRENT.*"], ["NYMEX.WTI.*"]],
+     [("get_futures_spread", {})], False),
+    ("futures_crack", "What is the 3-2-1 crack spread on futures?", [["NYMEX.RBOB.*"], ["NYMEX.WTI.*"]],
+     [("get_futures_crack", {"kind": "3-2-1"})], False),
     ("follow_up", FOLLOW_UP, [[BRENT]],
      [("search_series", {"query": "Brent spot price"}), ("get_latest", {"series_ids": [BRENT]})], False),
     ("abstain_carbon", "What did EU carbon allowances (EUA) settle at yesterday?", [],
@@ -133,7 +139,10 @@ class RightSeries(Evaluator[str, DeskAnswer]):
         if not want:
             ok = not got and bool(ctx.output.caveats)
             return EvaluationReason(ok, "abstained with a caveat" if ok else f"should abstain, answered with {sorted(got)}")
-        missing = [alts for alts in want if not got & set(alts)]
+        def hit(alt):  # an exact series id, or a prefix ending in * (dated contracts change every month)
+            return any(g.startswith(alt[:-1]) for g in got) if alt.endswith("*") else alt in got
+
+        missing = [alts for alts in want if not any(hit(a) for a in alts)]
         return EvaluationReason(not missing, f"missing one of {missing}" if missing else f"used {sorted(got)}")
 
 

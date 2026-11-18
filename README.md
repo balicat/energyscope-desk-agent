@@ -5,7 +5,7 @@ The page shows the answer, the series and values behind it, each tool call as it
 numbers passed a recomputation from the data.
 
 Built on [Pydantic AI](https://ai.pydantic.dev) over the [EnergyScope](https://energyscope.io) data lake
-(22 datasets: EIA, ICE, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
+(23 datasets: EIA, NYMEX and Brent futures, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
 customers. First version 10 Nov 2026 (offline only); first run on a live model and public launch 18 Nov 2026.
 
 Named after 'The Librarian' in Neal Stephenson's *Snow Crash* (1992), the novel that also gave us 'The
@@ -52,7 +52,9 @@ cites it, and does not speculate.
 | `search_series` | series by keyword, optionally within one dataset; four calls a run |
 | `get_latest`, `get_change` | latest value; latest against N days earlier |
 | `get_spread` | one series minus another on the latest shared date; refuses if units differ |
-| `get_curve` | Brent futures M1 to M12, front spread, backwardation or contango |
+| `get_curve` | Brent, WTI, RBOB or heating oil futures, M1 to M12: front spread, backwardation or contango, slope a week earlier |
+| `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history |
+| `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
 | `get_watch` | flags for the week or month: unusual moves, stretched fund positioning, a curve that changed shape, stocks outside their five-year range, related prices that parted ways |
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
@@ -63,11 +65,12 @@ cites it, and does not speculate.
 | `get_positioning` | managed-money net, long, short, change on the week, three-year percentile |
 
 What it cannot do: there are no route freight rates or physical differentials in the data (the arbitrage reading
-says so and uses a tanker ETF as a proxy), no WTI futures curve, and no news.
+says so and uses a tanker ETF as a proxy), and no news. The arbitrage reading still uses the spot
+Brent-WTI spread; on 18 Nov 2026 spot said $2.52 (17th percentile) while same-month futures said $8.42 (96th).
 
 ## Evaluation
 
-Twenty-three questions, five evaluators each (115 assertions): `Grounded` (recompute from source),
+Twenty-six questions, five evaluators each (130 assertions): `Grounded` (recompute from source),
 `SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, the week's surprises and watch list, "when was it last this high", seasonal and
@@ -76,14 +79,14 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **115/115**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **113/115** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
-| `anthropic:claude-haiku-5-5`, live lake | **115/115** | 2.6 tool calls and 6.1 s a question, $0.0027 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
+| scripted model, frozen data (`--source fixture`) | **130/130**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **128/130** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| `anthropic:claude-haiku-5-5`, live lake | **129/130** | every number right; one question went over its tool budget. 2.5 tool calls and 6.1 s a question, $0.0031 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
 cost. What the suite does not measure: the quality of the prose, whether a market interpretation is economically
-right, and anything outside twenty-three questions.
+right, and anything outside twenty-six questions.
 
 How the suite got here, including the failures:
 
@@ -98,6 +101,7 @@ How the suite got here, including the failures:
 | 18 Nov | release blocked at 75/76 | the gate stopped a one-line prompt change that failed one live assertion |
 | 18 Nov | 78, 79, 80 of 80 on Haiku | `get_surprises`, added after a visitor asked "what are this week's surprises" and the agent had to improvise. The unstable case was a bug, not noise: one run in six the model compared a Brent future with WTI spot and `get_spread` refused because one dataset writes "USD/bbl" and the other "Dollars per Barrel". Units are now compared on a normalised form |
 | 18 Nov | 115/115 on Haiku | history sentences, what-if scenarios, the weekly watch and charts; 23 cases, a fifth evaluator |
+| 18 Nov | 129/130 on Haiku | WTI, RBOB and heating oil futures curves ingested the same day; curve, futures-spread and futures-crack tools; 26 cases |
 
 ## Release gate
 
@@ -136,7 +140,7 @@ events with one `tool` event as each tool starts.
 ## Files
 
 ```
-es_agent/agent.py     the agent: instructions, fourteen tools, the output validator
+es_agent/agent.py     the agent: instructions, sixteen tools, the output validator
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
 es_agent/readings.py  curve, crack, arbitrage, scenarios, surprises, watch, seasonal, percentile, positioning; compute(source, key) rebuilds any of them

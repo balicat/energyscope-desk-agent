@@ -23,6 +23,9 @@ History = list[tuple[dt.date, float]]
 
 CURVES = {
     "brent": ("Brent futures curve (NYMEX BZ, settles on ICE Brent)", [f"ICE.BRENT.M{i}.D" for i in range(1, 13)]),
+    "wti": ("WTI futures curve (NYMEX CL)", [f"NYMEX.WTI.M{i}.D" for i in range(1, 13)]),
+    "rbob": ("RBOB gasoline futures curve (NYMEX RB)", [f"NYMEX.RBOB.M{i}.D" for i in range(1, 13)]),
+    "heating_oil": ("Heating oil (ULSD) futures curve (NYMEX HO)", [f"NYMEX.HO.M{i}.D" for i in range(1, 13)]),
 }
 CRUDE, GASOLINE, DISTILLATE = "PET.RWTC.D", "PET.EER_EPMRU_PF4_RGC_DPG.D", "PET.EER_EPD2F_PF4_Y35NY_DPG.D"
 CRACKS = ("3-2-1", "gasoline", "distillate")
@@ -176,6 +179,88 @@ def crack(source: DataSource, kind: str) -> Reading | None:
                    period=d, units="Dollars per Barrel", series_ids=[CRUDE, GASOLINE, DISTILLATE], values=values,
                    note="products minus crude, spot prices; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude",
                    context=context)
+
+
+def _add_months(ym: str, k: int) -> str:
+    y, m = int(ym[:4]), int(ym[5:7]) - 1 + k
+    return f"{y + m // 12}-{m % 12 + 1:02d}"
+
+
+def front_contract(source: DataSource, prefix: str) -> tuple[dt.date, str] | None:
+    """(latest date, delivery month) of the contract that is M1 today: the dated contract whose
+    settlement equals the M1 series on M1's latest date. Read from the data, so the exchange's
+    expiry calendar is not repeated here."""
+    m1 = source.history(f"{prefix}.M1.D", start=_since(30))
+    if not m1:
+        return None
+    d, v = m1[-1]
+    for k in range(0, 5):
+        ym = _add_months(d.isoformat()[:7], k)
+        px = dict(source.history(f"{prefix}.{ym}.D", start=d - dt.timedelta(days=5))).get(d)
+        if px is not None and abs(px - v) < 1e-6:
+            return d, ym
+    return None
+
+
+def futures_spread_parts(source: DataSource) -> tuple[str, History] | None:
+    """Brent minus WTI on futures of the same delivery month: (delivery month, history of the spread)."""
+    b, w = front_contract(source, "ICE.BRENT"), front_contract(source, "NYMEX.WTI")
+    if not b or not w:
+        return None
+    ym = max(b[1], w[1])  # the nearest month both still trade (Brent's front is the later one)
+    rows = aligned(source, [f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D"], 366 * HISTORY_YEARS)
+    return (ym, [(d, round(v[0] - v[1], 6)) for d, v in rows]) if len(rows) >= 20 else None
+
+
+def futures_spread(source: DataSource) -> Reading | None:
+    parts = futures_spread_parts(source)
+    if parts is None or parts[1][-1][0] < _since(10):
+        return None
+    ym, hist = parts
+    d, spread = hist[-1]
+    ids = [f"ICE.BRENT.{ym}.D", f"NYMEX.WTI.{ym}.D"]
+    brent, wti = (dict(source.history(i, start=d - dt.timedelta(days=5)))[d] for i in ids)
+    values = {"brent": brent, "wti": wti, "brent_minus_wti": spread,
+              "spread_percentile": _rank([v for _, v in hist], spread), "observations": len(hist)}
+    extra, context = spell(hist, "spread_", "The futures spread")
+    values.update(extra)
+    return Reading(key="fspread:brent_wti", title=f"Brent minus WTI on futures, {ym} delivery", period=d,
+                   units="USD/bbl", series_ids=ids, values=values, context=context,
+                   note=(f"Both legs are the {ym} delivery contract, the nearest month both still trade, so the spread "
+                         "compares like with like. The percentile ranks today against this contract pair's own "
+                         "history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent."))
+
+
+def futures_crack_parts(source: DataSource, kind: str) -> tuple[str, list] | None:
+    """A crack spread on futures of one delivery month: (delivery month, aligned rows of crude, gasoline, distillate)."""
+    fronts = [front_contract(source, p) for p in ("NYMEX.WTI", "NYMEX.RBOB", "NYMEX.HO")]
+    if kind not in CRACKS or not all(fronts):
+        return None
+    ym = max(f[1] for f in fronts)
+    rows = aligned(source, [f"NYMEX.WTI.{ym}.D", f"NYMEX.RBOB.{ym}.D", f"NYMEX.HO.{ym}.D"], 366 * HISTORY_YEARS)
+    return (ym, rows) if len(rows) >= 20 else None
+
+
+def futures_crack(source: DataSource, kind: str) -> Reading | None:
+    parts = futures_crack_parts(source, kind)
+    if parts is None or parts[1][-1][0] < _since(10):
+        return None
+    ym, rows = parts
+    d, (crude, gas, dist) = rows[-1]
+    hist = [(dd, round(crack_value(kind, *v), 6)) for dd, v in rows]
+    values = {
+        "crack": hist[-1][1], "crude": crude, "gasoline_per_gallon": gas, "distillate_per_gallon": dist,
+        "gallons_per_barrel": GALLONS_PER_BARREL,
+        "crack_percentile": _rank([v for _, v in hist], hist[-1][1]), "observations": len(hist),
+    }
+    extra, context = spell(hist, "crack_", "The futures crack")
+    values.update(extra)
+    return Reading(key=f"fcrack:{kind}", title=f"{kind} crack spread on futures, {ym} delivery: WTI, RBOB, heating oil",
+                   period=d, units="Dollars per Barrel",
+                   series_ids=[f"NYMEX.WTI.{ym}.D", f"NYMEX.RBOB.{ym}.D", f"NYMEX.HO.{ym}.D"], values=values,
+                   note=(f"All three legs are the {ym} delivery contract. Products minus crude; "
+                         "3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude. The percentile ranks today against "
+                         "this contract set's own history (up to three years)."), context=context)
 
 
 def _same_date(d: dt.date, years_back: int) -> dt.date:
@@ -599,6 +684,10 @@ def compute(source: DataSource, key: str) -> Reading | None:
             return curve(source, rest)
         if kind == "crack":
             return crack(source, rest)
+        if kind == "fcrack":
+            return futures_crack(source, rest)
+        if kind == "fspread":
+            return futures_spread(source) if rest == "brent_wti" else None
         if kind == "positioning":
             return positioning(source, rest)
         if kind == "arb":

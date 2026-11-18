@@ -1,4 +1,4 @@
-"""The agent: fourteen tools over EnergyScope data, a typed answer, and a
+"""The agent: sixteen tools over EnergyScope data, a typed answer, and a
 validator that sends the model back when a number cannot be traced to a
 tool result.
 
@@ -42,7 +42,8 @@ How to work
 - Prefer a computed reading when one fits the question:
   get_watch (what should I look at, what matters this week), get_surprises (what moved unusually, what
   changed), get_arbitrage (is a route open), get_arbitrage_scenario and get_crack_scenario (what if a price
-  moved), get_curve (backwardation or contango), get_crack_spread (refining margin),
+  moved), get_curve (backwardation or contango: Brent, WTI, RBOB, heating oil), get_futures_spread (the
+  Brent-WTI spread as traded: futures of one delivery month), get_futures_crack (refining margin on futures), get_crack_spread (refining margin),
   get_seasonal (a level against its usual level for the time of year), get_percentile (is a level high or low
   against recent years), get_positioning (what funds are doing).
   Each returns a reading with a key. List every key you used in cites; quote the reading's values in the summary.
@@ -136,7 +137,7 @@ def get_change(ctx: RunContext[Deps], series_id: str, lookback_days: int) -> Cha
 def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
     """series_a minus series_b on the latest date both have a value. Both must share units. Compare like with
     like: a spot price with a spot price, a future with a future. For the Brent-WTI spread use the two spot
-    prices (there is no WTI future in the data)."""
+    series. For Brent against WTI on futures, call get_futures_spread, which matches the delivery month."""
     ctx.deps.emit("get_spread", {"series_a": series_a, "series_b": series_b})
     hits = []
     for sid in (series_a, series_b):
@@ -163,11 +164,30 @@ def _keep(ctx: RunContext[Deps], reading: Reading | None, why: str) -> Reading:
 
 
 @agent.tool
-def get_curve(ctx: RunContext[Deps], market: Literal["brent"]) -> Reading:
+def get_curve(ctx: RunContext[Deps], market: Literal["brent", "wti", "rbob", "heating_oil"]) -> Reading:
     """Futures curve on the latest date: each contract month (M1 = front), M1 minus M2, M1 minus the last month,
-    and whether the curve is in backwardation or contango. Brent only (12 months); there is no WTI curve in the data."""
+    and whether the curve is in backwardation or contango, with the slope a week earlier. Twelve months each for
+    Brent, WTI, RBOB gasoline and heating oil."""
     ctx.deps.emit("get_curve", {"market": market})
     return _keep(ctx, readings.curve(ctx.deps.source, market), f"No complete {market} curve in the last 60 days.")
+
+
+@agent.tool
+def get_futures_spread(ctx: RunContext[Deps]) -> Reading:
+    """Brent minus WTI on futures of the same delivery month (the nearest month both still trade), with its
+    percentile against that contract pair's history and whether it is unusual. This is the spread a trader
+    means by 'the Brent-WTI spread'; use get_spread on the two spot series only when spot is asked for."""
+    ctx.deps.emit("get_futures_spread", {})
+    return _keep(ctx, readings.futures_spread(ctx.deps.source), "No recent futures for both Brent and WTI.")
+
+
+@agent.tool
+def get_futures_crack(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", "distillate"]) -> Reading:
+    """A crack spread on NYMEX futures of one delivery month (WTI, RBOB, heating oil), in dollars per barrel,
+    with its percentile and whether it is unusual. Use when futures or forward margins are asked for;
+    get_crack_spread is the same from spot prices."""
+    ctx.deps.emit("get_futures_crack", {"kind": kind})
+    return _keep(ctx, readings.futures_crack(ctx.deps.source, kind), "No recent futures for the three legs.")
 
 
 @agent.tool

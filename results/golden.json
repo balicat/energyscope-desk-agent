@@ -333,6 +333,79 @@
   "spreads": [],
   "summary": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years on 2026-11-17: latest 647.86, percentile 94.40, low 9.06, high 1012.75, average 101.75, z_score 2.63, observations 753.00, years 3.00, p10 10.81, p90 257.35, spell_days 110.00, previous_spell_days 0.00, previous_spell_extreme 257.35, days_since_previous_spell 126.00."
  },
+ "futures_crack": {
+  "caveats": [],
+  "cites": [
+   "fcrack:3-2-1"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "The futures crack is inside its usual range, between the 10th and 90th percentile lines (16.64 and 44.98) of the window.",
+    "hypothetical": false,
+    "key": "fcrack:3-2-1",
+    "note": "All three legs are the 2026-12 delivery contract. Products minus crude; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude. The percentile ranks today against this contract set's own history (up to three years).",
+    "period": "2026-11-18",
+    "series_ids": [
+     "NYMEX.WTI.2026-12.D",
+     "NYMEX.RBOB.2026-12.D",
+     "NYMEX.HO.2026-12.D"
+    ],
+    "title": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil",
+    "units": "Dollars per Barrel",
+    "values": {
+     "crack": 41.4818,
+     "crack_p10": 16.6446,
+     "crack_p90": 44.976,
+     "crack_percentile": 88.1,
+     "crude": 85.13,
+     "distillate_per_gallon": 4.0369,
+     "gallons_per_barrel": 42.0,
+     "gasoline_per_gallon": 2.5034,
+     "observations": 755.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-18: crack 41.48, crude 85.13, gasoline_per_gallon 2.50, distillate_per_gallon 4.04, gallons_per_barrel 42.00, crack_percentile 88.10, observations 755.00, crack_p10 16.64, crack_p90 44.98."
+ },
+ "futures_spread": {
+  "caveats": [],
+  "cites": [
+   "fspread:brent_wti"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "The futures spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back. The previous spell was on 2026-07-23 alone, reaching 6.69.",
+    "hypothetical": false,
+    "key": "fspread:brent_wti",
+    "note": "Both legs are the 2027-01 delivery contract, the nearest month both still trade, so the spread compares like with like. The percentile ranks today against this contract pair's own history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent.",
+    "period": "2026-11-17",
+    "series_ids": [
+     "ICE.BRENT.2027-01.D",
+     "NYMEX.WTI.2027-01.D"
+    ],
+    "title": "Brent minus WTI on futures, 2027-01 delivery",
+    "units": "USD/bbl",
+    "values": {
+     "brent": 93.07,
+     "brent_minus_wti": 8.42,
+     "observations": 754.0,
+     "spread_days_since_previous_spell": 117.0,
+     "spread_p10": 3.61,
+     "spread_p90": 6.69,
+     "spread_percentile": 96.4,
+     "spread_previous_spell_days": 0.0,
+     "spread_previous_spell_extreme": 6.69,
+     "spread_spell_days": 70.0,
+     "wti": 84.65
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-17: brent 93.07, wti 84.65, brent_minus_wti 8.42, spread_percentile 96.40, observations 754.00, spread_p10 3.61, spread_p90 6.69, spread_spell_days 70.00, spread_previous_spell_days 0.00, spread_previous_spell_extreme 6.69, spread_days_since_previous_spell 117.00."
+ },
  "henry_hub_percentile": {
   "caveats": [],
   "cites": [
@@ -641,6 +714,57 @@
   "readings": [],
   "spreads": [],
   "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11, down 5.37 (5.65%) from 94.99 on 2026-10-12, 30 days earlier."
+ },
+ "wti_curve": {
+  "caveats": [],
+  "cites": [
+   "curve:wti"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "M1 minus M12 was 11.54 on 2026-11-11 and is 13.08 now: the curve has steepened over the week.",
+    "hypothetical": false,
+    "key": "curve:wti",
+    "note": "backwardation (front above back)",
+    "period": "2026-11-18",
+    "series_ids": [
+     "NYMEX.WTI.M1.D",
+     "NYMEX.WTI.M2.D",
+     "NYMEX.WTI.M3.D",
+     "NYMEX.WTI.M4.D",
+     "NYMEX.WTI.M5.D",
+     "NYMEX.WTI.M6.D",
+     "NYMEX.WTI.M7.D",
+     "NYMEX.WTI.M8.D",
+     "NYMEX.WTI.M9.D",
+     "NYMEX.WTI.M10.D",
+     "NYMEX.WTI.M11.D",
+     "NYMEX.WTI.M12.D"
+    ],
+    "title": "WTI futures curve (NYMEX CL)",
+    "units": "USD/bbl",
+    "values": {
+     "M1": 85.13,
+     "M10": 73.86,
+     "M11": 73.33,
+     "M12": 72.05,
+     "M1_minus_M12": 13.08,
+     "M1_minus_M12_a_week_earlier": 11.54,
+     "M1_minus_M2": 1.27,
+     "M2": 83.86,
+     "M3": 82.49,
+     "M4": 81.03,
+     "M5": 79.55,
+     "M6": 78.2,
+     "M7": 76.95,
+     "M8": 75.89,
+     "M9": 74.73
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.13, M2 83.86, M3 82.49, M4 81.03, M5 79.55, M6 78.20, M7 76.95, M8 75.89, M9 74.73, M10 73.86, M11 73.33, M12 72.05, M1_minus_M2 1.27, M1_minus_M12 13.08, M1_minus_M12_a_week_earlier 11.54."
  },
  "wti_positioning": {
   "caveats": [],
