@@ -1,152 +1,143 @@
-# EnergyScope desk agent: a Pydantic AI spike
+# The Librarian: a desk agent that shows where every number came from
 
-**Live as The Librarian: [thelibrarian.energy](https://thelibrarian.energy).** Ask an oil or gas market question;
-the page shows the answer, the series and values behind it, the tool calls, and whether the numbers passed a
-recomputation from the data.
+**Live: [thelibrarian.energy](https://thelibrarian.energy).** Ask an oil or gas market question in plain English.
+The page shows the answer, the series and values behind it, each tool call as it happens, and whether the
+numbers passed a recomputation from the data.
 
-Built 10 Nov 2026, first run on a live model 18 Nov 2026, against the live [EnergyScope](https://energyscope.io) Parquet lake on my own server
-(Pydantic AI 2.66, pydantic-evals 2.66, Python 3.14).
+Built on [Pydantic AI](https://ai.pydantic.dev) over the [EnergyScope](https://energyscope.io) data lake
+(22 datasets: EIA, ICE, CFTC, GIE, IMF PortWatch, Baker Hughes, NOAA and others). It is a personal lab with no
+customers. First version 10 Nov 2026 (offline only); first run on a live model and public launch 18 Nov 2026.
 
-A desk analyst asks a question in plain English ("How do US commercial crude
-stocks compare with a year ago?"). The agent finds the series, pulls the
-numbers through tools, and returns a typed answer. Every number in the answer
-has to trace back to a tool result, or the answer is sent back.
+## The rules it is built on
 
-## What it shows
+- **The model chooses tools and writes sentences; code does the sums.** Changes, spreads, percentiles, crack
+  spreads and the arbitrage score are computed in `metrics.py` and `readings.py`, never by the model.
+- **Every number must trace to a tool result.** An output validator rejects an answer whose facts differ from
+  what the tools returned, or whose prose holds a number that appears in no fact, and sends the model back.
+- **The model cites, code copies.** Curves, cracks, arbitrage, seasonal comparisons, percentiles and positioning
+  come back as a keyed reading (`curve:brent`, `arb:us_crude_to_europe`). The model lists the keys it used; the
+  validator copies the readings into the answer. A twelve-month curve cannot be mistyped, and the key alone is
+  enough to recompute it.
+- **The check does not trust the run.** `verify()` rebuilds every fact, spread and reading from the data source,
+  independently of the agent's ledger. The eval suite uses it, and the public service runs it on every answer
+  before showing the tick.
+- **Budgets live in the tools, not the prompt.** `search_series` stops after four calls in a run and says so.
+  An instruction to "stop after two failed searches" did not hold: one model searched 18 times on a question
+  it should decline ($0.21 for one answer). The service also caps model requests per question, questions per
+  address per hour, questions per day and dollars per day.
+- **Memory holds conclusions, not tool output.** A follow-up question is given the earlier questions and the
+  sentences that answered them. Any number it quotes must be fetched again in the current run, so a stale
+  number cannot come through with a clean trace.
+- **Abstain, don't guess.** Asked for something the data does not hold (EU carbon allowances), or something
+  that is not an energy question, the right answer is no facts plus a stated reason, and that is scored.
+- **The model is a run-time string.** Changing it is one flag; the suite says what the change cost or bought.
 
-| Pydantic AI feature | Where |
+## Tools
+
+| Tool | Returns |
 |---|---|
-| Tools as typed Python functions (`@agent.tool`) | `es_agent/agent.py`: `search_series`, `get_latest`, `get_change`, `get_spread`, `get_curve`, `get_crack_spread`, `get_seasonal`, `get_positioning` |
-| Structured output (`output_type`) | `DeskAnswer` / `SeriesFact` in `es_agent/models.py` |
-| Dependency injection (`deps_type`, `RunContext`) | `Deps` carries the data source and a ledger of every number a tool returned |
-| Output validator + `ModelRetry` | `grounded()` rejects any fact that differs from the ledger and any summary number that traces to no fact |
-| Provider-agnostic models | the model is a run-time string: `anthropic:...`, `openai:...`, or the offline scripted model |
-| `FunctionModel` (offline testing) | `es_agent/scripted.py`: follows a fixed tool plan, writes the answer from real tool results |
-| pydantic-evals: `Dataset`, `Case`, custom `Evaluator`s, built-in `MaxToolCalls` | `run_evals.py` |
+| `search_series` | series by keyword, optionally within one dataset; four calls a run |
+| `get_latest`, `get_change` | latest value; latest against N days earlier |
+| `get_spread` | one series minus another on the latest shared date; refuses if units differ |
+| `get_curve` | Brent futures M1 to M12, front spread, backwardation or contango |
+| `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
+| `get_arbitrage` | the price side of a transatlantic route: spread and its three-year percentile, a freight proxy, curve slope, a score |
+| `get_seasonal` | latest against the same time of year in the previous N years |
+| `get_percentile` | where the latest value ranks in its own last N years |
+| `get_positioning` | managed-money net, long, short, change on the week, three-year percentile |
 
-Design rules:
+What it cannot do: there are no route freight rates or physical differentials in the data (the arbitrage reading
+says so and uses a tanker ETF as a proxy), no WTI futures curve, and no news.
 
-- **The model picks series and writes sentences; code does the sums.** Changes
-  and percentages are computed in `metrics.py`, never by the model.
-- **One grounding rule, used twice.** `untraceable_numbers()` drives the
-  validator (forces a retry during the run) and the `SummaryTraceable` eval
-  (measures the final answer).
-- **The eval does not trust the run.** `Grounded` recomputes every fact from
-  the data source independently of the agent's ledger.
-- **The model cites, code copies.** Curves, crack spreads, seasonal comparisons and positioning come back as a
-  keyed reading (`curve:brent`, `crack:3-2-1`). The model lists the keys it used; the validator copies the
-  readings into the answer, so a twelve-month curve cannot be mistyped, and the key is enough to recompute it.
-- **Budgets live in the tools.** `search_series` stops after four calls in a run and says so. An instruction to
-  "stop after two failed searches" did not hold: one model searched 18 times on a question it should decline
-  ($0.21 for one answer). The budget in code brought that to six calls.
-- **The same check runs on live traffic.** `verify()` is the `Grounded` evaluator's logic; `serve.py` runs it on
-  every answer after it is written, logs the result and returns it to the page.
-- **Abstain, don't guess.** Asked for something the lake does not hold (EU
-  carbon allowances), the right answer is no facts plus a caveat, and that is
-  scored.
-- **Storage is swappable.** `ParquetLakeSource` reads the lake on disk;
-  `FlightSource` makes the same calls over Arrow Flight with the public
-  `energyscope-client` package.
+## Evaluation
 
-## Results (offline, scripted model, real data)
+Nineteen questions, four evaluators each (76 assertions): `Grounded` (recompute from source),
+`SummaryTraceable` (no stray number in the prose), `RightSeries` (an acceptable series for each thing asked, or
+a correct refusal), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
+arbitrage, seasonal and percentile comparisons, positioning, European gas storage, rig counts, tanker transits,
+a follow-up, a cross-unit "spread" that must not be computed, a prompt injection and two out-of-scope questions.
 
-Ten cases, four evaluators each: `Grounded`, `SummaryTraceable`,
-`RightSeries`, `MaxToolCalls(6)`.
-
-| Run | Assertions | Notes |
+| Run | Assertions | What it shows |
 |---|---|---|
-| guard on (`python run_evals.py`) | **40/40** | `wti_30d` is deliberately sloppy: its first answer misquotes WTI by 5%. The validator rejects it (on 10 Nov: "latest is 2026-11-03 = 99.64, you wrote 104.62"), the retry fixes it: `retries: 1` |
-| guard off (`--no-guard`) | **38/40** | the same bad number gets through the run, and `Grounded` + `SummaryTraceable` both fail it |
+| scripted model, frozen data (`--source fixture`) | **76/76**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **74/76** | the control: one case misquotes a price by 5% on purpose. With the validator on, the run rejects it and retries; with it off, `Grounded` and `SummaryTraceable` both fail it. A green run means something |
+| `anthropic:claude-haiku-5-5`, live lake | **76/76** | 2.8 tool calls and 6.9 s a question, $0.0022 each |
+| `anthropic:claude-sonnet-5-5`, live lake | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
-The control run is the point: it shows the evals catch the error on their own,
-so a green run means something. Full reports: `results/`.
+The public service runs on the smaller model: on this suite it scores higher at about a twenty-fifth of the
+cost. What the suite does not measure: the quality of the prose, and anything outside nineteen questions.
 
-## Results (live models, 18 Nov 2026)
+How the suite got here, including the failures:
 
-| Run | Assertions | Notes |
+| Date | Result | What changed |
 |---|---|---|
-| first live run, five cases | **19/20** | every number matched the source and the carbon question was declined; `us_crude_yoy` used 8 tool calls against a budget of 6, because "commercial" is not in the publisher's series names and the all-words search returned nothing five times |
-| after the search fix, five cases | **20/20** | search now falls back to names holding most of the query words; 2.6 tool calls and 5.5 s a question on average |
-| with `get_spread`, six cases | **24/24** | 3.2 tool calls and 8.0 s a question on average, about $0.025 each. Report: `results/live-claude-sonnet-5-5.txt` |
-| eight tools, ten cases, first run | **39/40** on both models | the carbon question took 7 to 8 tool calls against a budget of 6 before the model declined |
-| eight tools, ten cases, with the search budget | **40/40** on both models | see the comparison below |
+| 10 Nov | 20/20 offline (5 cases) | first version, scripted model only |
+| 18 Nov | 19/20 live | first live run: 8 tool calls on "commercial crude stocks", a word the publisher does not use |
+| 18 Nov | 20/20, then 24/24 | search falls back to names holding most of the words; `get_spread` added |
+| 18 Nov | 39/40 on both models | four reading tools added; both models over-searched before declining the carbon question |
+| 18 Nov | 40/40 on both | search budget enforced in the tool |
+| 18 Nov | 76/76 Haiku, 74/76 Sonnet | 22 datasets, arbitrage and percentile tools, 19 cases |
 
-### Two models, one suite
+## Release gate
 
-The model is a run-time string, so changing it is one flag; the suite says what the change cost or bought.
-
-| Model | Assertions | Tool calls / question | Seconds / question | Cost / question |
-|---|---|---|---|---|
-| `anthropic:claude-sonnet-5-5` | 40/40 | 2.8 | 7.1 | $0.034 |
-| `anthropic:claude-haiku-5-5` | 40/40 | 2.5 | 5.5 | $0.0017 |
-
-On these ten cases the smaller model scores the same at about a twentieth of the cost, so the public service
-runs on it. What this does not show: ten cases is a small suite, and it scores numbers, series choice,
-abstention and tool budget, not the quality of the prose. Reports: `results/live-*.txt`.
-
-
-Five questions outside the suite, asked through `serve.py`: Henry Hub over a month and US gasoline stocks
-against last year were answered with the series and dates; an election question and a request for the system
-prompt and API key were declined with no tool calls; asked for the Brent-WTI spread, it quoted both prices
-and said it does not compute numbers itself. That gap became the fourth tool, `get_spread` (one series minus
-another on the latest date both have, computed in code), and the sixth eval case. Five questions is a smoke
-test, not a measurement. Seven more, asked of the smaller model after the new tools went in (arbitrage, gasoline
-margins, gas positioning, seasonal stocks, curve shape, a prompt-injection attempt, a two-part question), all
-passed the live recomputation.
-
-What the offline run does and does not prove: it exercises the real tools,
-data, typed output, validator, retry path and evaluators. It does not measure
-model judgement (series choice, when to abstain), because the scripted model
-follows a fixed plan. That is what the live run above is for.
+`deploy.sh` is how a change to the code, the prompt or the model reaches the public service. The candidate must
+pass the frozen-data suite with golden answers, the control run, the suite on today's lake with the scripted
+model, and the suite on today's lake with the live model. Only then does the service restart. Trying another
+model is the same command with `LIBRARIAN_MODEL=...`.
 
 ## Run it
-
-The Parquet lake (`--lake /opt/energyscope/data`) lives on my server and is not in this repo. Without it,
-use `--source flight` with an EnergyScope API key (sign up at [energyscope.io](https://energyscope.io/signup)):
-the agent, tools and evals are identical, only the `DataSource` changes.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-.venv/bin/python run_evals.py                 # offline: scripted model, Parquet lake
-.venv/bin/python run_evals.py --no-guard      # control run
+# No lake, no key, no cost: frozen data and a scripted stand-in for the model
+.venv/bin/python run_evals.py --source fixture --gate --golden check
+.venv/bin/python run_evals.py --source fixture --no-guard --expect-failures 2
+LIBRARIAN_SOURCE=fixture .venv/bin/python serve.py          # the service, offline, on :8790
 
-export ANTHROPIC_API_KEY=...                  # live: any Pydantic AI model string
-.venv/bin/python run_evals.py --model anthropic:claude-sonnet-5-5
-.venv/bin/python ask.py "Cushing stocks: latest and four-week change?" --model anthropic:claude-sonnet-5-5
-
-export ENERGYSCOPE_API_KEY=...                # over Arrow Flight instead of the local lake
-.venv/bin/python run_evals.py --model anthropic:claude-sonnet-5-5 --source flight
+# Live model (any Pydantic AI model string)
+export ANTHROPIC_API_KEY=...
+.venv/bin/python run_evals.py --model anthropic:claude-haiku-5-5 --gate
+.venv/bin/python ask.py "Is the Brent curve in backwardation?" --model anthropic:claude-haiku-5-5
 ```
+
+The Parquet lake (`--lake /opt/energyscope/data`) lives on my server and is not in this repo. `--source flight`
+makes the same calls over Arrow Flight with the public `energyscope-client` package and an EnergyScope API key
+([sign up](https://energyscope.io/signup)).
+
+The service is also the interface for other programs: `POST https://thelibrarian.energy/api/ask` with
+`{"question": "..."}` returns the typed answer as JSON; `/api/ask/stream` returns the same as server-sent
+events with one `tool` event as each tool starts.
 
 ## Files
 
 ```
+es_agent/agent.py     the agent: instructions, ten tools, the output validator
 es_agent/models.py    typed shapes: tool returns and the answer
-es_agent/sources.py   DataSource protocol, ParquetLakeSource, FlightSource
-es_agent/metrics.py   change calculations + the grounding rule
-es_agent/readings.py  curve, crack spread, seasonal comparison, positioning; `compute(source, key)` rebuilds any of them
+es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
+es_agent/readings.py  curve, crack, arbitrage, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
 es_agent/verify.py    recompute an answer from the data (the Grounded eval and the live check)
-es_agent/agent.py     the agent, eight tools, the output validator
-es_agent/scripted.py  offline FunctionModel
-run_evals.py          the eval suite
-ask.py                one question, prints the tool trail and the typed answer
-serve.py              HTTP front (POST /ask): per-address, per-day and per-question limits, and the live check
-results/              eval reports
+es_agent/memory.py    what a follow-up is allowed to remember
+es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder
+es_agent/scripted.py  offline stand-in for the model (Pydantic AI FunctionModel)
+es_agent/clock.py     today's date, pinnable for the frozen data
+run_evals.py          the suite, the gates, golden answers, fixture recording
+serve.py              HTTP service: JSON and streaming answers, limits, live check, stats
+deploy.sh             the release gate
+fixtures/series.json  frozen copy of the series the suite reads (18 Nov 2026)
+results/              eval reports and golden answers
 ```
 
+## Pydantic AI features used
+
+Typed tools (`@agent.tool`), structured output (`output_type`), dependency injection (`deps_type`,
+`RunContext`), output validator with `ModelRetry`, `UsageLimits`, provider-agnostic model strings,
+`FunctionModel` for offline runs, and pydantic-evals (`Dataset`, `Case`, custom `Evaluator`s, `MaxToolCalls`).
+
+Notes from the build: in Pydantic AI 2.66+ a rejected output comes back as a `ToolReturnPart` on the output tool
+with `outcome="retried"` (earlier releases used `RetryPromptPart`; `is_rejection()` handles both). The span-based
+evaluators need tracing on: `logfire.configure(send_to_logfire=False)` plus `logfire.instrument_pydantic_ai()`
+gives them a span tree with nothing leaving the machine. Year-ago changes on weekly series compare against the
+last observation on or before the date 365 days earlier, since weekly dates drift by a day a year.
+
 MIT licence.
-
-## Notes from the build
-
-- In Pydantic AI 2.66 a rejected output comes back as a `ToolReturnPart` on the
-  output tool with `outcome="retried"`; earlier releases used `RetryPromptPart`.
-  `is_rejection()` in `scripted.py` handles both.
-- `Dataset(...)` now requires `name=`; `result.usage` is a property.
-- The span-based evaluators (`MaxToolCalls`, `ToolCorrectness`,
-  `TrajectoryMatch`) need tracing on. `logfire.configure(send_to_logfire=False)`
-  plus `logfire.instrument_pydantic_ai()` gives them a span tree with nothing
-  leaving the machine.
-- Year-ago changes on weekly series compare against the last observation on or
-  before the date 365 days earlier (2026-10-30 vs 2025-10-24), since weekly
-  dates drift by a day a year.

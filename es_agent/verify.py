@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from . import metrics, readings
+from . import clock, metrics, readings
 from .models import DeskAnswer
 from .sources import DataSource
 
@@ -23,7 +23,7 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
             problems.append(f"{f.series_id} does not exist")
             continue
         lb = f.lookback_days or 0
-        hist = source.history(f.series_id, start=dt.date.today() - dt.timedelta(days=lb + 400))
+        hist = source.history(f.series_id, start=clock.today() - dt.timedelta(days=lb + 400))
         truth = metrics.change_over(hit, hist, lb) if lb else metrics.latest_obs(hit, hist)
         if truth is None:
             problems.append(f"{f.series_id}: source has no value to compare")
@@ -34,7 +34,7 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
             problems.append(f"{f.series_id}: source says {tp}={tv}, answer says {f.latest_period}={f.latest_value}")
         elif lb and not (metrics.close(f.change_pct, truth.change_pct) and metrics.close(f.base_value, truth.base_value)):
             problems.append(f"{f.series_id}: change differs from source")
-    start = dt.date.today() - dt.timedelta(days=400)
+    start = clock.today() - dt.timedelta(days=400)
     for s in answer.spreads:
         a, b = source.meta(s.series_a), source.meta(s.series_b)
         truth = a and b and metrics.spread_of(a, source.history(s.series_a, start=start), b, source.history(s.series_b, start=start))

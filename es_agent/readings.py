@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+from . import clock
 from .models import Reading
 from .sources import DataSource
 
@@ -30,7 +31,7 @@ PERCENTILE_WEEKS = 156
 
 
 def _since(days: int) -> dt.date:
-    return dt.date.today() - dt.timedelta(days=days)
+    return clock.today() - dt.timedelta(days=days)
 
 
 def _on_common_date(source: DataSource, ids: list[str], days: int = 60) -> tuple[dt.date, list[float]] | None:
@@ -153,6 +154,109 @@ def positioning(source: DataSource, market: str) -> Reading | None:
                    note="net_percentile ranks the latest net position against the last percentile_weeks weekly reports")
 
 
+def _rank(sample: list[float], v: float) -> float:
+    """Share of the sample at or below v, in percent."""
+    return round(sum(x <= v for x in sample) / len(sample) * 100, 1)
+
+
+def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | None:
+    """Where the latest value sits in its own last `years` years."""
+    hit = source.meta(series_id)
+    if hit is None or not 1 <= years <= 10:
+        return None
+    hist = source.history(series_id, start=_since(366 * years))
+    if len(hist) < 20:
+        return None
+    d, v = hist[-1]
+    sample = [x for _, x in hist]
+    mean = sum(sample) / len(sample)
+    sd = (sum((x - mean) ** 2 for x in sample) / len(sample)) ** 0.5
+    values = {
+        "latest": v,
+        "percentile": _rank(sample, v),
+        "low": min(sample),
+        "high": max(sample),
+        "average": round(mean, 6),
+        "z_score": round((v - mean) / sd, 2) if sd else 0.0,
+        "observations": len(sample),
+        "years": years,
+    }
+    return Reading(key=f"percentile:{series_id}:{years}", title=f"{hit.name}: latest against its last {years} years",
+                   period=d, units=hit.units, series_ids=[series_id], values=values,
+                   note="percentile 0 = lowest of the window, 100 = highest")
+
+
+ARB_YEARS = 3
+BRENT_SPOT, FREIGHT = "PET.RBRTE.D", "SHIP.BWET.D"
+GASOIL, NYH_DIESEL = "ICE.GASOIL.M1.D", "PET.EER_EPD2DXL0_PF4_Y35NY_DPG.D"
+GALLONS_PER_TONNE_GASOIL = 312.9  # 7.45 barrels a tonne x 42
+ROUTES = ("us_crude_to_europe", "distillate_us_to_europe")
+
+
+def _paired(source: DataSource, a: str, b: str) -> list[tuple[dt.date, float, float]]:
+    start = _since(366 * ARB_YEARS)
+    hb = dict(source.history(b, start=start))
+    return [(d, va, hb[d]) for d, va in source.history(a, start=start) if d in hb]
+
+
+def arbitrage(source: DataSource, route: str) -> Reading | None:
+    """Whether the prices favour moving a barrel from the US to Europe. No route freight rates or physical
+    differentials are in the data, so this is the price side of the arbitrage, not the full economics."""
+    if route == "us_crude_to_europe":
+        pairs = _paired(source, BRENT_SPOT, CRUDE)
+        freight = source.history(FREIGHT, start=_since(366 * ARB_YEARS))
+        m1 = dict(source.history("ICE.BRENT.M1.D", start=_since(60)))
+        m12 = dict(source.history("ICE.BRENT.M12.D", start=_since(60)))
+        dates = {d for d, _, _ in pairs} & {d for d, _ in freight} & set(m1) & set(m12)
+        if not dates or len(pairs) < 60 or len(freight) < 60:
+            return None
+        d = max(dates)
+        spreads = [a - b for dd, a, b in pairs if dd <= d]
+        brent, wti = next((a, b) for dd, a, b in pairs if dd == d)
+        fr_sample = [v for dd, v in freight if dd <= d]
+        fr = dict(freight)[d]
+        spread_pct, freight_pct = _rank(spreads, brent - wti), _rank(fr_sample, fr)
+        slope = m12[d] - m1[d]
+        parts = [(spread_pct - 50) / 50, (50 - freight_pct) / 50, max(-1.0, min(1.0, slope / m1[d] / 0.1))]
+        score = round(sum(parts) / len(parts) * 2, 2)
+        verdict = ("strongly favours" if score >= 1 else "tilts towards" if score >= 0.3 else
+                   "strongly against" if score <= -1 else "tilts against" if score <= -0.3 else "neutral for")
+        values = {
+            "brent": brent, "wti": wti, "brent_minus_wti": round(brent - wti, 6), "spread_percentile": spread_pct,
+            "freight_proxy": fr, "freight_percentile": freight_pct,
+            "curve_M1": m1[d], "curve_M12": m12[d], "curve_M12_minus_M1": round(slope, 6),
+            "score": score, "percentile_years": ARB_YEARS,
+        }
+        return Reading(
+            key=f"arb:{route}", title="US crude to Europe: Brent-WTI spread, tanker freight proxy, Brent curve",
+            period=d, units="Dollars per Barrel (prices); index points (freight proxy); percent (percentiles)",
+            series_ids=[BRENT_SPOT, CRUDE, FREIGHT, "ICE.BRENT.M1.D", "ICE.BRENT.M12.D"], values=values,
+            note=(f"score {verdict} US crude exports: +2 = wide spread, cheap freight, contango; -2 = narrow spread, dear "
+                  "freight, backwardation. Freight is the Breakwave tanker ETF, a proxy, not a route rate; no physical "
+                  "differentials or port costs are included."))
+    if route == "distillate_us_to_europe":
+        pairs = _paired(source, GASOIL, NYH_DIESEL)
+        if len(pairs) < 60 or pairs[-1][0] < _since(60):
+            return None
+        d, gasoil_t, nyh = pairs[-1]
+        diffs = [a / GALLONS_PER_TONNE_GASOIL - b for _, a, b in pairs]
+        gasoil_gal = gasoil_t / GALLONS_PER_TONNE_GASOIL
+        values = {
+            "ice_gasoil_per_tonne": gasoil_t, "ice_gasoil_per_gallon": round(gasoil_gal, 6),
+            "new_york_diesel_per_gallon": nyh, "europe_minus_us_per_gallon": round(gasoil_gal - nyh, 6),
+            "difference_percentile": _rank(diffs, diffs[-1]), "gallons_per_tonne": GALLONS_PER_TONNE_GASOIL,
+            "percentile_years": ARB_YEARS,
+        }
+        return Reading(
+            key=f"arb:{route}", title="Distillate, US to Europe: ICE gasoil against New York Harbor diesel",
+            period=d, units="Dollars per Gallon (difference); Dollars per Tonne (gasoil)",
+            series_ids=[GASOIL, NYH_DIESEL], values=values,
+            note=("europe_minus_us is the price gap a cargo would earn before freight; a high percentile means Europe is "
+                  "paying up relative to the last three years. ICE gasoil is a futures price, New York diesel a spot "
+                  "price; no freight is included."))
+    return None
+
+
 def compute(source: DataSource, key: str) -> Reading | None:
     """Rebuild a reading from its key."""
     kind, _, rest = key.partition(":")
@@ -162,6 +266,11 @@ def compute(source: DataSource, key: str) -> Reading | None:
         return crack(source, rest)
     if kind == "positioning":
         return positioning(source, rest)
+    if kind == "arb":
+        return arbitrage(source, rest)
+    if kind == "percentile":
+        series_id, _, years = rest.rpartition(":")
+        return percentile(source, series_id, int(years)) if years.isdigit() else None
     if kind == "seasonal":
         series_id, _, years = rest.rpartition(":")
         return seasonal(source, series_id, int(years)) if years.isdigit() else None

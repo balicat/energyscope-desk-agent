@@ -1,0 +1,22 @@
+name: evals
+
+# The offline gate: frozen data, a scripted stand-in for the model, no lake and no API key.
+# It proves the tools, the arithmetic, the validator and the evaluators still agree with the
+# recorded answers, and that the suite still catches a wrong number when the validator is off.
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+      - name: Suite on frozen data, answers must match the golden file
+        run: python run_evals.py --source fixture --gate --golden check
+      - name: Control run, validator off, exactly two assertions must fail
+        run: python run_evals.py --source fixture --no-guard --expect-failures 2
