@@ -259,9 +259,9 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
                     m = _FETCH.match(other.formula)
                     if m and m[1] not in order:
                         order.append(m[1])
-                wcol = _col(19 + order.index(_sheet.window.series_id))
-                wlast = _FIRST + (_dt.date.fromisoformat(shared) - _sheet.window.start).days
-                rng = f"${wcol}${_FIRST}:${wcol}${wlast}"
+                # (the column of what R4 FILLS, R4# in Excel's notation, not a fixed range: the table grows when
+                # the reader moves C2 back or C1 forward, and a fixed range then left the newest rows out)
+                rng = f"INDEX(_xlfn.ANCHORARRAY($R${_FIRST}),0,{order.index(_sheet.window.series_id) + 2})"
                 for name, code in (("MIN", 5), ("MAX", 4), ("AVERAGE", 1), ("STDEV.P", 8)):
                     moved = moved.replace(f"{name}(W)", f"_xlfn.AGGREGATE({code},6,{rng})")
                 moved = moved.replace("COUNT(W)", f"COUNT({rng})").replace("COUNTIF(W,", f"COUNTIF({rng},")
@@ -391,7 +391,8 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     _days = [m[2] for m in (_FETCH.match(row.formula) for row in _sheet.rows) if m]
     _top = max(_days, key=lambda d: (_days.count(d), -_days.index(d)))
     _from = "$C$2" if _sheet.window is not None else "$C$1-365"
-    _end = _FIRST + ((_dt.date.fromisoformat(_top) - _sheet.window.start).days if _sheet.window is not None else 365)
+    # charts and the grey rule cannot follow the table, so on a window tab they reach eleven years down
+    _end = _FIRST + (366 * 11 if _sheet.window is not None else 365)
     stated = {("H", 1): ("text", _HISTORY_LABEL_WINDOW if _sheet.window is not None else _HISTORY_LABEL, True, None),
               ("R", _HEAD): ("text", "Date", True, None),
               ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},{_from},$C$1,"#N/A","D")', False, "yyyy-mm-dd")}

@@ -285,15 +285,19 @@ managed-money positioning. Both rank the latest value against a WINDOW of observ
 reports), which a row-per-number sheet cannot hold, so the window is the tab's history table: cell C2 holds its first
 day, the table runs from C2 to C1, and the rows take their statistics over the table's column. In the sheet's own
 form they are written over the token W (`=ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1)`, `=MIN(W)`, `=AVERAGE(W)`); in
-the file W is a range, and since the table shows #N/A on days without a value, MIN, MAX, AVERAGE and STDEV.P are
-written `AGGREGATE(5|4|1|8, 6, range)`. The check without Excel computes the same statistics from the source and
+the file W is the table's own column, `INDEX(R4#,0,2)`: a reference to whatever the formula in R4 fills, so the
+statistics cover the table however long it becomes. (The first version wrote a fixed range. The reviewer
+predicted, before any code existed, that a reader who moved C2 a year back would get a longer table whose newest
+rows lay outside the statistics; in Excel the count now goes from 746 to 996 with the window, and the chart draws
+all 996.) Since the table shows #N/A on days without a value, MIN, MAX, AVERAGE and STDEV.P are
+written `AGGREGATE(5|4|1|8, 6, ...)`. The check without Excel computes the same statistics from the source and
 rounds as Excel does (a half away from zero; Python's `round` sends 12.25 to 12.2), so a tie that would make the
 sheet disagree with the answer is reported and the sheet withheld. Excel taught two things here as well:
 `AGGREGATE` written into a file by hand reads #NAME? unless spelled `_xlfn.AGGREGATE`; and the weekly grid lost a
 report, which is why every table is now daily. In Excel with add-in 3.2.1: percentile 7 of 7 and positioning 8 of 8
 values equal the reported ones. Such a sheet works in the workbook only: the page shows its rows and says what W
 is, with no copy button. Not reproduced: when the level was last this high or low (the reading's own sentence).
-A reader who moves C1 gets the rank within C2 to C1, a shorter window, not "the last N years to that day". Run in Excel with add-in 3.2.1: with
+A reader who moves C1 gets the rank within C2 to C1, a shorter window, not "the last N years to that day". The charts and the grey rule cannot follow a table that grows, so on these tabs they reach eleven years down. Run in Excel with add-in 3.2.1: with
 C1 of the crack tab set to another day all three legs and the spread moved and Check showed the differences; set
 back, every row read "same" again. Values show with thousands separators and two decimals while the cells keep every
 digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a

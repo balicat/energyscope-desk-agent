@@ -454,17 +454,21 @@ def history_formula(count: int, windowed: bool = False) -> str:
     return f'_xll.ES.Table({first}{HEADER_ROW}:{last}{HEADER_ROW},{start},$C$1,"#N/A","D")'
 
 
+WINDOW_LAST_ROW = FIRST_ROW + 366 * 11       # the longest window a reading uses is ten years; one more to move C2
+
+
 def history_last_row(sheet: Sheet) -> int:
-    """The last row the table can reach: one row a day from its start to the tab's date."""
-    if sheet.window is None:
-        return HISTORY_LAST_ROW
-    return FIRST_ROW + (dt.date.fromisoformat(tab_date(sheet)) - sheet.window.start).days
+    """The last row the charts and the grey rule cover. They need fixed ranges and skip empty cells, so on a
+    tab with a window, whose table grows when the reader moves C2 back, they reach far enough for eleven years."""
+    return HISTORY_LAST_ROW if sheet.window is None else WINDOW_LAST_ROW
 
 
 def window_range(sheet: Sheet) -> str:
-    """Where W is in the file: the window series' column of the history table."""
-    col = _column(HISTORY_COLUMN + 1 + tab_series(sheet).index(sheet.window.series_id))
-    return f"${col}${FIRST_ROW}:${col}${history_last_row(sheet)}"
+    """Where W is in the file: the window series' column of whatever the formula in R4 fills (R4# in Excel's
+    own notation), so the statistics cover the table however long it is. A fixed range was right only while C1
+    and C2 stayed where the answer put them."""
+    k = tab_series(sheet).index(sheet.window.series_id)
+    return f"INDEX(_xlfn.ANCHORARRAY(${_column(HISTORY_COLUMN)}${FIRST_ROW}),0,{k + 2})"
 
 
 def _moved(formula: str, sheet: Sheet | None = None) -> str:
@@ -777,7 +781,7 @@ _FILE_ROW = re.compile(
     r'<c r="D\d+" s="\d+"><f>(.*?)</f></c><c r="E\d+" s="\d+"><v>(.*?)</v></c>')
 _FILE_TOP = re.compile(r'<c r="C1" s="\d+"><v>(\d+)</v></c>')
 _FILE_REF = re.compile(r"\bD(\d+)\b")
-_FILE_RANGE = r"\$[A-Z]+\$\d+:\$[A-Z]+\$\d+"
+_FILE_RANGE = r"INDEX\(_xlfn\.ANCHORARRAY\(\$[A-Z]+\$\d+\),0,\d+\)"
 _FILE_AGGREGATE = re.compile(r"_xlfn\.AGGREGATE\((\d),6," + _FILE_RANGE + r"\)")
 _FILE_COUNT = re.compile(r"\b(COUNT|COUNTIF)\(" + _FILE_RANGE + r"([,)])")
 _AGGREGATE_NAME = {str(n): name for name, n in _AGGREGATE.items()}
