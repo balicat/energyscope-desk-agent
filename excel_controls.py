@@ -100,23 +100,31 @@ if excel.workbook(list(good.values()), GIVEN_AT) != book:
 # six passed: arithmetic left in the pasted form's column, a Check that always says "same", styles swapped).
 # So what every cell must hold is written out HERE, from the sheets alone, and nothing below calls excel's helpers.
 import datetime as _dt, io as _io, re as _re, zipfile as _zip
-_CELL = _re.compile(r'<c r="([A-Z]+)(\d+)"(?: s="(\d+)")?(?: t="inlineStr")?>(.*?)</c>')
+_CELL = _re.compile(r'<c r="([A-Z]+)(\d+)"(?: s="(\d+)")?((?: [a-zA-Z]+="[^"]*")*)>(.*?)</c>')
 _FETCH = _re.compile(r'^=ES\.Value\("([^"]+)","(\d{4}-\d{2}-\d{2})"\)$')
 
 
 def _cells(xml):
-    """{(column, row): (style or None, 'text' | 'formula' | 'value', content)} of one worksheet."""
+    """{(column, row): (style or None, kind, content)} of one worksheet. Kinds: 'text', 'formula', 'value';
+    'stored' (a formula with its result beside it: "$C$1 = 46337"); 'stored text' (the same, a text result);
+    'spill' (the one formula that fills other cells: "R4: formula"); 'odd' for any cell written another way, so
+    that nothing in the file goes unseen."""
+    un = lambda s: s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
     out = {}
-    for col, row, style, body in _CELL.findall(xml):
+    for col, row, style, attrs, body in _CELL.findall(xml):
+        key, style = (col, int(row)), style or None      # no s= attribute: the default style
+        spill = _re.fullmatch(r'<f t="array" ref="([A-Z]+\d+)">(.*?)</f>', body)
         both = _re.fullmatch(r"<f>(.*?)</f><v>(.*?)</v>", body)
-        if both:    # a formula with a result stored beside it: only a Date cell that refers to C1 may have one
-            out[(col, int(row))] = (style or None, "stored", f"{both[1]} = {both[2]}")
-            continue
-        for kind, pat in (("text", r"<is><t[^>]*>(.*?)</t></is>"), ("formula", r"<f>(.*?)</f>"), ("value", r"<v>(.*?)</v>")):
-            m = _re.fullmatch(pat, body)
-            if m:
-                text = m[1].replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-                out[(col, int(row))] = (style or None, kind, text)   # no s= attribute: the default style
+        if spill:
+            out[key] = (style, "spill" if attrs == ' cm="1"' else "odd", f"{spill[1]}: {un(spill[2])}")
+        elif both:
+            out[key] = (style, {"": "stored", ' t="str"': "stored text"}.get(attrs, "odd"), f"{un(both[1])} = {un(both[2])}")
+        else:
+            out[key] = (style, "odd", body[:60])
+            for kind, pat in (("text", r"<is><t[^>]*>(.*?)</t></is>"), ("formula", r"<f>(.*?)</f>"), ("value", r"<v>(.*?)</v>")):
+                m = _re.fullmatch(pat, body)
+                if m and attrs == (' t="inlineStr"' if kind == "text" else ""):
+                    out[key] = (style, kind, un(m[1]))
     return out
 
 
@@ -204,7 +212,9 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         if check[1:] != ("formula", verdict) or _shown(check[0]) != "General":
             layout.append(f"{at}: Check is not the verdict formula in the General format: {check[2][:80]}")
     # nothing may sit between the top cell and the header, or in the header's own row beyond its six cells
-    stray = sorted(k for k in c if k[1] < _FIRST and k not in {("A", 1), ("C", 1)} | {(col, _HEAD) for col in "ABCDEF"})
+    # (columns A to F; what stands right of them is the history, stated further down)
+    stray = sorted(k for k in c if k[1] < _FIRST and len(k[0]) == 1 and k[0] <= "F"
+                   and k not in {("A", 1), ("C", 1)} | {(col, _HEAD) for col in "ABCDEF"})
     if stray:
         layout.append(f"{where}: unexpected cells above the rows: {stray[:4]}")
 # What holds for the workbook as a whole. The reviewer's second set, written before it had read the control:
@@ -242,6 +252,122 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             layout.append(f"tab {_t}: no note says {why} ({needed!r})")
     if _C1_NOTE not in notes:
         layout.append(f"tab {_t}: the note on C1 is not the one that says which rows follow and which do not move")
+# ---- The history: a table from column R and charts in columns H to P. Stated here, from the sheets alone.
+# On every tab that fetches: H1 a label; R3 "Date" and from S3 one cell per series of the tab, in the order the
+# rows name them, each a REFERENCE to the Series cell of the first row naming it with the ID stored beside it;
+# R4 the one formula, ES.Table over those header cells for the 365 days to C1 with "#N/A" for a day without a
+# value, stored as a dynamic array (so it fills the cells around it; stored plainly Excel shows one cell). No
+# other cell right of column F: inside the table's range it would stop the formula filling (#SPILL!). One line
+# chart per series, three at most, in columns H to P below the frozen rows and clear of each other, each reading
+# the dates R4:R369, its own series column and its own header cell, with ONE value axis.
+_HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the first three series; "
+                  "the table behind them starts in column R")
+_HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
+                 "first three series) and as a table from column R, filled by the one formula in R4. Both follow "
+                 "C1 and the Series cells. A day with no value shows #N/A in grey; do not type inside the table. "
+                 "This part needs Excel 365 or Excel 2021.")
+_num = lambda col: sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col)))
+
+
+def _col(n):
+    s = ""
+    while n:
+        n, k = divmod(n - 1, 26)
+        s = chr(65 + k) + s
+    return s
+
+
+with _zip.ZipFile(_io.BytesIO(book)) as _z:
+    _parts = {n: _z.read(n).decode("utf-8") for n in _z.namelist()}
+_types = _parts.get("[Content_Types].xml", "")
+_meta = _parts.get("xl/metadata.xml", "")
+if "XLDAPR" not in _meta or 'fDynamic="1"' not in _meta or '<rc t="1" v="0"/>' not in _meta:
+    layout.append("no part declaring dynamic arrays (xl/metadata.xml): the history formula would show one cell")
+if 'Target="metadata.xml"' not in _rels_xml or '"/xl/metadata.xml"' not in _types:
+    layout.append("the dynamic-array part is not related to the workbook or has no content type")
+if not _re.search(r'<dxfs count="1"><dxf><font><color rgb="FF(?!000000)[0-9A-F]{6}"/></font></dxf></dxfs>', _styles):
+    layout.append("no format to show the history's days without a value in grey")
+_used = set()
+for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
+    c = _cells(_xml)
+    where = f"tab {_t}"
+    ids, first = [], {}
+    for i, row in enumerate(_sheet.rows):
+        m = _FETCH.match(row.formula)
+        if m and m[1] not in first:
+            first[m[1]] = _FIRST + i
+            ids.append(m[1])
+    right = {k: v for k, v in c.items() if _num(k[0]) > 6}
+    if not ids:
+        if right or "<drawing" in _xml:
+            layout.append(f"{where}: fetches nothing and has a history")
+        continue
+    last = _col(18 + len(ids))
+    stated = {("H", 1): ("text", _HISTORY_LABEL, True, None), ("R", _HEAD): ("text", "Date", True, None),
+              ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},$C$1-365,$C$1,"#N/A")', False, "yyyy-mm-dd")}
+    for k, sid in enumerate(ids):
+        stated[(_col(19 + k), _HEAD)] = ("stored text", f"B{first[sid]} = {sid}", True, None)
+    for key, (kind, content, bold, shown) in stated.items():
+        got = c.get(key, (None, "nothing", ""))
+        if got[1:] != (kind, content) or (bold and not _bold(got[0])) or (shown and _shown(got[0]) != shown):
+            layout.append(f"{where}: {key[0]}{key[1]} should be {kind} {content[:70]}, the file has {got[1]} {got[2][:70]}")
+    extra = sorted(set(right) - set(stated))
+    if extra:
+        layout.append(f"{where}: cells right of the rows that the history does not own; inside the table they stop it filling: {extra[:4]}")
+    cols = {}
+    for lo, hi, w, st in _re.findall(r'<col min="(\d+)" max="(\d+)" width="([\d.]+)"(?: style="(\d+)")?', _xml):
+        for n in range(int(lo), int(hi) + 1):
+            cols[n] = (float(w), st or None)
+    if cols.get(18, (0, None))[0] < 10 or _shown(cols.get(18, (0, None))[1]) != "yyyy-mm-dd":
+        layout.append(f"{where}: column R would not show the history's dates as yyyy-mm-dd")
+    if any(cols.get(19 + k, (0, None))[0] < 12 or _shown(cols.get(19 + k, (0, None))[1]) != "#,##0.00" for k in range(len(ids))):
+        layout.append(f"{where}: a series column of the history is too narrow or not shown as #,##0.00")
+    if (f'<conditionalFormatting sqref="S{_FIRST}:{last}369"><cfRule type="containsErrors" dxfId="0" priority="1">'
+            f'<formula>ISERROR(S{_FIRST})</formula></cfRule></conditionalFormatting>') not in _xml:
+        layout.append(f"{where}: the history's days without a value are not shown in grey over S{_FIRST}:{last}369")
+    notes = [v[2] for (col, r), v in c.items() if col == "A" and r >= _FIRST + len(_sheet.rows) and v[1] == "text"]
+    if _HISTORY_NOTE not in notes:
+        layout.append(f"{where}: the note on the history is missing or reworded")
+    # the charts
+    name = _unx(_named[_t - 1][0]) if _t <= len(_named) else ""
+    q = "'" + name.replace("'", "''") + "'"
+    target = _re.search(r'<Relationship Id="rId1" Type="[^"]*/drawing" Target="\.\./drawings/(drawing\d+\.xml)"/>',
+                        _parts.get(f"xl/worksheets/_rels/sheet{_t}.xml.rels", ""))
+    if '<drawing r:id="rId1"/>' not in _xml or not target or f'"/xl/drawings/{target[1]}"' not in _types:
+        layout.append(f"{where}: no drawing holds its charts")
+        continue
+    drawing = _parts.get("xl/drawings/" + target[1], "")
+    charts = dict(_re.findall(r'<Relationship Id="(rId\d+)" Type="[^"]*/chart" Target="\.\./charts/(chart\d+\.xml)"/>',
+                              _parts.get(f"xl/drawings/_rels/{target[1]}.rels", "")))
+    anchors = sorted((int(r0), int(r1), int(c0), int(c1), rid) for c0, r0, c1, r1, rid in _re.findall(
+        r'<xdr:from><xdr:col>(\d+)</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>(\d+)</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>'
+        r'<xdr:to><xdr:col>(\d+)</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>(\d+)</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>'
+        r'.*?r:id="(rId\d+)"', drawing))
+    if len(anchors) != min(3, len(ids)) or drawing.count("<xdr:twoCellAnchor>") != len(anchors):
+        layout.append(f"{where}: {drawing.count('<xdr:twoCellAnchor>')} charts for {len(ids)} series (one each, three at most)")
+    floor = _FIRST - 1          # rows count from 0 here: the first row below the frozen ones
+    for k, (r0, r1, c0, c1, rid) in enumerate(anchors):
+        at = f"{where} chart {k + 1}"
+        if c0 < 7 or c1 > 16 or c1 <= c0 or r0 < floor or r1 <= r0:
+            layout.append(f"{at}: not in columns H to P below the frozen rows and clear of the chart above")
+        floor = r1
+        part = charts.get(rid, "")
+        chart = _parts.get("xl/charts/" + part, "")
+        if not chart or part in _used or f'"/xl/charts/{part}"' not in _types:
+            layout.append(f"{at}: its chart part is missing, shared with another chart or has no content type")
+            continue
+        _used.add(part)
+        col = _col(19 + k)
+        reads = [_unx(f) for f in _re.findall(r"<c:f>(.*?)</c:f>", chart)]
+        should = [f"{q}!${col}${_HEAD}", f"{q}!$R${_FIRST}:$R$369", f"{q}!${col}${_FIRST}:${col}$369"]
+        if reads != should:
+            layout.append(f"{at}: reads {reads}, should read {should}")
+        if chart.count("<c:ser>") != 1 or chart.count("<c:valAx>") != 1 or chart.count("<c:dateAx>") != 1 or "<c:lineChart>" not in chart:
+            layout.append(f"{at}: not one line on one date axis and one value axis")
+        if '<c:dispBlanksAs val="span"/>' not in chart:
+            layout.append(f"{at}: days without a value would break the line or draw it at zero")
+        if "<c:title>" not in chart or '<c:autoTitleDeleted val="0"/>' not in chart:
+            layout.append(f"{at}: no title, so nothing says which series it is")
 if not _tabs or not _styles:
     layout.append("the workbook has no worksheets or no styles")
 failures += layout[:6]

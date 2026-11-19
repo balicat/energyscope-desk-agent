@@ -264,7 +264,21 @@ earlier, the same week of a prior year) keeps a date of its own and does not mov
 ("3 of 3 fetched rows follow", "1 of 6 ... the other 5 keep their own dates"). The first wording said the whole
 sheet moves; the reviewer counted the 77 frozen sheets and it does on 7 (cracks, curves, a spread), one row of two
 follows on the 64 price-change tabs and one of six on the seasonal tabs, where moving C1 alone leaves the average
-comparing other weeks of the year. A workbook whose dates all move together is a later step. Run in Excel with add-in 3.2.1: with
+comparing other weeks of the year. A workbook whose dates all move together is a later step.
+
+Each tab also carries the history behind its numbers: right of the rows, a table of the tab's series over the year
+to the date in C1 and a line chart for each of the first three. The table is one formula,
+`=ES.Table(S3:U3, C1-365, C1, "#N/A")`, whose header cells refer to the Series cells of the rows, so C1 and a
+Series cell each stay the one place to change. Three things had to be learnt in Excel before it worked. A formula
+that fills other cells must be stored the way Excel stores its own dynamic arrays (a marker on the cell and a
+part named `metadata.xml`); stored as an ordinary formula Excel reads it as `=@ES.Table(...)` and shows one cell.
+The fill must be `"#N/A"`: the default forward fill leaves text before a series' first value and a chart draws
+text as zero. And no chart shares an axis between series: a crack tab has dollars a barrel beside dollars a
+gallon, so each series has its own chart. The control states every cell of the table and what each chart reads
+from the sheets alone; 44 faults planted in the table, the charts, their placing and the metadata part are all
+reported. In Excel with add-in 3.2.1 the rows beside the table still equal the reported values (31 of 31), the
+table's last row equals what `ES.Value` fetched for the same date on every tab, and table and charts follow a
+changed C1 and a changed Series cell. Needs Excel 365 or 2021; an older Excel shows the first cell of the table. Run in Excel with add-in 3.2.1: with
 C1 of the crack tab set to another day all three legs and the spread moved and Check showed the differences; set
 back, every row read "same" again. Values show with thousands separators and two decimals while the cells keep every
 digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a
