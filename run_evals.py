@@ -148,7 +148,10 @@ class ExcelReproduces(Evaluator[str, DeskAnswer]):
         good, wrong = excel.sheets(ctx.output, SOURCE)
         owed = len(ctx.output.facts) + len(ctx.output.spreads)
         kinds = [r.key.split(":", 1)[0] for r in ctx.output.readings if not r.hypothetical]
-        covered = sum(k in ("curve", "crack", "seasonal", "percentile", "positioning") for k in kinds)
+        covered = sum(k in ("curve", "crack", "seasonal", "positioning") for k in kinds)
+        # a percentile owes a sheet too, except for a quarterly series, which the workbook cannot serve
+        covered += sum(r.key.startswith("percentile:") and not r.series_ids[0].endswith(".Q")
+                       for r in ctx.output.readings if not r.hypothetical)
         EXCEL["sheets"] += len(good)
         EXCEL["rows"] += sum(len(s.rows) for s in good)
         EXCEL["readings"] += len(kinds)

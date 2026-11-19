@@ -147,6 +147,12 @@ RANK = '=ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1)'     # the share of the window
 def _percentile(r: Reading, source: DataSource) -> Sheet | None:
     """The latest value against its own last N years: the window is every observation the reading ranked."""
     series_id, years = r.series_ids[0], int(r.values["years"])
+    # No sheet for a quarterly series: ES.Table returns no value for one at any window (the server's date filter
+    # for quarterly periods; tried in Excel at one year and five), so the statistics would have nothing under
+    # them, and the check without Excel could not see that.
+    hit = source.meta(series_id)
+    if hit is None or hit.frequency == "Q" or series_id.endswith(".Q"):
+        return None
     hist = source.history(series_id, start=readings._since(366 * years))
     if len(hist) < 20 or hist[-1][0] != r.period:
         return None
