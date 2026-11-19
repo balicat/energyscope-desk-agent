@@ -20,5 +20,8 @@ jobs:
         run: python run_evals.py --source fixture --gate --golden check
       - name: Prose control, wrong sentences over true tables must all be rejected
         run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python prose_controls.py
-      - name: Control run, validator off, exactly three assertions must fail
-        run: python run_evals.py --source fixture --no-guard --expect-failures 3
+      - name: Excel control, errors planted in true sheets must all be reported
+        run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python excel_controls.py
+      # Four since the Excel sheets (19 Nov 2026): the planted wrong price also makes its sheet fail to reproduce.
+      - name: Control run, validator off, exactly four assertions must fail
+        run: python run_evals.py --source fixture --no-guard --expect-failures 4
