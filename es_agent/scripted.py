@@ -44,6 +44,9 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
             c = body
             facts.append({k: c[k] for k in ("series_id", "name", "units", "latest_period", "latest_value",
                                              "lookback_days", "base_period", "base_value", "change_abs", "change_pct")})
+            # A live model does not always copy six decimals: it wrote -17.26 for -17.262664 (19 Nov 2026) and
+            # only the paid run could show what followed. So this stand-in rounds the percent the same way.
+            facts[-1]["change_pct"] = round(facts[-1]["change_pct"], 2)
             way = "up" if c["change_abs"] >= 0 else "down"
             lines.append(
                 f"{c['name']} was {c['latest_value']:.2f} {c['units']} on {c['latest_period']}, {way} "

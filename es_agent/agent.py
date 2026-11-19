@@ -398,6 +398,19 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         and metrics.close(s.spread, src.spread) else s
         for s in answer.spreads
     ]
+    # A fact the tool's result confirms is shown with the tool's own figures, as a spread is. The model types a
+    # fact's numbers and "close" accepts a rounded one: on 19 Nov 2026 the live model wrote a 30-day change as
+    # -17.26 percent where the tool had returned -17.262664, the table showed the rounded figure, and the Excel
+    # sheet for that fact did not reproduce it. A fact that is not close is left as typed and rejected below.
+    for f in answer.facts:
+        src = ctx.deps.ledger.get((f.series_id, f.lookback_days))
+        if isinstance(src, Change):
+            if f.latest_period == src.latest_period and all(
+                    metrics.close(getattr(f, n), getattr(src, n)) for n in ("latest_value", "base_value", "change_abs", "change_pct")):
+                f.latest_value, f.base_period, f.base_value = src.latest_value, src.base_period, src.base_value
+                f.change_abs, f.change_pct = src.change_abs, src.change_pct
+        elif isinstance(src, Observation) and f.latest_period == src.period and metrics.close(f.latest_value, src.value):
+            f.latest_value = src.value
     # The model's caveats are held to the same tracing as the summary: one that states a number or a
     # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
     # What the visitor wrote: the prompt without the lines that quote The Librarian's own earlier answers.

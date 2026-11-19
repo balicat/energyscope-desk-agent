@@ -8,8 +8,8 @@ takes a sheet that reproduces on the frozen data, breaks one thing a careless ed
 """
 import sys
 
-from es_agent import excel, readings
-from es_agent.models import Spread
+from es_agent import excel, metrics, readings
+from es_agent.models import SeriesFact, Spread
 from es_agent.sources import FixtureSource
 
 source = FixtureSource("fixtures/series.json")
@@ -30,7 +30,16 @@ def edited(sheet: excel.Sheet, row: int, old: str, new: str) -> excel.Sheet:
     return copy
 
 
+def fact_sheet(percent_places: int) -> excel.Sheet:
+    c = metrics.change_over(source.meta(WTI), source.history(WTI), 30)
+    return excel.for_fact(SeriesFact(series_id=WTI, name=c.name, units=c.units, latest_period=c.latest_period,
+                                     latest_value=c.latest_value, lookback_days=30, base_period=c.base_period,
+                                     base_value=c.base_value, change_abs=c.change_abs,
+                                     change_pct=round(c.change_pct, percent_places)))
+
+
 good = {
+    "fact": fact_sheet(6),
     "spread": spread_sheet(),
     "curve": excel.for_reading(readings.curve(source, "brent"), source),
     "crack": excel.for_reading(readings.crack(source, "3-2-1"), source),
@@ -61,6 +70,11 @@ planted = [
     ("an average that includes this year", edited(good["seasonal"], last_prior, f"B2:B{last_prior}", f"B1:B{last_prior}")),
     ("percent of the wrong base", edited(good["seasonal"], last_prior + 2, f"/B{last_prior + 1}*100", "/B1*100")),
     ("a date with no observation", edited(good["spread"], 0, f'"{day}")', '"2026-01-01")')),
+    ("the percent of the wrong base", edited(good["fact"], 3, "/B2*100", "/B1*100")),
+    # The reported value wrong, not the formula: a percent to two decimals where the data gives six. This is what
+    # the live model wrote on 19 Nov 2026. It must be reported, because the validator now copies the tool's
+    # figure into the fact, and a rounded one reaching a sheet means that copy did not happen.
+    ("a percent the model rounded to two decimals", fact_sheet(2)),
 ]
 for what, sheet in planted:
     if not excel.problems(sheet, source):

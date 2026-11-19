@@ -244,8 +244,8 @@ what a reader needs: Enable Editing, Refresh All, the add-in version, and when t
 A sheet is offered only if it reproduces: a small interpreter computes every formula from the same data the answer
 was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen
 data: 21 sheets and 85 formulas reproduce across the 32 questions (hard evaluator `ExcelReproduces`), and a
-control (`excel_controls.py`) plants ten errors in true sheets, such as the day before, a reference one row off,
-41 gallons to the barrel and an average over one year too few; all ten are reported. The same control requires
+control (`excel_controls.py`) plants twelve errors in true sheets, such as the day before, a reference one row off,
+41 gallons to the barrel and an average over one year too few; all twelve are reported. The same control requires
 that the workbook reads back as the sheets, that the same sheets give the same bytes, and that 112 tab names,
 with repeats, come out legal and distinct.
 
@@ -266,7 +266,13 @@ reviewer found it before release.
 What this does not show. The interpreter proves the logic of a sheet (series, dates, arithmetic), not Excel. The
 check compares values, so a formula fetching the wrong date passes when the series had the same value on both
 days (the control found one: WTI on a US holiday). "Same" means within 0.00005 or one part in a million,
-whichever is larger, so on a series whose values are themselves that small the check says nothing. Dates are
+whichever is larger, so on a series whose values are themselves that small the check says nothing. The check is
+that strict because of what the release gate found: the numbers in a fact were typed by the model and accepted
+when close to the tool's, the live model gave a 30-day change as -17.26 percent where the tool had returned
+-17.262664, and the sheet for that fact did not reproduce it. The reviewer's answer was not a looser tolerance
+but the root: the validator now copies the tool's own figures into a fact it accepts, as it already did for
+spreads and readings, so the table shows them and the model cannot round them. The scripted model now rounds a
+percent the same way, so the frozen suite covers it without a paid run. Dates are
 fixed, but sources revise: the reviewer opened all 77 sheets the suite can produce as one workbook a day after
 the data was frozen, and of 367 formula cells 86 differed, every one traced to a futures close revised at the
 source (Brent for 17 Nov, NYMEX for 18 Nov) and none to arithmetic. So a sheet can disagree with the answer it
