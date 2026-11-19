@@ -52,7 +52,7 @@ planted = [
     ("the other series", edited(good["spread"], 0, BRENT, WTI)),
     # Brent, not WTI: on the frozen data WTI has the same price on both days (a US holiday), and a wrong date
     # with the same value reproduces. The check compares values; it cannot see that kind of wrong date.
-    ("the day before", edited(good["spread"], 0, f'"{day}","{day}"', f'"{earlier}","{earlier}"')),
+    ("the day before", edited(good["spread"], 0, f'"{day}")', f'"{earlier}")')),
     ("the subtraction reversed", edited(good["spread"], 2, "=B1-B2", "=B2-B1")),
     ("a reference one row off", edited(good["curve"], n_curve + 1, f"=B1-B{n_curve}", f"=B1-B{n_curve - 1}")),
     ("41 gallons to the barrel", edited(good["crack"], 3, "B3*42", "B3*41")),
@@ -60,13 +60,26 @@ planted = [
     ("an average over one year too few", edited(good["seasonal"], last_prior, f"B2:B{last_prior}", f"B2:B{last_prior - 1}")),
     ("an average that includes this year", edited(good["seasonal"], last_prior, f"B2:B{last_prior}", f"B1:B{last_prior}")),
     ("percent of the wrong base", edited(good["seasonal"], last_prior + 2, f"/B{last_prior + 1}*100", "/B1*100")),
-    ("a date with no observation", edited(good["spread"], 0, f'"{day}","{day}"', '"2026-01-01","2026-01-01"')),
+    ("a date with no observation", edited(good["spread"], 0, f'"{day}")', '"2026-01-01")')),
 ]
 for what, sheet in planted:
     if not excel.problems(sheet, source):
         failures.append(f"NOT CAUGHT: {what}")
+
+# The workbook a reader downloads must say what the page shows: the same labels, formulas and values, tab by
+# tab, in the same cells. Titles that Excel would refuse as tab names must come out legal and distinct.
+book = excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC")
+back = excel.read_back(book)
+want = [[(r.label, r.formula, r.value) for r in s.rows] for s in good.values()]
+if back != want:
+    failures.append("the workbook does not say what the sheets say")
+if excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC") != book:
+    failures.append("the same sheets gave two different workbooks")
+tabs = excel._tab_names(["Brent/WTI: spread [futures]", "brent/wti: spread [futures]", "x" * 40, ""])
+if (len({t.lower() for t in tabs}) != len(tabs) or any(len(t) > 31 or not t or set(t) & set("[]:*?/\\") for t in tabs)):
+    failures.append(f"tab names Excel would refuse: {tabs}")
 for line in failures:
     print(line)
 print(f"excel control: {len(planted) - len(failures)} of {len(planted)} planted errors reported; "
-      f"{len(good)} true sheets reproduce")
+      f"{len(good)} true sheets reproduce; the workbook reads back as the sheets ({len(book)} bytes)")
 sys.exit(1 if failures else 0)

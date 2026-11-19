@@ -227,7 +227,7 @@ How the suite got here, including the failures:
 
 Under each answer, code writes a small sheet for every fact, spread, futures curve, crack spread and seasonal
 comparison: a label, a formula and the value reported. Pasted at cell A1 with the EnergyScope add-in loaded, the
-formulas fetch each input on a fixed date (`=INDEX(ES.Get("PET.RWTC.D","2026-11-11","2026-11-11"),2,2)`) and do
+formulas fetch each input on a fixed date (`=ES.Value("PET.RWTC.D","2026-11-11")`) and do
 the arithmetic in plain Excel (`=(2*B2*42+B3*42)/3-B1`), so a reader can check a number without trusting the model
 or this service. The model writes none of it (`es_agent/excel.py`).
 
