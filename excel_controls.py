@@ -83,28 +83,95 @@ for what, sheet in planted:
 # The workbook a reader downloads must say what the page shows: the same labels, formulas and values, tab by
 # tab, in the same cells. Titles that Excel would refuse as tab names must come out legal and distinct.
 book = excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC")
-back = excel.read_back(book)
+try:
+    back = excel.read_back(book)
+except Exception as e:  # a workbook read_back cannot read is a failure of the writer, not of this script
+    back = None
+    failures.append(f"the workbook cannot be read back: {type(e).__name__}: {e}"[:200])
 want = [[(r.label, r.formula, r.value) for r in s.rows] for s in good.values()]
 if back != want:
     failures.append("the workbook does not say what the sheets say")
 if excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC") != book:
     failures.append("the same sheets gave two different workbooks")
-# The file is laid out for a person: series and date in their own cells, the value formula reading them, a header
-# row, number formats. Every fetching row must read ITS OWN cells, and no series ID or date may be left inside a
-# formula, or a reader who edits the cell changes nothing.
-import io as _io, re as _re, zipfile as _zip
+# The file is laid out for a person: a header, series and date in their own cells, the value formula reading
+# them, number formats, a Check column. `read_back` above goes through the writer's own idea of the layout, so a
+# writer that is wrong in a way read_back shares would pass it (the reviewer broke the writer fourteen ways and
+# six passed: arithmetic left in the pasted form's column, a Check that always says "same", styles swapped).
+# So what every cell must hold is written out HERE, from the sheets alone, and nothing below calls excel's helpers.
+import datetime as _dt, io as _io, re as _re, zipfile as _zip
+_CELL = _re.compile(r'<c r="([A-Z]+)(\d+)"(?: s="(\d+)")?(?: t="inlineStr")?>(.*?)</c>')
+_FETCH = _re.compile(r'^=ES\.Value\("([^"]+)","(\d{4}-\d{2}-\d{2})"\)$')
+
+
+def _cells(xml):
+    """{(column, row): (style or None, 'text' | 'formula' | 'value', content)} of one worksheet."""
+    out = {}
+    for col, row, style, body in _CELL.findall(xml):
+        for kind, pat in (("text", r"<is><t[^>]*>(.*?)</t></is>"), ("formula", r"<f>(.*?)</f>"), ("value", r"<v>(.*?)</v>")):
+            m = _re.fullmatch(pat, body)
+            if m:
+                text = m[1].replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+                out[(col, int(row))] = (style or None, kind, text)   # no s= attribute: the default style
+    return out
+
+
 with _zip.ZipFile(_io.BytesIO(book)) as _z:
-    _tabs = [_z.read(n).decode("utf-8") for n in _z.namelist() if n.startswith("xl/worksheets/")]
-    if "xl/styles.xml" not in _z.namelist() or "#,##0.00" not in _z.read("xl/styles.xml").decode("utf-8"):
-        failures.append("the workbook has no number format for values")
-_formulas = [f for t in _tabs for f in _re.findall(r"<f>(.*?)</f>", t)]
-_fetches = [f for f in _formulas if "ES.Value" in f]
-if not _fetches or any(not _re.fullmatch(r"_xll\.ES\.Value\(B(\d+),C\1\)", f) for f in _fetches):
-    failures.append(f"a fetching formula does not read the series and date cells of its own row: {_fetches[:2]}")
-if any("&quot;" in f and "same" not in f for f in _formulas):
-    failures.append("a series ID or a date is still written inside a formula")
-if any(">What<" not in t or ">Series<" not in t or ">Reported<" not in t for t in _tabs):
-    failures.append("a tab has no header row")
+    _tabs = [_z.read(f"xl/worksheets/sheet{i}.xml").decode("utf-8") for i in range(1, len(good) + 1)]
+    _styles = _z.read("xl/styles.xml").decode("utf-8") if "xl/styles.xml" in _z.namelist() else ""
+_codes = dict(_re.findall(r'<numFmt numFmtId="(\d+)" formatCode="([^"]*)"', _styles))
+_xfs = _re.findall(r'<xf numFmtId="(\d+)" fontId="(\d+)"[^>]*xfId="0"[^>]*/>', _styles)      # cellXfs, in order
+_shown = lambda style: _codes.get(_xfs[int(style)][0], "General") if style is not None and int(style) < len(_xfs) else "General"
+_bold = lambda style: style is not None and int(style) < len(_xfs) and _xfs[int(style)][1] != "0"
+layout = []
+for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
+    c = _cells(_xml)
+    where = f"tab {_t}"
+    if [c.get((col, 1), (None, "", ""))[2] for col in "ABCDEF"] != ["What", "Series", "Date", "Value", "Reported", "Check"]:
+        layout.append(f"{where}: the header row is not What | Series | Date | Value | Reported | Check")
+    if not all(_bold(c.get((col, 1), (None,))[0]) for col in "ABCDEF"):
+        layout.append(f"{where}: the header is not bold")
+    if '<pane ySplit="1"' not in _xml or 'state="frozen"' not in _xml:
+        layout.append(f"{where}: the header row is not frozen")
+    for i, row in enumerate(_sheet.rows, 1):
+        r = i + 1
+        at = f"{where} row {r}"
+        if c.get(("A", r), (None, "", ""))[1:] != ("text", row.label):
+            layout.append(f"{at}: column A is not the row's label")
+        value = c.get(("D", r), (None, "", ""))
+        fetch = _FETCH.match(row.formula)
+        if fetch:
+            series_id, day = fetch.groups()
+            serial = (_dt.date.fromisoformat(day) - _dt.date(1899, 12, 30)).days
+            if c.get(("B", r), (None, "", ""))[1:] != ("text", series_id):
+                layout.append(f"{at}: column B is not the series ID {series_id}")
+            date = c.get(("C", r), (None, "", ""))
+            if date[1:] != ("value", str(serial)) or _shown(date[0]) != "yyyy-mm-dd":
+                layout.append(f"{at}: column C is not the date {day} as a real date shown yyyy-mm-dd")
+            if value[1:] != ("formula", f"_xll.ES.Value(B{r},C{r})"):
+                layout.append(f"{at}: Value does not fetch from this row's series and date cells: {value[2]}")
+        else:
+            # the sheet's arithmetic names cells of the pasted form (formula in column B, first row 1); in the
+            # file the same cells are column D, one row down. No other column may be named.
+            moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + 1}", row.formula.lstrip("="))
+            named = {col for col, _ in _re.findall(r"\b([A-Z]{1,3})(\d+)\b", value[2])}
+            if value[1:] != ("formula", moved) or named - {"D"}:
+                layout.append(f"{at}: Value should be {moved}, the file has {value[2]}")
+            if ("B", r) in c or ("C", r) in c:
+                layout.append(f"{at}: a calculated row has something in Series or Date")
+        if _shown(value[0]) != "#,##0.00":
+            layout.append(f"{at}: Value is shown as {_shown(value[0])}, not #,##0.00")
+        reported = c.get(("E", r), (None, "", ""))
+        if reported[1] != "value" or float(reported[2] or "nan") != row.value or _shown(reported[0]) != "#,##0.00":
+            layout.append(f"{at}: Reported is not {row.value!r} shown as #,##0.00")
+        # Check is the reader's verdict, so its formula is spelled out here: "same" within the larger of 0.00005
+        # and one part in a million of Reported, otherwise Value minus Reported, and not rounded for display.
+        verdict = (f'IF(ISNUMBER(D{r}),IF(ABS(D{r}-E{r})<=MAX(0.00005,0.000001*ABS(E{r})),"same",D{r}-E{r}),"")')
+        check = c.get(("F", r), (None, "", ""))
+        if check[1:] != ("formula", verdict) or _shown(check[0]) != "General":
+            layout.append(f"{at}: Check is not the verdict formula in the General format: {check[2][:80]}")
+if not _tabs or not _styles:
+    layout.append("the workbook has no worksheets or no styles")
+failures += layout[:6]
 # Twelve tabs, so that a repeat falls at a two-digit position: the first version made a 32-character name there
 # and Excel refused the file. Long titles, repeats in another case, characters Excel forbids, an empty title.
 long = "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year"
@@ -112,8 +179,11 @@ tabs = excel._tab_names(["A (3)", "A", "A", "Brent/WTI: spread [futures]", "bren
                         + [long] * 4 + ["x" * 27] * 4 + [long.upper()] * 100)
 if (len({t.lower() for t in tabs}) != len(tabs) or any(len(t) > 31 or not t or set(t) & set("[]:*?/\\") for t in tabs)):
     failures.append(f"tab names Excel would refuse: {[t for t in tabs if len(t) > 31][:3]}")
+missed = [f for f in failures if f.startswith("NOT CAUGHT")]
 for line in failures:
     print(line)
-print(f"excel control: {len(planted) - len(failures)} of {len(planted)} planted errors reported; "
-      f"{len(good)} true sheets reproduce; the workbook reads back as the sheets ({len(book)} bytes)")
+print(f"excel control: {len(planted) - len(missed)} of {len(planted)} planted errors reported; "
+      f"{len(good)} true sheets reproduce; the workbook "
+      + ("reads back as the sheets and every cell is as the layout says" if back == want and not layout
+         else "DOES NOT match the sheets or the layout") + f" ({len(book)} bytes)")
 sys.exit(1 if failures else 0)

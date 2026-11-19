@@ -332,6 +332,11 @@ def notes(given_at: str) -> list[str]:
         "which is the check the service applies; otherwise it is Value minus Reported.",
         "Change a Date or a Series ID and Value follows; Reported stays what the answer said, so Check will then "
         "show the difference. Values are shown to two decimals; the cells hold every digit.",
+        # The reviewer, editing as a reader would: "WTI ..., 2026-11-11" stayed beside a Date of 2026-10-12, and an
+        # emptied Date gave the latest value with nothing to say which day (on a forecast series, the furthest one).
+        "The text in What was written for the original series and date and does not change when you edit them. "
+        "Write dates as 2026-11-17 or pick them as dates. An empty Date gives the last value of the series, which "
+        "on a series that includes forecasts is the furthest forecast.",
         f"Value needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If it reads "
         "#NAME?, the add-in is not loaded; with no key, it says so in words.",
     ]

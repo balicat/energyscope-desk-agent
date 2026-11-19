@@ -260,9 +260,12 @@ calculated from it, follow. Values show with thousands separators and two decima
 digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a
 million, which is the service's own check, and gives the difference otherwise; it is not rounded for display,
 because at two decimals a real difference of 0.003 would read 0.00. Under the rows the tab says what a reader
-needs: Enable Editing, Refresh All, when the answer was given, and the add-in version. The page still shows each
-sheet in its plain form, with the series and date written inside the formula, and the control proves the two say
-the same thing by reading the workbook back into that form.
+needs: Enable Editing, Refresh All, when the answer was given, what does not follow an edit, and the add-in
+version. The page still shows each sheet in its plain form, with the series and date written inside the formula.
+The control checks the workbook two ways: it reads it back into the plain form, and it states cell by cell what
+the layout must hold, from the sheets alone and without the writer's helpers. The second was added because the
+reviewer broke the writer fourteen ways and the first let six through: arithmetic left in the pasted form's
+column, a Check that always said "same", the two number formats swapped. All fourteen are now reported.
 
 A sheet is offered only if it reproduces: a small interpreter computes every formula from the same data the answer
 was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen
