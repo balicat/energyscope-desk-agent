@@ -246,17 +246,31 @@ def _tab_names(titles: list[str]) -> list[str]:
 #     row 3   A What | B Series | C Date | D Value | E Reported | F Check        the header, frozen
 #     row 4.. one row for each row of the sheet
 #
-# A row that fetches holds its series ID in B and its date in C, and D is =ES.Value(B,C). The date most rows of
+# A row that fetches holds its series ID in B and its date in C, and D is =ES.Value(B,C). The date the most rows of
 # the tab share (all three legs of a crack, every month of a curve, the latest value of a comparison) is written
-# ONCE, in C1, and each of those rows has =$C$1 in its Date cell: change C1 and they all move, with everything
+# ONCE, in C1, and each of those rows has =$C$1 in its Date cell: change C1 and THOSE rows move, with everything
 # calculated from them. A row with another date (the value thirty days earlier, the same week of a prior year)
-# keeps a date of its own. Values show with thousands separators and two decimals; the cells keep every digit.
+# keeps a date of its own and does not move; the label in A1 says how many rows follow. Values show with thousands separators and two decimals; the cells keep every digit.
 # The sheet's own formulas (Row.formula, the form the page shows and `evaluate` checks) are written as if pasted
 # at A1 with the formula in column B, so they are moved FIRST_ROW - 1 rows down and into column D here, and
 # `read_back` moves them back to prove nothing was lost.
 
 HEADER = ("What", "Series", "Date", "Value", "Reported", "Check")
-DATE_LABEL = "Date (change this one cell: every row below that shows this date follows)"
+
+
+def date_label(follow: int, fetching: int) -> str:
+    """The words beside C1. They COUNT: the reviewer read the first wording ("the whole sheet moves") against
+    77 sheets and the whole tab followed on 7; on a seasonal tab one row of six did, and the average beside it
+    then compared a week with other weeks of the year with nothing on the tab to say so."""
+    if fetching == 1:
+        return "Date: change this cell and the one fetched row follows"
+    if follow == fetching:
+        return f"Date: change this cell and all {fetching} fetched rows follow"
+    others = "one keeps its own date" if fetching - follow == 1 else f"{fetching - follow} keep their own dates"
+    return (f"Date: change this cell and {follow} of {fetching} fetched rows follow{'s' if follow == 1 else ''}; "
+            f"the other {others}")
+
+
 HEADER_ROW, FIRST_ROW = 3, 4
 _EPOCH = dt.date(1899, 12, 30)   # day 0 of Excel's calendar
 _STYLE_NUMBER, _STYLE_DATE, _STYLE_HEAD = 1, 2, 3
@@ -293,9 +307,10 @@ def _serial(day: str) -> int:
 
 def _worksheet(sheet: Sheet, notes: list[str]) -> str:
     shared = tab_date(sheet)
+    days = [m[2] for m in (_GET.match(r.formula) for r in sheet.rows) if m]
     xml = []
     if shared is not None:
-        xml.append(f'<row r="1">{_text("A1", DATE_LABEL, _STYLE_HEAD)}'
+        xml.append(f'<row r="1">{_text("A1", date_label(days.count(shared), len(days)), _STYLE_HEAD)}'
                    f'<c r="C1" s="{_STYLE_DATE}"><v>{_serial(shared)}</v></c></row>')
     xml.append(f'<row r="{HEADER_ROW}">'
                + "".join(_text(f"{col}{HEADER_ROW}", name, _STYLE_HEAD) for col, name in zip("ABCDEF", HEADER)) + "</row>")
@@ -304,7 +319,8 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
         fetch = _GET.match(row.formula)
         if fetch:
             series_id, day = fetch.groups()
-            date = "<f>$C$1</f>" if day == shared else f"<v>{_serial(day)}</v>"
+            # the date is stored beside the reference too: Protected View calculates nothing and showed blanks
+            date = f"<f>$C$1</f><v>{_serial(day)}</v>" if day == shared else f"<v>{_serial(day)}</v>"
             inputs = (f'{_text(f"B{r}", series_id)}<c r="C{r}" s="{_STYLE_DATE}">{date}</c>'
                       f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>_xll.ES.Value(B{r},C{r})</f></c>')
         else:
@@ -341,6 +357,12 @@ _STYLES = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
            '</styleSheet>')
 
 
+C1_NOTE = ("The Date in cell C1 belongs to the rows whose Date cell shows the same date: change C1 and those rows "
+           "follow, with everything calculated from them. A row with another date keeps its own cell and does not "
+           "move, so where a tab compares dates (a change over thirty days, the same week of earlier years) moving "
+           "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value.")
+
+
 def notes(given_at: str) -> list[str]:
     """What a reader needs under the rows of every tab. `given_at` is when the answer was given, as text."""
     return [
@@ -354,15 +376,14 @@ def notes(given_at: str) -> list[str]:
         "Value is fetched from the Series and Date beside it, or calculated from the Value cells above. Reported is "
         "what The Librarian said. Check says \"same\" when they agree to within 0.00005 or one part in a million, "
         "which is the check the service applies; otherwise it is Value minus Reported.",
-        "The Date in cell C1 is the date most rows of this tab use; each of them refers to it, so change C1 and "
-        "they all follow, with everything calculated from them. A row with another date keeps its own cell.",
+        C1_NOTE,
         "Change a Date or a Series ID and Value follows; Reported stays what the answer said, so Check will then "
         "show the difference. Values are shown to two decimals; the cells hold every digit.",
         # The reviewer, editing as a reader would: "WTI ..., 2026-11-11" stayed beside a Date of 2026-10-12, and an
         # emptied Date gave the latest value with nothing to say which day (on a forecast series, the furthest one).
         "The text in What was written for the original series and date and does not change when you edit them. "
-        "Write dates as 2026-11-17 or pick them as dates. An empty Date gives the last value of the series, which "
-        "on a series that includes forecasts is the furthest forecast.",
+        "Write dates as 2026-11-17 or pick them as dates. A row's own Date left empty gives the last value of the "
+        "series, which on a series that includes forecasts is the furthest forecast.",
         f"Value needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If it reads "
         "#NAME?, the add-in is not loaded; with no key, it says so in words.",
     ]
@@ -419,7 +440,7 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
 _FILE_ROW = re.compile(
     r'<row r="(\d+)"><c r="A\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
     r'(?:<c r="B\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
-    r'<c r="C\d+" s="\d+">(?:<v>(\d+)</v>|<f>(\$C\$1)</f>)</c>)?'
+    r'<c r="C\d+" s="\d+">(?:<v>(\d+)</v>|<f>(\$C\$1)</f><v>\d+</v>)</c>)?'
     r'<c r="D\d+" s="\d+"><f>(.*?)</f></c><c r="E\d+" s="\d+"><v>(.*?)</v></c>')
 _FILE_TOP = re.compile(r'<c r="C1" s="\d+"><v>(\d+)</v></c>')
 _FILE_REF = re.compile(r"\bD(\d+)\b")

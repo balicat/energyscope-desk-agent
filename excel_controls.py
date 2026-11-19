@@ -108,6 +108,10 @@ def _cells(xml):
     """{(column, row): (style or None, 'text' | 'formula' | 'value', content)} of one worksheet."""
     out = {}
     for col, row, style, body in _CELL.findall(xml):
+        both = _re.fullmatch(r"<f>(.*?)</f><v>(.*?)</v>", body)
+        if both:    # a formula with a result stored beside it: only a Date cell that refers to C1 may have one
+            out[(col, int(row))] = (style or None, "stored", f"{both[1]} = {both[2]}")
+            continue
         for kind, pat in (("text", r"<is><t[^>]*>(.*?)</t></is>"), ("formula", r"<f>(.*?)</f>"), ("value", r"<v>(.*?)</v>")):
             m = _re.fullmatch(pat, body)
             if m:
@@ -128,7 +132,12 @@ _bold = lambda style: style is not None and int(style) < len(_xfs) and _xfs[int(
 layout = []
 # Where things are, stated here and not taken from the writer: the tab's date in C1 beside a label in A1, the
 # header in row 3 (frozen), the sheet's rows from row 4.
-_TOP_LABEL = "Date (change this one cell: every row below that shows this date follows)"
+# The words beside C1 count the rows that follow it, and the note under the rows says what does not move. Both
+# are spelled out here: the reviewer rewrote the note to say ALL rows follow and the first control passed it.
+_C1_NOTE = ("The Date in cell C1 belongs to the rows whose Date cell shows the same date: change C1 and those rows "
+            "follow, with everything calculated from them. A row with another date keeps its own cell and does not "
+            "move, so where a tab compares dates (a change over thirty days, the same week of earlier years) moving "
+            "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value.")
 _HEAD, _FIRST = 3, 4
 _serial = lambda day: (_dt.date.fromisoformat(day) - _dt.date(1899, 12, 30)).days
 for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
@@ -139,8 +148,13 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     shared = max(days, key=lambda d: (days.count(d), -days.index(d))) if days else None
     top = c.get(("C", 1), (None, "", ""))
     if shared is not None:
-        if c.get(("A", 1), (None, "", ""))[1:] != ("text", _TOP_LABEL) or not _bold(c.get(("A", 1), (None,))[0]):
-            layout.append(f"{where}: A1 is not the label of the tab's date, in bold")
+        _n, _k = len(days), days.count(shared)
+        _label = ("Date: change this cell and the one fetched row follows" if _n == 1 else
+                  f"Date: change this cell and all {_n} fetched rows follow" if _k == _n else
+                  f"Date: change this cell and {_k} of {_n} fetched rows follow{'s' if _k == 1 else ''}; the other "
+                  + ("one keeps its own date" if _n - _k == 1 else f"{_n - _k} keep their own dates"))
+        if c.get(("A", 1), (None, "", ""))[1:] != ("text", _label) or not _bold(c.get(("A", 1), (None,))[0]):
+            layout.append(f"{where}: A1 does not say, in bold, that {_k} of {_n} fetched rows follow C1")
         if top[1:] != ("value", str(_serial(shared))) or _shown(top[0]) != "yyyy-mm-dd":
             layout.append(f"{where}: C1 is not the tab's date {shared} as a real date shown yyyy-mm-dd")
     if [c.get((col, _HEAD), (None, "", ""))[2] for col in "ABCDEF"] != ["What", "Series", "Date", "Value", "Reported", "Check"]:
@@ -163,7 +177,8 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             # a row on the tab's date must REFER to C1, so that one edit moves it; a row on another date must
             # hold its own date, or an edit of C1 would move a row it should not
             date = c.get(("C", r), (None, "", ""))
-            wanted = ("formula", "$C$1") if day == shared else ("value", str(_serial(day)))
+            # (and it stores that date beside the reference, which is what Protected View shows)
+            wanted = ("stored", f"$C$1 = {_serial(day)}") if day == shared else ("value", str(_serial(day)))
             if date[1:] != wanted or _shown(date[0]) != "yyyy-mm-dd":
                 layout.append(f"{at}: the Date cell should be {wanted[1]} ({day}) shown yyyy-mm-dd, the file has {date[2]}")
             if value[1:] != ("formula", f"_xll.ES.Value(B{r},C{r})"):
@@ -222,10 +237,11 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     c = _cells(_xml)
     notes = [v[2] for (col, r), v in c.items() if col == "A" and r >= _FIRST + len(_sheet.rows) and v[1] == "text"]
     for needed, why in (("Protected View", "what to do when nothing calculates"), (GIVEN_AT, "when the answer was given"),
-                        ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear"),
-                        ("C1", "which cell moves the whole tab to another date")):
+                        ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear")):
         if not any(needed in n for n in notes):
             layout.append(f"tab {_t}: no note says {why} ({needed!r})")
+    if _C1_NOTE not in notes:
+        layout.append(f"tab {_t}: the note on C1 is not the one that says which rows follow and which do not move")
 if not _tabs or not _styles:
     layout.append("the workbook has no worksheets or no styles")
 failures += layout[:6]
