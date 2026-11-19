@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import ast
 import datetime as dt
+import decimal
 import io
 import operator
 import re
@@ -58,9 +59,19 @@ class Row(BaseModel):
     value: float
 
 
+class Window(BaseModel):
+    """The run of observations a sheet's statistics are taken over: every value of one series from `start` to
+    the sheet's date (the date most of its fetching rows use). Formulas name it W: COUNT(W), MIN(W), MAX(W),
+    AVERAGE(W), STDEV.P(W) and COUNTIF(W,"<="&B1). A row-per-number sheet cannot hold 750 observations, so in
+    the workbook W is a column of the tab's history table, and such a sheet cannot be pasted at A1."""
+    series_id: str
+    start: dt.date
+
+
 class Sheet(BaseModel):
     title: str
     rows: list[Row]
+    window: Window | None = None
 
 
 def _get(series_id: str, d: dt.date) -> str:
@@ -130,10 +141,61 @@ def _seasonal(r: Reading, source: DataSource) -> Sheet | None:
     return Sheet(title=r.title, rows=rows)
 
 
+RANK = '=ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1)'     # the share of the window at or below the latest, as _rank
+
+
+def _percentile(r: Reading, source: DataSource) -> Sheet | None:
+    """The latest value against its own last N years: the window is every observation the reading ranked."""
+    series_id, years = r.series_ids[0], int(r.values["years"])
+    hist = source.history(series_id, start=readings._since(366 * years))
+    if len(hist) < 20 or hist[-1][0] != r.period:
+        return None
+    rows = [
+        Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=r.values["latest"]),
+        Row(label="Percentile: the share of the window's values at or below the latest", formula=RANK,
+            value=r.values["percentile"]),
+        Row(label="Lowest value of the window", formula="=MIN(W)", value=r.values["low"]),
+        Row(label="Highest value of the window", formula="=MAX(W)", value=r.values["high"]),
+        Row(label="Average of the window", formula="=AVERAGE(W)", value=r.values["average"]),
+    ]
+    if len({v for _, v in hist}) > 1:       # with every value the same there is no deviation to divide by
+        rows.append(Row(label="Standard deviations from that average", formula="=ROUND((B1-B5)/STDEV.P(W),2)",
+                        value=r.values["z_score"]))
+    rows.append(Row(label="Values in the window", formula="=COUNT(W)", value=r.values["observations"]))
+    return Sheet(title=r.title, rows=rows, window=Window(series_id=series_id, start=hist[0][0]))
+
+
+def _positioning(r: Reading, source: DataSource) -> Sheet | None:
+    """Managed-money positioning: four figures of the latest report, the change on the week, and the net
+    position ranked against the weekly reports the reading used."""
+    net_id, long_id, short_id, oi_id = r.series_ids
+    net = source.history(net_id, start=readings._since(7 * readings.PERCENTILE_WEEKS + 30))[-readings.PERCENTILE_WEEKS:]
+    if len(net) < 20 or net[-1][0] != r.period:
+        return None
+    before, before_value = net[-2]
+    rows = [
+        Row(label=f"Managed money, net position, {r.period} (contracts)", formula=_get(net_id, r.period),
+            value=r.values["managed_money_net"]),
+        Row(label="Managed money, long", formula=_get(long_id, r.period), value=r.values["managed_money_long"]),
+        Row(label="Managed money, short", formula=_get(short_id, r.period), value=r.values["managed_money_short"]),
+        Row(label="Open interest", formula=_get(oi_id, r.period), value=r.values["open_interest"]),
+        Row(label=f"Net position in the report before, {before}", formula=_get(net_id, before), value=before_value),
+        Row(label="Change in the net position on the week", formula="=B1-B5", value=r.values["net_change_on_week"]),
+        Row(label="Percentile: the share of the window's weekly net positions at or below the latest", formula=RANK,
+            value=r.values["net_percentile"]),
+        Row(label="Weekly reports in the window", formula="=COUNT(W)", value=r.values["percentile_weeks"]),
+    ]
+    return Sheet(title=r.title, rows=rows, window=Window(series_id=net_id, start=net[0][0]))
+
+
 def for_reading(r: Reading, source: DataSource) -> Sheet | None:
     kind = r.key.split(":", 1)[0]
     if r.hypothetical:
         return None
+    if kind == "percentile":
+        return _percentile(r, source)
+    if kind == "positioning":
+        return _positioning(r, source)
     if kind == "curve":
         return _curve(r)
     if kind == "crack":
@@ -165,9 +227,35 @@ def _arithmetic(node) -> float:
     raise ValueError("not arithmetic")
 
 
+_W_STAT = re.compile(r"\b(COUNT|MIN|MAX|AVERAGE|STDEV\.P)\(W\)")
+_W_RANK = re.compile(r'COUNTIF\(W,"<="&B(\d+)\)')
+_ROUND = re.compile(r"ROUND\((.*),(\d+)\)")
+
+
+def excel_round(x: float, places: int) -> float:
+    """ROUND as Excel does it: a half goes away from zero. Python's round() sends 12.25 to 12.2; Excel shows
+    12.3. A reading that reports the former beside a sheet that would show the latter must be seen here."""
+    return float(decimal.Decimal(repr(x)).quantize(decimal.Decimal(1).scaleb(-places), rounding=decimal.ROUND_HALF_UP))
+
+
+def _statistic(name: str, sample: list[float]) -> float:
+    mean = sum(sample) / len(sample)
+    return {"COUNT": float(len(sample)), "MIN": min(sample), "MAX": max(sample), "AVERAGE": mean,
+            "STDEV.P": (sum((x - mean) ** 2 for x in sample) / len(sample)) ** 0.5}[name]
+
+
+def window_values(sheet: Sheet, source: DataSource) -> list[float]:
+    """The observations W stands for: the window's series from its start to the sheet's date."""
+    end = dt.date.fromisoformat(tab_date(sheet))
+    return [float(v) for d, v in source.history(sheet.window.series_id, start=sheet.window.start) if d <= end]
+
+
 def evaluate(sheet: Sheet, source: DataSource) -> list[float]:
     """What each formula gives, in order, as if the rows were pasted at A1 (so row i is cell B{i})."""
     out: list[float] = []
+    sample = window_values(sheet, source) if sheet.window is not None else None
+    if sample is not None and not sample:
+        raise ValueError(f"the window of {sheet.window.series_id} from {sheet.window.start} holds no value")
     for row in sheet.rows:
         fetch = _GET.match(row.formula)
         if fetch:
@@ -183,9 +271,17 @@ def evaluate(sheet: Sheet, source: DataSource) -> list[float]:
             cells = out[int(m[2]) - 1:int(m[3])]
             return repr({"AVERAGE": sum(cells) / len(cells), "MIN": min(cells), "MAX": max(cells)}[m[1]])
 
-        text = _RANGE.sub(over, row.formula.lstrip("="))
+        text, places = row.formula.lstrip("="), None
+        rounded = _ROUND.fullmatch(text)
+        if rounded:
+            text, places = rounded[1], int(rounded[2])
+        if sample is not None:
+            text = _W_RANK.sub(lambda m: repr(float(sum(x <= out[int(m[1]) - 1] for x in sample))), text)
+            text = _W_STAT.sub(lambda m: f"({_statistic(m[1], sample)!r})", text)
+        text = _RANGE.sub(over, text)
         text = _REF.sub(lambda m: f"({out[int(m[1]) - 1]!r})", text)
-        out.append(_arithmetic(ast.parse(text, mode="eval")))
+        value = _arithmetic(ast.parse(text, mode="eval"))
+        out.append(value if places is None else excel_round(value, places))
     return out
 
 
@@ -294,6 +390,17 @@ CHARTS_MOST = 3
 CHART_COLUMNS, CHART_ROWS = (7, 16), 16              # H to P (counted from 0), sixteen rows each, a row between
 HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the first three series; "
                  "the table behind them starts in column R")
+# A sheet with a window (percentile, positioning) uses row 2: C2 is the window's start, and the table runs from
+# C2 to C1 instead of over a year, so that the statistics in the rows are taken over the table itself.
+WINDOW_LABEL = "Window from (the statistics below use every value from this date to the date in C1)"
+HISTORY_LABEL_WINDOW = ("History: from the date in C2 to the date in C1, the window the statistics use. A chart for "
+                        "each of the first three series; the table starts in column R")
+WINDOW_NOTE = ("To the right: this sheet's series from the date in C2 to the date in C1, as charts (the first three "
+               "series) and as a table from column R, filled by the one formula in R4. The statistics in the rows are "
+               "taken over that table: AGGREGATE(5,6,..), (4,6,..), (1,6,..) and (8,6,..) are MIN, MAX, AVERAGE and "
+               "STDEV.P that skip the days with no value, which show #N/A in grey. Move C2 or C1 and the window, the "
+               "statistics and the charts follow; do not type inside the table. This part needs Excel 365 or Excel 2021.")
+_AGGREGATE = {"MIN": 5, "MAX": 4, "AVERAGE": 1, "STDEV.P": 8}
 HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
                 "first three series) and as a table from column R, filled by the one formula in R4. Both follow "
                 "C1 and the Series cells. The table has a row for every day; a day with no value shows #N/A in grey. Do not type inside it. "
@@ -336,18 +443,42 @@ def _column(n: int) -> str:
     return s
 
 
-def history_formula(count: int) -> str:
-    """The one formula of the history table, as the file stores it, for a tab with `count` series."""
+def history_formula(count: int, windowed: bool = False) -> str:
+    """The one formula of the history table, as the file stores it, for a tab with `count` series: the year to
+    C1, or from C2 to C1 on a tab whose statistics are taken over the table."""
     first, last = _column(HISTORY_COLUMN + 1), _column(HISTORY_COLUMN + count)
+    start = "$C$2" if windowed else f"$C$1-{HISTORY_DAYS}"
     # The frequency is "D", a row for every day. Left to itself ES.Table puts a weekly series on a regular
     # weekly grid counted from its first date, and a report dated on another weekday (a holiday week) falls
     # off it: 155 of 156 weekly positioning reports, seen in Excel. On a daily grid nothing can fall off.
-    return f'_xll.ES.Table({first}{HEADER_ROW}:{last}{HEADER_ROW},$C$1-{HISTORY_DAYS},$C$1,"#N/A","D")'
+    return f'_xll.ES.Table({first}{HEADER_ROW}:{last}{HEADER_ROW},{start},$C$1,"#N/A","D")'
 
 
-def _moved(formula: str) -> str:
-    """An arithmetic formula as the workbook holds it: B{n} of the pasted form is D{n + FIRST_ROW - 1} here."""
-    return _REF.sub(lambda m: f"D{int(m[1]) + FIRST_ROW - 1}", formula.lstrip("="))
+def history_last_row(sheet: Sheet) -> int:
+    """The last row the table can reach: one row a day from its start to the tab's date."""
+    if sheet.window is None:
+        return HISTORY_LAST_ROW
+    return FIRST_ROW + (dt.date.fromisoformat(tab_date(sheet)) - sheet.window.start).days
+
+
+def window_range(sheet: Sheet) -> str:
+    """Where W is in the file: the window series' column of the history table."""
+    col = _column(HISTORY_COLUMN + 1 + tab_series(sheet).index(sheet.window.series_id))
+    return f"${col}${FIRST_ROW}:${col}${history_last_row(sheet)}"
+
+
+def _moved(formula: str, sheet: Sheet | None = None) -> str:
+    """A calculating formula as the workbook holds it: B{n} of the pasted form is D{n + FIRST_ROW - 1} here, and
+    W is the window's column of the table. The table has #N/A on days without a value: COUNT and COUNTIF pass
+    over those, MIN, MAX, AVERAGE and STDEV.P would return the error, so they become AGGREGATE(n, 6, range).
+    In a file AGGREGATE carries the prefix _xlfn. (a function newer than the format): without it Excel 16
+    showed #NAME? in every such cell."""
+    text = formula.lstrip("=")
+    if sheet is not None and sheet.window is not None:
+        rng = window_range(sheet)
+        text = re.sub(r"\b(MIN|MAX|AVERAGE|STDEV\.P)\(W\)", lambda m: f"_xlfn.AGGREGATE({_AGGREGATE[m[1]]},6,{rng})", text)
+        text = text.replace("COUNT(W)", f"COUNT({rng})").replace("COUNTIF(W,", f"COUNTIF({rng},")
+    return _REF.sub(lambda m: f"D{int(m[1]) + FIRST_ROW - 1}", text)
 
 
 def _same(r: int) -> str:
@@ -374,7 +505,11 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
     if shared is not None:
         xml.append(f'<row r="1">{_text("A1", date_label(days.count(shared), len(days)), _STYLE_HEAD)}'
                    f'<c r="C1" s="{_STYLE_DATE}"><v>{_serial(shared)}</v></c>'
-                   f'{_text("H1", HISTORY_LABEL, _STYLE_HEAD)}</row>')
+                   f'{_text("H1", HISTORY_LABEL_WINDOW if sheet.window else HISTORY_LABEL, _STYLE_HEAD)}</row>')
+    if sheet.window is not None:
+        xml.append(f'<row r="2">{_text("A2", WINDOW_LABEL, _STYLE_HEAD)}'
+                   f'<c r="C2" s="{_STYLE_DATE}"><v>{_serial(str(sheet.window.start))}</v></c></row>')
+        notes = [WINDOW_NOTE if note == HISTORY_NOTE else note for note in notes]
     # the history's header: each series cell REFERS to the Series cell of the first row that names it (the ID is
     # stored beside the reference, as the date is beside =$C$1, for Protected View). The reference is never
     # empty and never a number: =IF(B4="","(empty)",B4&""). A bare =B4 of an emptied cell is the NUMBER 0, and
@@ -407,9 +542,9 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
             inputs = (f'{_text(f"B{r}", series_id)}<c r="C{r}" s="{_STYLE_DATE}">{date}</c>'
                       f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>_xll.ES.Value(B{r},C{r})</f></c>')
         else:
-            inputs = f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>{escape(_moved(row.formula))}</f></c>'
+            inputs = f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>{escape(_moved(row.formula, sheet))}</f></c>'
         # the history's one formula sits at the end of the first row; cm="1" and t="array" let it fill other cells
-        table = (f'<c r="{d}{r}" s="{_STYLE_DATE}" cm="1"><f t="array" ref="{d}{r}">{history_formula(len(series))}</f></c>'
+        table = (f'<c r="{d}{r}" s="{_STYLE_DATE}" cm="1"><f t="array" ref="{d}{r}">{history_formula(len(series), sheet.window is not None)}</f></c>'
                  if i == 0 and series else "")
         xml.append(f'<row r="{r}">{_text(f"A{r}", row.label)}{inputs}'
                    f'<c r="E{r}" s="{_STYLE_NUMBER}"><v>{row.value!r}</v></c>'
@@ -423,7 +558,7 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
     history = ""
     if series:
         first, last = _column(HISTORY_COLUMN + 1), _column(HISTORY_COLUMN + len(series))
-        history = (f'<conditionalFormatting sqref="{first}{FIRST_ROW}:{last}{HISTORY_LAST_ROW}">'
+        history = (f'<conditionalFormatting sqref="{first}{FIRST_ROW}:{last}{history_last_row(sheet)}">'
                    f'<cfRule type="containsErrors" dxfId="0" priority="1"><formula>ISERROR({first}{FIRST_ROW})</formula>'
                    '</cfRule></conditionalFormatting><drawing r:id="rId1"/>')
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -479,7 +614,7 @@ _METADATA = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 _SMALL = '<c:txPr><a:bodyPr/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:endParaRPr lang="en-GB"/></a:p></c:txPr>'
 
 
-def _chart(tab: str, k: int) -> str:
+def _chart(tab: str, k: int, last_row: int = HISTORY_LAST_ROW) -> str:
     """A line chart of the tab's k-th series (from 0) over the history table: one series, one value axis, its
     title the series' header cell, dates in months, days with no value spanned."""
     q = escape("'" + tab.replace("'", "''") + "'")
@@ -495,8 +630,8 @@ def _chart(tab: str, k: int) -> str:
             f'<c:tx><c:strRef><c:f>{q}!${col}${HEADER_ROW}</c:f></c:strRef></c:tx>'
             '<c:spPr><a:ln w="19050" cap="rnd"><a:solidFill><a:srgbClr val="2F6DB5"/></a:solidFill><a:round/></a:ln></c:spPr>'
             '<c:marker><c:symbol val="none"/></c:marker>'
-            f'<c:cat><c:numRef><c:f>{q}!${d}${FIRST_ROW}:${d}${HISTORY_LAST_ROW}</c:f></c:numRef></c:cat>'
-            f'<c:val><c:numRef><c:f>{q}!${col}${FIRST_ROW}:${col}${HISTORY_LAST_ROW}</c:f></c:numRef></c:val>'
+            f'<c:cat><c:numRef><c:f>{q}!${d}${FIRST_ROW}:${d}${last_row}</c:f></c:numRef></c:cat>'
+            f'<c:val><c:numRef><c:f>{q}!${col}${FIRST_ROW}:${col}${last_row}</c:f></c:numRef></c:val>'
             '<c:smooth val="0"/></c:ser><c:marker val="1"/><c:axId val="1"/><c:axId val="2"/></c:lineChart>'
             '<c:dateAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/>'
             '<c:axPos val="b"/><c:numFmt formatCode="mmm yy" sourceLinked="0"/><c:majorTickMark val="none"/>'
@@ -580,7 +715,7 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
         rels = []
         for k in range(count):
             charts += 1
-            drawn[f"xl/charts/chart{charts}.xml"] = _chart(name, k)
+            drawn[f"xl/charts/chart{charts}.xml"] = _chart(name, k, history_last_row(sheet))
             rels.append(f'<Relationship Id="rId{k + 1}" Type="{_REL}/chart" Target="../charts/chart{charts}.xml"/>')
             overrides.append(f'<Override PartName="/xl/charts/chart{charts}.xml" '
                              'ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>')
@@ -642,6 +777,10 @@ _FILE_ROW = re.compile(
     r'<c r="D\d+" s="\d+"><f>(.*?)</f></c><c r="E\d+" s="\d+"><v>(.*?)</v></c>')
 _FILE_TOP = re.compile(r'<c r="C1" s="\d+"><v>(\d+)</v></c>')
 _FILE_REF = re.compile(r"\bD(\d+)\b")
+_FILE_RANGE = r"\$[A-Z]+\$\d+:\$[A-Z]+\$\d+"
+_FILE_AGGREGATE = re.compile(r"_xlfn\.AGGREGATE\((\d),6," + _FILE_RANGE + r"\)")
+_FILE_COUNT = re.compile(r"\b(COUNT|COUNTIF)\(" + _FILE_RANGE + r"([,)])")
+_AGGREGATE_NAME = {str(n): name for name, n in _AGGREGATE.items()}
 
 
 def read_back(data: bytes) -> list[list[tuple[str, str, float]]]:
@@ -667,7 +806,10 @@ def read_back(data: bytes) -> list[list[tuple[str, str, float]]]:
                     day = _EPOCH + dt.timedelta(days=int(top[1] if refers else serial))
                     canonical = f'=ES.Value("{unescape(series_id)}","{day}")'
                 else:
-                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - FIRST_ROW + 1}", unescape(formula))
+                    # a statistic over the window comes back as the sheet writes it: AGGREGATE(5,6,range) is MIN(W)
+                    text = _FILE_AGGREGATE.sub(lambda m: f"{_AGGREGATE_NAME[m[1]]}(W)", unescape(formula))
+                    text = _FILE_COUNT.sub(lambda m: f"{m[1]}(W{m[2]}", text)
+                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - FIRST_ROW + 1}", text)
                 rows.append((unescape(label), canonical, float(value)))
             tabs.append(rows)
     return tabs

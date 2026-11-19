@@ -30,6 +30,15 @@ def edited(sheet: excel.Sheet, row: int, old: str, new: str) -> excel.Sheet:
     return copy
 
 
+def windowed(sheet: excel.Sheet, days: int = 0, series: str = "") -> excel.Sheet:
+    """The same sheet over another window: starting `days` later, or over another series."""
+    import datetime
+    copy = sheet.model_copy(deep=True)
+    copy.window = excel.Window(series_id=series or copy.window.series_id,
+                               start=copy.window.start + datetime.timedelta(days=days))
+    return copy
+
+
 def fact_sheet(percent_places: int) -> excel.Sheet:
     c = metrics.change_over(source.meta(WTI), source.history(WTI), 30)
     return excel.for_fact(SeriesFact(series_id=WTI, name=c.name, units=c.units, latest_period=c.latest_period,
@@ -44,6 +53,10 @@ good = {
     "curve": excel.for_reading(readings.curve(source, "brent"), source),
     "crack": excel.for_reading(readings.crack(source, "3-2-1"), source),
     "seasonal": excel.for_reading(readings.seasonal(source, "PET.WCESTUS1.W", 5), source),
+    # two whose statistics are taken over a window of observations: a daily series against its last three
+    # years, and weekly positioning against its last 156 reports
+    "percentile": excel.for_reading(readings.percentile(source, "NG.RNGWHHD.D", 3), source),
+    "positioning": excel.for_reading(readings.positioning(source, "wti"), source),
 }
 failures = []
 for name, sheet in good.items():
@@ -75,6 +88,15 @@ planted = [
     # the live model wrote on 19 Nov 2026. It must be reported, because the validator now copies the tool's
     # figure into the fact, and a rounded one reaching a sheet means that copy did not happen.
     ("a percent the model rounded to two decimals", fact_sheet(2)),
+    # the window sheets
+    ("a percentile counted from the top (at or above)", edited(good["percentile"], 1, '"<="', '">="')),
+    ("a percentile rounded to a whole number", edited(good["percentile"], 1, "*100,1)", "*100,0)")),
+    ("the highest of the window where the lowest belongs", edited(good["percentile"], 2, "MIN(W)", "MAX(W)")),
+    ("deviations from the highest, not from the average", edited(good["percentile"], 5, "(B1-B5)", "(B1-B4)")),
+    ("a window that starts a month late", windowed(good["percentile"], days=30)),
+    ("the change on the week reversed", edited(good["positioning"], 5, "=B1-B5", "=B5-B1")),
+    ("the net position ranked in the window of the longs", windowed(good["positioning"], series=good["positioning"].rows[1].formula.split('"')[1])),
+    ("a window one report short", windowed(good["positioning"], days=7)),
 ]
 for what, sheet in planted:
     if not excel.problems(sheet, source):
@@ -126,6 +148,19 @@ def _cells(xml):
                 if m and attrs == (' t="inlineStr"' if kind == "text" else ""):
                     out[key] = (style, kind, un(m[1]))
     return out
+
+
+def _col(n):
+    """1 -> A, 27 -> AA."""
+    s = ""
+    while n:
+        n, k = divmod(n - 1, 26)
+        s = chr(65 + k) + s
+    return s
+
+
+# the label beside the first day of a window, in A2 of a tab whose statistics are taken over one
+_WINDOW_LABEL = "Window from (the statistics below use every value from this date to the date in C1)"
 
 
 def _notes(c, start):
@@ -213,7 +248,26 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         else:
             # the sheet's arithmetic names cells of the pasted form (formula in column B, first row 1); in the
             # file the same cells are column D, three rows down. No other column may be named.
-            moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + _FIRST - 1}", row.formula.lstrip("="))
+            moved = row.formula.lstrip("=")
+            if _sheet.window is not None:
+                # W is the window series' column of the table, from row 4 to one row a day later up to the tab's
+                # date. The table has #N/A on days without a value: COUNT and COUNTIF pass over them; MIN, MAX,
+                # AVERAGE and STDEV.P must be AGGREGATE(5|4|1|8, 6, range), spelled _xlfn.AGGREGATE in a file
+                # (without the prefix Excel 16 showed #NAME?).
+                order = []
+                for other in _sheet.rows:
+                    m = _FETCH.match(other.formula)
+                    if m and m[1] not in order:
+                        order.append(m[1])
+                wcol = _col(19 + order.index(_sheet.window.series_id))
+                wlast = _FIRST + (_dt.date.fromisoformat(shared) - _sheet.window.start).days
+                rng = f"${wcol}${_FIRST}:${wcol}${wlast}"
+                for name, code in (("MIN", 5), ("MAX", 4), ("AVERAGE", 1), ("STDEV.P", 8)):
+                    moved = moved.replace(f"{name}(W)", f"_xlfn.AGGREGATE({code},6,{rng})")
+                moved = moved.replace("COUNT(W)", f"COUNT({rng})").replace("COUNTIF(W,", f"COUNTIF({rng},")
+                if "W" in _re.sub(r"[A-Za-z_.]+\(", "", moved).replace("ROUND", ""):
+                    layout.append(f"{at}: a statistic over the window that this control cannot place: {row.formula}")
+            moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + _FIRST - 1}", moved)
             named = {col for col, _ in _re.findall(r"\b([A-Z]{1,3})(\d+)\b", value[2])}
             if value[1:] != ("formula", moved) or named - {"D"}:
                 layout.append(f"{at}: Value should be {moved}, the file has {value[2]}")
@@ -232,8 +286,15 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             layout.append(f"{at}: Check is not the verdict formula in the General format: {check[2][:80]}")
     # nothing may sit between the top cell and the header, or in the header's own row beyond its six cells
     # (columns A to F; what stands right of them is the history, stated further down)
-    stray = sorted(k for k in c if k[1] < _FIRST and len(k[0]) == 1 and k[0] <= "F"
-                   and k not in {("A", 1), ("C", 1)} | {(col, _HEAD) for col in "ABCDEF"})
+    # A sheet with a window uses row 2: A2 a label, C2 the first day of the window as a real date.
+    above = {("A", 1), ("C", 1)} | {(col, _HEAD) for col in "ABCDEF"}
+    if _sheet.window is not None:
+        above |= {("A", 2), ("C", 2)}
+        start = c.get(("C", 2), (None, "", ""))
+        if (c.get(("A", 2), (None, "", ""))[1:] != ("text", _WINDOW_LABEL) or not _bold(c.get(("A", 2), (None,))[0])
+                or start[1:] != ("value", str(_serial(str(_sheet.window.start)))) or _shown(start[0]) != "yyyy-mm-dd"):
+            layout.append(f"{where}: row 2 is not the window's start {_sheet.window.start}, labelled in bold, as a real date")
+    stray = sorted(k for k in c if k[1] < _FIRST and len(k[0]) == 1 and k[0] <= "F" and k not in above)
     if stray:
         layout.append(f"{where}: unexpected cells above the rows: {stray[:4]}")
 # What holds for the workbook as a whole. The reviewer's second set, written before it had read the control:
@@ -284,6 +345,13 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
 # other cell right of column F: inside the table's range it would stop the formula filling (#SPILL!). One line
 # chart per series, three at most, in columns H to P below the frozen rows and clear of each other, each reading
 # the dates R4:R369, its own series column and its own header cell, with ONE value axis.
+_HISTORY_LABEL_WINDOW = ("History: from the date in C2 to the date in C1, the window the statistics use. A chart for "
+                         "each of the first three series; the table starts in column R")
+_WINDOW_NOTE = ("To the right: this sheet's series from the date in C2 to the date in C1, as charts (the first three "
+                "series) and as a table from column R, filled by the one formula in R4. The statistics in the rows are "
+                "taken over that table: AGGREGATE(5,6,..), (4,6,..), (1,6,..) and (8,6,..) are MIN, MAX, AVERAGE and "
+                "STDEV.P that skip the days with no value, which show #N/A in grey. Move C2 or C1 and the window, the "
+                "statistics and the charts follow; do not type inside the table. This part needs Excel 365 or Excel 2021.")
 _HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the first three series; "
                   "the table behind them starts in column R")
 _HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
@@ -291,14 +359,6 @@ _HISTORY_NOTE = ("To the right: the history of this sheet's series over the year
                  "C1 and the Series cells. The table has a row for every day; a day with no value shows #N/A in grey. Do not type inside it. "
                  "This part needs Excel 365 or Excel 2021.")
 _num = lambda col: sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col)))
-
-
-def _col(n):
-    s = ""
-    while n:
-        n, k = divmod(n - 1, 26)
-        s = chr(65 + k) + s
-    return s
 
 
 with _zip.ZipFile(_io.BytesIO(book)) as _z:
@@ -327,8 +387,14 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             layout.append(f"{where}: fetches nothing and has a history")
         continue
     last = _col(18 + len(ids))
-    stated = {("H", 1): ("text", _HISTORY_LABEL, True, None), ("R", _HEAD): ("text", "Date", True, None),
-              ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},$C$1-365,$C$1,"#N/A","D")', False, "yyyy-mm-dd")}
+    # with a window the table runs from C2 to C1 and reaches one row a day down from row 4; otherwise a year, to 369
+    _days = [m[2] for m in (_FETCH.match(row.formula) for row in _sheet.rows) if m]
+    _top = max(_days, key=lambda d: (_days.count(d), -_days.index(d)))
+    _from = "$C$2" if _sheet.window is not None else "$C$1-365"
+    _end = _FIRST + ((_dt.date.fromisoformat(_top) - _sheet.window.start).days if _sheet.window is not None else 365)
+    stated = {("H", 1): ("text", _HISTORY_LABEL_WINDOW if _sheet.window is not None else _HISTORY_LABEL, True, None),
+              ("R", _HEAD): ("text", "Date", True, None),
+              ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},{_from},$C$1,"#N/A","D")', False, "yyyy-mm-dd")}
     for k, sid in enumerate(ids):
         # never empty, never a number: an emptied Series cell must reach ES.Table as a name it does not know,
         # which keeps the column's place (a number is skipped, an empty text at either end is trimmed, and the
@@ -351,12 +417,12 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     if any(cols.get(19 + k, (0, None))[0] < max(14, len(sid) + 4) or _shown(cols.get(19 + k, (0, None))[1]) != "#,##0.00"
            for k, sid in enumerate(ids)):
         layout.append(f"{where}: a series column of the history is too narrow for its ID or not shown as #,##0.00")
-    if (f'<conditionalFormatting sqref="S{_FIRST}:{last}369"><cfRule type="containsErrors" dxfId="0" priority="1">'
+    if (f'<conditionalFormatting sqref="S{_FIRST}:{last}{_end}"><cfRule type="containsErrors" dxfId="0" priority="1">'
             f'<formula>ISERROR(S{_FIRST})</formula></cfRule></conditionalFormatting>') not in _xml:
-        layout.append(f"{where}: the history's days without a value are not shown in grey over S{_FIRST}:{last}369")
+        layout.append(f"{where}: the history's days without a value are not shown in grey over S{_FIRST}:{last}{_end}")
     notes = _notes(c, _FIRST + len(_sheet.rows))[0]
-    if _HISTORY_NOTE not in notes:
-        layout.append(f"{where}: the note on the history is missing or reworded")
+    if (_WINDOW_NOTE if _sheet.window is not None else _HISTORY_NOTE) not in notes or (_WINDOW_NOTE in notes and _HISTORY_NOTE in notes):
+        layout.append(f"{where}: the note on the history is missing, reworded or the wrong one for this tab")
     # the charts
     name = _unx(_named[_t - 1][0]) if _t <= len(_named) else ""
     q = "'" + name.replace("'", "''") + "'"
@@ -388,7 +454,7 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         _used.add(part)
         col = _col(19 + k)
         reads = [_unx(f) for f in _re.findall(r"<c:f>(.*?)</c:f>", chart)]
-        should = [f"{q}!${col}${_HEAD}", f"{q}!$R${_FIRST}:$R$369", f"{q}!${col}${_FIRST}:${col}$369"]
+        should = [f"{q}!${col}${_HEAD}", f"{q}!$R${_FIRST}:$R${_end}", f"{q}!${col}${_FIRST}:${col}${_end}"]
         if reads != should:
             layout.append(f"{at}: reads {reads}, should read {should}")
         if chart.count("<c:ser>") != 1 or chart.count("<c:valAx>") != 1 or chart.count("<c:dateAx>") != 1 or "<c:lineChart>" not in chart:

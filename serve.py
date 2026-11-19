@@ -218,7 +218,11 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         out["charts"] = []
     try:  # formulas that reproduce the numbers in Excel; written and checked by code, never by the model
         good, wrong = excel.sheets(output, _source)
-        out["excel"] = [{"title": s.title, "rows": [r.model_dump() for r in s.rows], "tsv": excel.tsv(s)} for s in good]
+        # a sheet with a window cannot be pasted at A1 (its statistics are taken over a table in the workbook):
+        # the page shows its rows and points at the download
+        out["excel"] = [{"title": s.title, "rows": [r.model_dump() for r in s.rows], "tsv": excel.tsv(s),
+                         "window": s.window and {"series_id": s.window.series_id, "start": str(s.window.start)}}
+                        for s in good]
         if good:  # the same sheets as one workbook, which every locale of Excel reads the same way
             try:
                 given_at = time.strftime("%d %B %Y, %H:%M UTC", time.gmtime())
