@@ -266,7 +266,11 @@ version. The page still shows each sheet in its plain form, with the series and 
 The control checks the workbook two ways: it reads it back into the plain form, and it states cell by cell what
 the layout must hold, from the sheets alone and without the writer's helpers. The second was added because the
 reviewer broke the writer fourteen ways and the first let six through: arithmetic left in the pasted form's
-column, a Check that always said "same", the two number formats swapped. All fourteen are now reported.
+column, a Check that always said "same", the two number formats swapped. All fourteen are now reported. A second
+set of twenty-one, written by the reviewer before it had read the new control, found six more that touch no
+number but would mislead a reader: tabs under the wrong names, the 1904 calendar switched on so that every date
+read four years late beside a Check of "same", a value column too narrow to show a value, and the notes a
+reader depends on missing or carrying another time. The control now states those as well.
 
 A sheet is offered only if it reproduces: a small interpreter computes every formula from the same data the answer
 was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen

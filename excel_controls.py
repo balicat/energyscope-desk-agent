@@ -82,7 +82,8 @@ for what, sheet in planted:
 
 # The workbook a reader downloads must say what the page shows: the same labels, formulas and values, tab by
 # tab, in the same cells. Titles that Excel would refuse as tab names must come out legal and distinct.
-book = excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC")
+GIVEN_AT = "19 November 2026, 16:00 UTC"
+book = excel.workbook(list(good.values()), GIVEN_AT)
 try:
     back = excel.read_back(book)
 except Exception as e:  # a workbook read_back cannot read is a failure of the writer, not of this script
@@ -91,7 +92,7 @@ except Exception as e:  # a workbook read_back cannot read is a failure of the w
 want = [[(r.label, r.formula, r.value) for r in s.rows] for s in good.values()]
 if back != want:
     failures.append("the workbook does not say what the sheets say")
-if excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC") != book:
+if excel.workbook(list(good.values()), GIVEN_AT) != book:
     failures.append("the same sheets gave two different workbooks")
 # The file is laid out for a person: a header, series and date in their own cells, the value formula reading
 # them, number formats, a Check column. `read_back` above goes through the writer's own idea of the layout, so a
@@ -118,6 +119,8 @@ def _cells(xml):
 with _zip.ZipFile(_io.BytesIO(book)) as _z:
     _tabs = [_z.read(f"xl/worksheets/sheet{i}.xml").decode("utf-8") for i in range(1, len(good) + 1)]
     _styles = _z.read("xl/styles.xml").decode("utf-8") if "xl/styles.xml" in _z.namelist() else ""
+    _book_xml = _z.read("xl/workbook.xml").decode("utf-8")
+    _rels_xml = _z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
 _codes = dict(_re.findall(r'<numFmt numFmtId="(\d+)" formatCode="([^"]*)"', _styles))
 _xfs = _re.findall(r'<xf numFmtId="(\d+)" fontId="(\d+)"[^>]*xfId="0"[^>]*/>', _styles)      # cellXfs, in order
 _shown = lambda style: _codes.get(_xfs[int(style)][0], "General") if style is not None and int(style) < len(_xfs) else "General"
@@ -169,6 +172,39 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         check = c.get(("F", r), (None, "", ""))
         if check[1:] != ("formula", verdict) or _shown(check[0]) != "General":
             layout.append(f"{at}: Check is not the verdict formula in the General format: {check[2][:80]}")
+# What holds for the workbook as a whole. The reviewer's second set, written before it had read the control:
+# tabs named in reverse (the tab called "U.S. Ending Stocks" held the crack rows), names attached to the wrong
+# worksheet through workbook.xml, the 1904 calendar switched on (Date read 2030-11-07 beside the value of
+# 2026-11-06 and Check said "same"), a Value column three characters wide (## in every cell), and the notes a
+# reader depends on dropped or carrying another time.
+_targets = dict(_re.findall(r'<Relationship Id="(rId\d+)"[^>]*Target="([^"]+)"', _rels_xml))
+_named = _re.findall(r'<sheet name="([^"]*)" sheetId="\d+" r:id="(rId\d+)"/>', _book_xml)
+_unx = lambda s: s.replace("&quot;", '"').replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+for _t, _sheet in enumerate(good.values(), 1):
+    # a tab's name is its sheet's title with the characters Excel forbids made spaces, cut to 31 (no repeats here)
+    expected = _re.sub(r"[\[\]:*?/\\]", " ", _sheet.title).strip().strip("'")[:31].rstrip()
+    name, rid = (_unx(_named[_t - 1][0]), _named[_t - 1][1]) if _t <= len(_named) else ("", "")
+    if name != expected or _targets.get(rid) != f"worksheets/sheet{_t}.xml":
+        layout.append(f"tab {_t}: named {name!r} on {_targets.get(rid)}, expected {expected!r} on worksheets/sheet{_t}.xml")
+if _re.search(r'date1904="(1|true)"', _book_xml):
+    layout.append("the workbook uses the 1904 calendar: every date would read four years and a day late")
+# The file holds formulas and no cached results, so it asks Excel to calculate when it opens. Excel 16 does so
+# anyway (the reviewer removed the flag and saw no difference), but the request is deliberate and stays.
+if 'fullCalcOnLoad="1"' not in _book_xml:
+    layout.append("the workbook does not ask Excel to calculate on opening")
+for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
+    widths = {}
+    for lo, hi, w in _re.findall(r'<col min="(\d+)" max="(\d+)" width="([\d.]+)"', _xml):
+        for col in range(int(lo), int(hi) + 1):
+            widths[col] = float(w)
+    if min(widths.get(4, 0), widths.get(5, 0)) < 12 or widths.get(3, 0) < 10:
+        layout.append(f"tab {_t}: the Date, Value or Reported column is too narrow to show its values: {widths}")
+    c = _cells(_xml)
+    notes = [v[2] for (col, r), v in c.items() if col == "A" and r > len(_sheet.rows) + 1 and v[1] == "text"]
+    for needed, why in (("Protected View", "what to do when nothing calculates"), (GIVEN_AT, "when the answer was given"),
+                        ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear")):
+        if not any(needed in n for n in notes):
+            layout.append(f"tab {_t}: no note says {why} ({needed!r})")
 if not _tabs or not _styles:
     layout.append("the workbook has no worksheets or no styles")
 failures += layout[:6]
