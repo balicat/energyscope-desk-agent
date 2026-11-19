@@ -250,9 +250,19 @@ the answer carries the same sheets as one workbook to download, a tab each, writ
 standard library (an .xlsx is a zip of small XML files). The workbook is the one that works everywhere: pasted
 text is read by the reader's locale, and where Excel separates arguments with a semicolon and writes decimals
 with a comma, a pasted formula is refused and "2.538" becomes 2538; a file stores formulas and numbers the same
-way in every locale. In the workbook column D says "same" when the formula's result equals the reported value
-within the tolerance the service's own check applies, and gives the difference otherwise. Under the rows it says
-what a reader needs: Enable Editing, Refresh All, the add-in version, and when the answer was given.
+way in every locale.
+
+The workbook is laid out for use, not only for checking (the owner's request the evening it was released: "put
+the date in a cell and refer to it and put the series ids in a neighbouring cell"). Each tab has a header row,
+What | Series | Date | Value | Reported | Check. A row that fetches holds its series ID and its date in cells of
+their own and its Value is `=ES.Value(B2,C2)`, so a reader can change either and watch the value, and everything
+calculated from it, follow. Values show with thousands separators and two decimals while the cells keep every
+digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a
+million, which is the service's own check, and gives the difference otherwise; it is not rounded for display,
+because at two decimals a real difference of 0.003 would read 0.00. Under the rows the tab says what a reader
+needs: Enable Editing, Refresh All, when the answer was given, and the add-in version. The page still shows each
+sheet in its plain form, with the series and date written inside the formula, and the control proves the two say
+the same thing by reading the workbook back into that form.
 
 A sheet is offered only if it reproduces: a small interpreter computes every formula from the same data the answer
 was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen
@@ -270,7 +280,10 @@ same release. The earlier form, `=INDEX(ES.Get(series, date, date), 2, 2)`, show
 What was run in Excel, and what was not. With add-in 3.2.0 in Excel 16 on 19 Nov 2026: five sheets entered one
 after another (24 cells, the second reviewer), a workbook of four tabs (30 cells) and one of twelve tabs with
 repeated titles (90 cells), and a workbook downloaded through the page in a browser under the site's content
-security policy (4 cells). Every formula cell equalled the reported value. Not run by anyone: a semicolon-locale
+security policy (4 cells). Every formula cell equalled the reported value. The second layout was run the same
+evening with add-in 3.2.1: four tabs, 31 values equal to the reported ones, and then edited as a reader would:
+a changed date moved the price and the crack spread built on it, a changed series ID fetched the other series,
+and a Saturday gave the words "no value on 2026-11-14". Not run by anyone: a semicolon-locale
 Excel, a real clipboard paste (the runs typed the formulas in), 32-bit Excel, and a person opening a
 browser-downloaded add-in file, which Excel may block until it is unblocked. The first version of the workbook
 gave a tab a 32-character name when an answer had ten or more sheets and Excel refused the whole file; the

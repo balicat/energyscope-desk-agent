@@ -239,55 +239,101 @@ def _tab_names(titles: list[str]) -> list[str]:
     return names
 
 
-def _file_formula(formula: str) -> str:
-    """A formula as a workbook stores it: no leading equals sign, and an add-in function carries the prefix
-    Excel gives every function that comes from an XLL."""
-    return formula.lstrip("=").replace("ES.Value(", "_xll.ES.Value(")
+# The workbook is a second rendering of the same sheets, laid out for a person to use (David, 19 Nov 2026: "put
+# the date in a cell and refer to it and put the series ids in a neighbouring cell"):
+#
+#     A What | B Series | C Date | D Value | E Reported | F Check        row 1 is the header
+#
+# A row that fetches holds its series ID in B and its date in C, and D is =ES.Value(B,C), so a reader can change
+# either and watch the value follow. A row that calculates has its arithmetic in D. Values show with thousands
+# separators and two decimals; the cells keep every digit. The sheet's own formulas (Row.formula, the form the
+# page shows and `evaluate` checks) are written as if pasted at A1 with the formula in column B, so they are
+# moved one row down and into column D here, and `read_back` moves them back to prove nothing was lost.
+
+HEADER = ("What", "Series", "Date", "Value", "Reported", "Check")
+_EPOCH = dt.date(1899, 12, 30)   # day 0 of Excel's calendar
+_STYLE_NUMBER, _STYLE_DATE, _STYLE_HEAD = 1, 2, 3
 
 
-def _same(i: int) -> str:
-    """Column D: "same" when B equals C by the tolerance `problems` uses, otherwise B minus C. A plain B minus C
-    showed -2.3E-07 on a percent the answer reports to six decimals, and 1E-14 of floating point elsewhere."""
-    return (f'IF(ISNUMBER(B{i}),IF(ABS(B{i}-C{i})<=MAX({TOLERANCE_ABS:.5f},{TOLERANCE_REL:.6f}*ABS(C{i})),'
-            f'"same",B{i}-C{i}),"")')
+def _moved(formula: str) -> str:
+    """An arithmetic formula as the workbook holds it: B{n} of the pasted form is D{n+1} here."""
+    return _REF.sub(lambda m: f"D{int(m[1]) + 1}", formula.lstrip("="))
 
 
-def _text(ref: str, text: str) -> str:
-    return f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{escape(text)}</t></is></c>'
+def _same(r: int) -> str:
+    """The Check column: "same" when Value equals Reported by the tolerance `problems` uses, otherwise Value
+    minus Reported. A plain difference showed -2.3E-07 on a percent the answer reports to six decimals. The
+    column keeps the General format: at two decimals a real difference of 0.003 would read 0.00."""
+    return (f'IF(ISNUMBER(D{r}),IF(ABS(D{r}-E{r})<=MAX({TOLERANCE_ABS:.5f},{TOLERANCE_REL:.6f}*ABS(E{r})),'
+            f'"same",D{r}-E{r}),"")')
+
+
+def _text(ref: str, text: str, style: int = 0) -> str:
+    s = f' s="{style}"' if style else ""
+    return f'<c r="{ref}"{s} t="inlineStr"><is><t xml:space="preserve">{escape(text)}</t></is></c>'
 
 
 def _worksheet(sheet: Sheet, notes: list[str]) -> str:
-    """Row i holds the sheet's row i (A label, B formula, C reported value, D the difference), exactly where the
-    pasted text puts it, so a formula's references to B1, B2 ... mean the same cells. Notes come below."""
-    xml = []
+    xml = ['<row r="1">' + "".join(_text(f"{col}1", name, _STYLE_HEAD) for col, name in zip("ABCDEF", HEADER)) + "</row>"]
     for i, row in enumerate(sheet.rows, 1):
-        xml.append(f'<row r="{i}">{_text(f"A{i}", row.label)}'
-                   f'<c r="B{i}"><f>{escape(_file_formula(row.formula))}</f></c>'
-                   f'<c r="C{i}"><v>{row.value!r}</v></c>'
-                   f'<c r="D{i}"><f>{escape(_same(i))}</f></c></row>')
-    for j, note in enumerate(notes, len(sheet.rows) + 2):
+        r = i + 1
+        fetch = _GET.match(row.formula)
+        if fetch:
+            series_id, day = fetch.groups()
+            serial = (dt.date.fromisoformat(day) - _EPOCH).days
+            inputs = (f'{_text(f"B{r}", series_id)}<c r="C{r}" s="{_STYLE_DATE}"><v>{serial}</v></c>'
+                      f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>_xll.ES.Value(B{r},C{r})</f></c>')
+        else:
+            inputs = f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>{escape(_moved(row.formula))}</f></c>'
+        xml.append(f'<row r="{r}">{_text(f"A{r}", row.label)}{inputs}'
+                   f'<c r="E{r}" s="{_STYLE_NUMBER}"><v>{row.value!r}</v></c>'
+                   f'<c r="F{r}"><f>{escape(_same(r))}</f></c></row>')
+    for j, note in enumerate(notes, len(sheet.rows) + 3):
         xml.append(f'<row r="{j}">{_text(f"A{j}", note)}</row>')
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            '<cols><col min="1" max="1" width="58" customWidth="1"/><col min="2" max="4" width="16" customWidth="1"/></cols>'
+            '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" '
+            'state="frozen"/></sheetView></sheetViews>'
+            '<cols><col min="1" max="1" width="58" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/>'
+            '<col min="3" max="3" width="12" customWidth="1"/><col min="4" max="5" width="16" customWidth="1"/>'
+            '<col min="6" max="6" width="12" customWidth="1"/></cols>'
             f'<sheetData>{"".join(xml)}</sheetData></worksheet>')
+
+
+_STYLES = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+           '<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00"/>'
+           '<numFmt numFmtId="165" formatCode="yyyy-mm-dd"/></numFmts>'
+           '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
+           '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+           '<fills count="2"><fill><patternFill patternType="none"/></fill>'
+           '<fill><patternFill patternType="gray125"/></fill></fills>'
+           '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+           '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+           '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+           '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+           '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+           '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+           '</styleSheet>')
 
 
 def notes(given_at: str) -> list[str]:
     """What a reader needs under the rows of every tab. `given_at` is when the answer was given, as text."""
     return [
         "If Excel shows a yellow bar saying Protected View, click Enable Editing first: until then nothing here calculates.",
-        "Then press Refresh All on the EnergyScope tab. Before that the cells in column B that fetch a value are "
-        "empty, and the ones that calculate from them read #VALUE! or #DIV/0!.",
+        "Then press Refresh All on the EnergyScope tab. Before that the Value cells that fetch are empty, and the "
+        "ones that calculate from them read #VALUE! or #DIV/0!.",
         # Second, not last: the reviewer opened all 77 sheets a day after the data was frozen and 86 of 367
         # cells differed, every one from a futures close revised at the source (Brent 17 Nov, NYMEX 18 Nov).
-        f"The answer was given on {given_at}. If column D shows a number on the latest day or two of a futures "
+        f"The answer was given on {given_at}. If Check shows a number on the latest day or two of a futures "
         "series, the source has revised that price since; it is not an error in the sheet.",
-        "Column A says what the row is. B is the formula. C is the value The Librarian reported. D says \"same\" when "
-        "B equals C to within 0.00005 or one part in a million, which is the check the service applies; otherwise "
-        "it is B minus C.",
-        f"B needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If B reads "
-        "#NAME?, the add-in is not loaded; with no key, B says so in words.",
+        "Value is fetched from the Series and Date beside it, or calculated from the Value cells above. Reported is "
+        "what The Librarian said. Check says \"same\" when they agree to within 0.00005 or one part in a million, "
+        "which is the check the service applies; otherwise it is Value minus Reported.",
+        "Change a Date or a Series ID and Value follows; Reported stays what the answer said, so Check will then "
+        "show the difference. Values are shown to two decimals; the cells hold every digit.",
+        f"Value needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If it reads "
+        "#NAME?, the add-in is not loaded; with no key, it says so in words.",
     ]
 
 
@@ -297,6 +343,7 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
     names = _tab_names([s.title for s in good])
     below = notes(given_at)
     n = range(1, len(good) + 1)
+    styles_id = len(good) + 1
     files = {
         "[Content_Types].xml":
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -304,6 +351,7 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
             '<Default Extension="xml" ContentType="application/xml"/>'
             '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
             + "".join(f'<Override PartName="/xl/worksheets/sheet{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' for i in n)
             + "</Types>",
         "_rels/.rels":
@@ -314,14 +362,17 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
         "xl/workbook.xml":
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<bookViews><workbookView/></bookViews><sheets>'
             + "".join(f'<sheet name="{escape(name, {chr(34): "&quot;"})}" sheetId="{i}" r:id="rId{i}"/>' for i, name in zip(n, names))
             + '</sheets><calcPr fullCalcOnLoad="1"/></workbook>',
         "xl/_rels/workbook.xml.rels":
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             + "".join(f'<Relationship Id="rId{i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{i}.xml"/>' for i in n)
+            + f'<Relationship Id="rId{styles_id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
             + "</Relationships>",
+        "xl/styles.xml": _STYLES,
     }
     for i, sheet in zip(n, good):
         files[f"xl/worksheets/sheet{i}.xml"] = _worksheet(sheet, below)
@@ -334,16 +385,31 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
     return out.getvalue()
 
 
+_FILE_ROW = re.compile(
+    r'<row r="(\d+)"><c r="A\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
+    r'(?:<c r="B\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c><c r="C\d+" s="\d+"><v>(\d+)</v></c>)?'
+    r'<c r="D\d+" s="\d+"><f>(.*?)</f></c><c r="E\d+" s="\d+"><v>(.*?)</v></c>')
+_FILE_REF = re.compile(r"\bD(\d+)\b")
+
+
 def read_back(data: bytes) -> list[list[tuple[str, str, float]]]:
-    """What a workbook written by `workbook` says, tab by tab: (label, formula as a sheet row writes it, value).
-    For the control that the file and the page say the same thing."""
+    """What a workbook written by `workbook` says, tab by tab, turned back into the sheet's own form:
+    (label, formula as a sheet row writes it, value). A fetching row is rebuilt from the series and the date in
+    its cells, a calculating row has its references moved back. For the control that the file and the page say
+    the same thing."""
+    unescape = lambda s: s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
     tabs = []
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         for name in sorted((n for n in z.namelist() if n.startswith("xl/worksheets/")),
                            key=lambda n: int(re.search(r"(\d+)", n)[1])):
-            xml = z.read(name).decode("utf-8")
-            rows = re.findall(r'<c r="A\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
-                              r'<c r="B\d+"><f>(.*?)</f></c><c r="C\d+"><v>(.*?)</v></c>', xml)
-            unescape = lambda s: s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-            tabs.append([(unescape(a), "=" + unescape(f).replace("_xll.", ""), float(v)) for a, f, v in rows])
+            rows = []
+            for r, label, series_id, serial, formula, value in _FILE_ROW.findall(z.read(name).decode("utf-8")):
+                if series_id:
+                    if formula != f"_xll.ES.Value(B{r},C{r})":
+                        raise ValueError(f"{name} row {r}: a fetching row does not read its own cells: {formula}")
+                    canonical = f'=ES.Value("{unescape(series_id)}","{_EPOCH + dt.timedelta(days=int(serial))}")'
+                else:
+                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - 1}", unescape(formula))
+                rows.append((unescape(label), canonical, float(value)))
+            tabs.append(rows)
     return tabs

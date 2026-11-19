@@ -89,6 +89,22 @@ if back != want:
     failures.append("the workbook does not say what the sheets say")
 if excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC") != book:
     failures.append("the same sheets gave two different workbooks")
+# The file is laid out for a person: series and date in their own cells, the value formula reading them, a header
+# row, number formats. Every fetching row must read ITS OWN cells, and no series ID or date may be left inside a
+# formula, or a reader who edits the cell changes nothing.
+import io as _io, re as _re, zipfile as _zip
+with _zip.ZipFile(_io.BytesIO(book)) as _z:
+    _tabs = [_z.read(n).decode("utf-8") for n in _z.namelist() if n.startswith("xl/worksheets/")]
+    if "xl/styles.xml" not in _z.namelist() or "#,##0.00" not in _z.read("xl/styles.xml").decode("utf-8"):
+        failures.append("the workbook has no number format for values")
+_formulas = [f for t in _tabs for f in _re.findall(r"<f>(.*?)</f>", t)]
+_fetches = [f for f in _formulas if "ES.Value" in f]
+if not _fetches or any(not _re.fullmatch(r"_xll\.ES\.Value\(B(\d+),C\1\)", f) for f in _fetches):
+    failures.append(f"a fetching formula does not read the series and date cells of its own row: {_fetches[:2]}")
+if any("&quot;" in f and "same" not in f for f in _formulas):
+    failures.append("a series ID or a date is still written inside a formula")
+if any(">What<" not in t or ">Series<" not in t or ">Reported<" not in t for t in _tabs):
+    failures.append("a tab has no header row")
 # Twelve tabs, so that a repeat falls at a two-digit position: the first version made a 32-character name there
 # and Excel refused the file. Long titles, repeats in another case, characters Excel forbids, an empty title.
 long = "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year"
