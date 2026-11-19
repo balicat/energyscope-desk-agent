@@ -126,17 +126,31 @@ _xfs = _re.findall(r'<xf numFmtId="(\d+)" fontId="(\d+)"[^>]*xfId="0"[^>]*/>', _
 _shown = lambda style: _codes.get(_xfs[int(style)][0], "General") if style is not None and int(style) < len(_xfs) else "General"
 _bold = lambda style: style is not None and int(style) < len(_xfs) and _xfs[int(style)][1] != "0"
 layout = []
+# Where things are, stated here and not taken from the writer: the tab's date in C1 beside a label in A1, the
+# header in row 3 (frozen), the sheet's rows from row 4.
+_TOP_LABEL = "Date (change this one cell: every row below that shows this date follows)"
+_HEAD, _FIRST = 3, 4
+_serial = lambda day: (_dt.date.fromisoformat(day) - _dt.date(1899, 12, 30)).days
 for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     c = _cells(_xml)
     where = f"tab {_t}"
-    if [c.get((col, 1), (None, "", ""))[2] for col in "ABCDEF"] != ["What", "Series", "Date", "Value", "Reported", "Check"]:
-        layout.append(f"{where}: the header row is not What | Series | Date | Value | Reported | Check")
-    if not all(_bold(c.get((col, 1), (None,))[0]) for col in "ABCDEF"):
+    # the tab's date: the one most of its fetching rows use, the first of them on a tie
+    days = [m[2] for m in (_FETCH.match(row.formula) for row in _sheet.rows) if m]
+    shared = max(days, key=lambda d: (days.count(d), -days.index(d))) if days else None
+    top = c.get(("C", 1), (None, "", ""))
+    if shared is not None:
+        if c.get(("A", 1), (None, "", ""))[1:] != ("text", _TOP_LABEL) or not _bold(c.get(("A", 1), (None,))[0]):
+            layout.append(f"{where}: A1 is not the label of the tab's date, in bold")
+        if top[1:] != ("value", str(_serial(shared))) or _shown(top[0]) != "yyyy-mm-dd":
+            layout.append(f"{where}: C1 is not the tab's date {shared} as a real date shown yyyy-mm-dd")
+    if [c.get((col, _HEAD), (None, "", ""))[2] for col in "ABCDEF"] != ["What", "Series", "Date", "Value", "Reported", "Check"]:
+        layout.append(f"{where}: row {_HEAD} is not the header What | Series | Date | Value | Reported | Check")
+    if not all(_bold(c.get((col, _HEAD), (None,))[0]) for col in "ABCDEF"):
         layout.append(f"{where}: the header is not bold")
-    if '<pane ySplit="1"' not in _xml or 'state="frozen"' not in _xml:
-        layout.append(f"{where}: the header row is not frozen")
-    for i, row in enumerate(_sheet.rows, 1):
-        r = i + 1
+    if f'<pane ySplit="{_HEAD}"' not in _xml or 'state="frozen"' not in _xml:
+        layout.append(f"{where}: the rows down to the header are not frozen")
+    for i, row in enumerate(_sheet.rows):
+        r = _FIRST + i
         at = f"{where} row {r}"
         if c.get(("A", r), (None, "", ""))[1:] != ("text", row.label):
             layout.append(f"{at}: column A is not the row's label")
@@ -144,18 +158,20 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         fetch = _FETCH.match(row.formula)
         if fetch:
             series_id, day = fetch.groups()
-            serial = (_dt.date.fromisoformat(day) - _dt.date(1899, 12, 30)).days
             if c.get(("B", r), (None, "", ""))[1:] != ("text", series_id):
                 layout.append(f"{at}: column B is not the series ID {series_id}")
+            # a row on the tab's date must REFER to C1, so that one edit moves it; a row on another date must
+            # hold its own date, or an edit of C1 would move a row it should not
             date = c.get(("C", r), (None, "", ""))
-            if date[1:] != ("value", str(serial)) or _shown(date[0]) != "yyyy-mm-dd":
-                layout.append(f"{at}: column C is not the date {day} as a real date shown yyyy-mm-dd")
+            wanted = ("formula", "$C$1") if day == shared else ("value", str(_serial(day)))
+            if date[1:] != wanted or _shown(date[0]) != "yyyy-mm-dd":
+                layout.append(f"{at}: the Date cell should be {wanted[1]} ({day}) shown yyyy-mm-dd, the file has {date[2]}")
             if value[1:] != ("formula", f"_xll.ES.Value(B{r},C{r})"):
                 layout.append(f"{at}: Value does not fetch from this row's series and date cells: {value[2]}")
         else:
             # the sheet's arithmetic names cells of the pasted form (formula in column B, first row 1); in the
-            # file the same cells are column D, one row down. No other column may be named.
-            moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + 1}", row.formula.lstrip("="))
+            # file the same cells are column D, three rows down. No other column may be named.
+            moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + _FIRST - 1}", row.formula.lstrip("="))
             named = {col for col, _ in _re.findall(r"\b([A-Z]{1,3})(\d+)\b", value[2])}
             if value[1:] != ("formula", moved) or named - {"D"}:
                 layout.append(f"{at}: Value should be {moved}, the file has {value[2]}")
@@ -172,6 +188,10 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         check = c.get(("F", r), (None, "", ""))
         if check[1:] != ("formula", verdict) or _shown(check[0]) != "General":
             layout.append(f"{at}: Check is not the verdict formula in the General format: {check[2][:80]}")
+    # nothing may sit between the top cell and the header, or in the header's own row beyond its six cells
+    stray = sorted(k for k in c if k[1] < _FIRST and k not in {("A", 1), ("C", 1)} | {(col, _HEAD) for col in "ABCDEF"})
+    if stray:
+        layout.append(f"{where}: unexpected cells above the rows: {stray[:4]}")
 # What holds for the workbook as a whole. The reviewer's second set, written before it had read the control:
 # tabs named in reverse (the tab called "U.S. Ending Stocks" held the crack rows), names attached to the wrong
 # worksheet through workbook.xml, the 1904 calendar switched on (Date read 2030-11-07 beside the value of
@@ -200,9 +220,10 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     if min(widths.get(4, 0), widths.get(5, 0)) < 12 or widths.get(3, 0) < 10:
         layout.append(f"tab {_t}: the Date, Value or Reported column is too narrow to show its values: {widths}")
     c = _cells(_xml)
-    notes = [v[2] for (col, r), v in c.items() if col == "A" and r > len(_sheet.rows) + 1 and v[1] == "text"]
+    notes = [v[2] for (col, r), v in c.items() if col == "A" and r >= _FIRST + len(_sheet.rows) and v[1] == "text"]
     for needed, why in (("Protected View", "what to do when nothing calculates"), (GIVEN_AT, "when the answer was given"),
-                        ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear")):
+                        ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear"),
+                        ("C1", "which cell moves the whole tab to another date")):
         if not any(needed in n for n in notes):
             layout.append(f"tab {_t}: no note says {why} ({needed!r})")
 if not _tabs or not _styles:

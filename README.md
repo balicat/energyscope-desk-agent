@@ -255,9 +255,14 @@ way in every locale.
 
 The workbook is laid out for use, not only for checking (the owner's request the evening it was released: "put
 the date in a cell and refer to it and put the series ids in a neighbouring cell"). Each tab has a header row,
-What | Series | Date | Value | Reported | Check. A row that fetches holds its series ID and its date in cells of
-their own and its Value is `=ES.Value(B2,C2)`, so a reader can change either and watch the value, and everything
-calculated from it, follow. Values show with thousands separators and two decimals while the cells keep every
+What | Series | Date | Value | Reported | Check, in row 3. A row that fetches holds its series ID and its date in cells of
+their own and its Value is `=ES.Value(B4,C4)`, so a reader can change either and watch the value, and everything
+calculated from it, follow. The date most rows of a tab share (the three legs of a crack spread, every month of a
+curve, the latest value of a comparison) is written once, in cell C1 above the header, and each of those rows has
+`=$C$1` in its Date cell: change C1 and the whole sheet moves to another day. A row with another date (the value
+thirty days earlier, the same week of a prior year) keeps a date of its own. Run in Excel with add-in 3.2.1: with
+C1 of the crack tab set to another day all three legs and the spread moved and Check showed the differences; set
+back, every row read "same" again. Values show with thousands separators and two decimals while the cells keep every
 digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a
 million, which is the service's own check, and gives the difference otherwise; it is not rounded for display,
 because at two decimals a real difference of 0.003 would read 0.00. Under the rows the tab says what a reader

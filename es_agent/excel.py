@@ -242,22 +242,36 @@ def _tab_names(titles: list[str]) -> list[str]:
 # The workbook is a second rendering of the same sheets, laid out for a person to use (David, 19 Nov 2026: "put
 # the date in a cell and refer to it and put the series ids in a neighbouring cell"):
 #
-#     A What | B Series | C Date | D Value | E Reported | F Check        row 1 is the header
+#     row 1   A "Date" label                     C the tab's date        <- the one cell to change
+#     row 3   A What | B Series | C Date | D Value | E Reported | F Check        the header, frozen
+#     row 4.. one row for each row of the sheet
 #
-# A row that fetches holds its series ID in B and its date in C, and D is =ES.Value(B,C), so a reader can change
-# either and watch the value follow. A row that calculates has its arithmetic in D. Values show with thousands
-# separators and two decimals; the cells keep every digit. The sheet's own formulas (Row.formula, the form the
-# page shows and `evaluate` checks) are written as if pasted at A1 with the formula in column B, so they are
-# moved one row down and into column D here, and `read_back` moves them back to prove nothing was lost.
+# A row that fetches holds its series ID in B and its date in C, and D is =ES.Value(B,C). The date most rows of
+# the tab share (all three legs of a crack, every month of a curve, the latest value of a comparison) is written
+# ONCE, in C1, and each of those rows has =$C$1 in its Date cell: change C1 and they all move, with everything
+# calculated from them. A row with another date (the value thirty days earlier, the same week of a prior year)
+# keeps a date of its own. Values show with thousands separators and two decimals; the cells keep every digit.
+# The sheet's own formulas (Row.formula, the form the page shows and `evaluate` checks) are written as if pasted
+# at A1 with the formula in column B, so they are moved FIRST_ROW - 1 rows down and into column D here, and
+# `read_back` moves them back to prove nothing was lost.
 
 HEADER = ("What", "Series", "Date", "Value", "Reported", "Check")
+DATE_LABEL = "Date (change this one cell: every row below that shows this date follows)"
+HEADER_ROW, FIRST_ROW = 3, 4
 _EPOCH = dt.date(1899, 12, 30)   # day 0 of Excel's calendar
 _STYLE_NUMBER, _STYLE_DATE, _STYLE_HEAD = 1, 2, 3
 
 
+def tab_date(sheet: Sheet) -> str | None:
+    """The date the tab's top cell holds: the one most of its fetching rows use, the first of them on a tie.
+    None for a sheet that fetches nothing."""
+    days = [m[2] for m in (_GET.match(r.formula) for r in sheet.rows) if m]
+    return max(days, key=lambda d: (days.count(d), -days.index(d))) if days else None
+
+
 def _moved(formula: str) -> str:
-    """An arithmetic formula as the workbook holds it: B{n} of the pasted form is D{n+1} here."""
-    return _REF.sub(lambda m: f"D{int(m[1]) + 1}", formula.lstrip("="))
+    """An arithmetic formula as the workbook holds it: B{n} of the pasted form is D{n + FIRST_ROW - 1} here."""
+    return _REF.sub(lambda m: f"D{int(m[1]) + FIRST_ROW - 1}", formula.lstrip("="))
 
 
 def _same(r: int) -> str:
@@ -273,27 +287,37 @@ def _text(ref: str, text: str, style: int = 0) -> str:
     return f'<c r="{ref}"{s} t="inlineStr"><is><t xml:space="preserve">{escape(text)}</t></is></c>'
 
 
+def _serial(day: str) -> int:
+    return (dt.date.fromisoformat(day) - _EPOCH).days
+
+
 def _worksheet(sheet: Sheet, notes: list[str]) -> str:
-    xml = ['<row r="1">' + "".join(_text(f"{col}1", name, _STYLE_HEAD) for col, name in zip("ABCDEF", HEADER)) + "</row>"]
-    for i, row in enumerate(sheet.rows, 1):
-        r = i + 1
+    shared = tab_date(sheet)
+    xml = []
+    if shared is not None:
+        xml.append(f'<row r="1">{_text("A1", DATE_LABEL, _STYLE_HEAD)}'
+                   f'<c r="C1" s="{_STYLE_DATE}"><v>{_serial(shared)}</v></c></row>')
+    xml.append(f'<row r="{HEADER_ROW}">'
+               + "".join(_text(f"{col}{HEADER_ROW}", name, _STYLE_HEAD) for col, name in zip("ABCDEF", HEADER)) + "</row>")
+    for i, row in enumerate(sheet.rows):
+        r = FIRST_ROW + i
         fetch = _GET.match(row.formula)
         if fetch:
             series_id, day = fetch.groups()
-            serial = (dt.date.fromisoformat(day) - _EPOCH).days
-            inputs = (f'{_text(f"B{r}", series_id)}<c r="C{r}" s="{_STYLE_DATE}"><v>{serial}</v></c>'
+            date = "<f>$C$1</f>" if day == shared else f"<v>{_serial(day)}</v>"
+            inputs = (f'{_text(f"B{r}", series_id)}<c r="C{r}" s="{_STYLE_DATE}">{date}</c>'
                       f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>_xll.ES.Value(B{r},C{r})</f></c>')
         else:
             inputs = f'<c r="D{r}" s="{_STYLE_NUMBER}"><f>{escape(_moved(row.formula))}</f></c>'
         xml.append(f'<row r="{r}">{_text(f"A{r}", row.label)}{inputs}'
                    f'<c r="E{r}" s="{_STYLE_NUMBER}"><v>{row.value!r}</v></c>'
                    f'<c r="F{r}"><f>{escape(_same(r))}</f></c></row>')
-    for j, note in enumerate(notes, len(sheet.rows) + 3):
+    for j, note in enumerate(notes, FIRST_ROW + len(sheet.rows) + 1):
         xml.append(f'<row r="{j}">{_text(f"A{j}", note)}</row>')
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" '
-            'state="frozen"/></sheetView></sheetViews>'
+            f'<sheetViews><sheetView workbookViewId="0"><pane ySplit="{HEADER_ROW}" topLeftCell="A{FIRST_ROW}" '
+            'activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
             '<cols><col min="1" max="1" width="58" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/>'
             '<col min="3" max="3" width="12" customWidth="1"/><col min="4" max="5" width="16" customWidth="1"/>'
             '<col min="6" max="6" width="12" customWidth="1"/></cols>'
@@ -330,6 +354,8 @@ def notes(given_at: str) -> list[str]:
         "Value is fetched from the Series and Date beside it, or calculated from the Value cells above. Reported is "
         "what The Librarian said. Check says \"same\" when they agree to within 0.00005 or one part in a million, "
         "which is the check the service applies; otherwise it is Value minus Reported.",
+        "The Date in cell C1 is the date most rows of this tab use; each of them refers to it, so change C1 and "
+        "they all follow, with everything calculated from them. A row with another date keeps its own cell.",
         "Change a Date or a Series ID and Value follows; Reported stays what the answer said, so Check will then "
         "show the difference. Values are shown to two decimals; the cells hold every digit.",
         # The reviewer, editing as a reader would: "WTI ..., 2026-11-11" stayed beside a Date of 2026-10-12, and an
@@ -392,29 +418,36 @@ def workbook(good: list[Sheet], given_at: str) -> bytes:
 
 _FILE_ROW = re.compile(
     r'<row r="(\d+)"><c r="A\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
-    r'(?:<c r="B\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c><c r="C\d+" s="\d+"><v>(\d+)</v></c>)?'
+    r'(?:<c r="B\d+" t="inlineStr"><is><t xml:space="preserve">(.*?)</t></is></c>'
+    r'<c r="C\d+" s="\d+">(?:<v>(\d+)</v>|<f>(\$C\$1)</f>)</c>)?'
     r'<c r="D\d+" s="\d+"><f>(.*?)</f></c><c r="E\d+" s="\d+"><v>(.*?)</v></c>')
+_FILE_TOP = re.compile(r'<c r="C1" s="\d+"><v>(\d+)</v></c>')
 _FILE_REF = re.compile(r"\bD(\d+)\b")
 
 
 def read_back(data: bytes) -> list[list[tuple[str, str, float]]]:
     """What a workbook written by `workbook` says, tab by tab, turned back into the sheet's own form:
-    (label, formula as a sheet row writes it, value). A fetching row is rebuilt from the series and the date in
-    its cells, a calculating row has its references moved back. For the control that the file and the page say
-    the same thing."""
+    (label, formula as a sheet row writes it, value). A fetching row is rebuilt from the series in its cell and
+    the date in its cell or, where that cell refers to the top of the tab, the date in C1; a calculating row has
+    its references moved back. For the control that the file and the page say the same thing."""
     unescape = lambda s: s.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
     tabs = []
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         for name in sorted((n for n in z.namelist() if n.startswith("xl/worksheets/")),
                            key=lambda n: int(re.search(r"(\d+)", n)[1])):
+            xml = z.read(name).decode("utf-8")
+            top = _FILE_TOP.search(xml)
             rows = []
-            for r, label, series_id, serial, formula, value in _FILE_ROW.findall(z.read(name).decode("utf-8")):
+            for r, label, series_id, serial, refers, formula, value in _FILE_ROW.findall(xml):
                 if series_id:
                     if formula != f"_xll.ES.Value(B{r},C{r})":
                         raise ValueError(f"{name} row {r}: a fetching row does not read its own cells: {formula}")
-                    canonical = f'=ES.Value("{unescape(series_id)}","{_EPOCH + dt.timedelta(days=int(serial))}")'
+                    if refers and not top:
+                        raise ValueError(f"{name} row {r}: the Date refers to C1 and C1 holds no date")
+                    day = _EPOCH + dt.timedelta(days=int(top[1] if refers else serial))
+                    canonical = f'=ES.Value("{unescape(series_id)}","{day}")'
                 else:
-                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - 1}", unescape(formula))
+                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - FIRST_ROW + 1}", unescape(formula))
                 rows.append((unescape(label), canonical, float(value)))
             tabs.append(rows)
     return tabs
