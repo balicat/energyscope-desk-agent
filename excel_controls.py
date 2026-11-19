@@ -278,7 +278,8 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
 # On every tab that fetches: H1 a label; R3 "Date" and from S3 one cell per series of the tab, in the order the
 # rows name them, each a REFERENCE to the Series cell of the first row naming it with the ID stored beside it;
 # R4 the one formula, ES.Table over those header cells for the 365 days to C1 with "#N/A" for a day without a
-# value, stored as a dynamic array (so it fills the cells around it; stored plainly Excel shows one cell). No
+# value and a row for EVERY day (frequency "D": on its own weekly grid ES.Table dropped a report dated on another
+# weekday), stored as a dynamic array (so it fills the cells around it; stored plainly Excel shows one cell). No
 # other cell right of column F: inside the table's range it would stop the formula filling (#SPILL!). One line
 # chart per series, three at most, in columns H to P below the frozen rows and clear of each other, each reading
 # the dates R4:R369, its own series column and its own header cell, with ONE value axis.
@@ -286,7 +287,7 @@ _HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the 
                   "the table behind them starts in column R")
 _HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
                  "first three series) and as a table from column R, filled by the one formula in R4. Both follow "
-                 "C1 and the Series cells. A day with no value shows #N/A in grey; do not type inside the table. "
+                 "C1 and the Series cells. The table has a row for every day; a day with no value shows #N/A in grey. Do not type inside it. "
                  "This part needs Excel 365 or Excel 2021.")
 _num = lambda col: sum((ord(ch) - 64) * 26 ** i for i, ch in enumerate(reversed(col)))
 
@@ -326,7 +327,7 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
         continue
     last = _col(18 + len(ids))
     stated = {("H", 1): ("text", _HISTORY_LABEL, True, None), ("R", _HEAD): ("text", "Date", True, None),
-              ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},$C$1-365,$C$1,"#N/A")', False, "yyyy-mm-dd")}
+              ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},$C$1-365,$C$1,"#N/A","D")', False, "yyyy-mm-dd")}
     for k, sid in enumerate(ids):
         stated[(_col(19 + k), _HEAD)] = ("stored text", f"B{first[sid]} = {sid}", True, None)
     for key, (kind, content, bold, shown) in stated.items():

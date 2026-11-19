@@ -279,14 +279,14 @@ HEADER_ROW, FIRST_ROW = 3, 4
 #     H4..P     a line chart for each of the first three series, one under the other (never two series on one
 #               chart: a crack tab has dollars a barrel beside dollars a gallon, and they would share an axis)
 #     R3, S3..  "Date" and one cell per series, each a reference to the Series cell of the first row naming it
-#     R4        ONE formula, =ES.Table(S3:.., C1-365, C1, "#N/A"), which fills the cells below and beside it
+#     R4        ONE formula, =ES.Table(S3:.., C1-365, C1, "#N/A", "D"), which fills the cells below and beside it
 #
 # Change C1, or a Series cell, and table and charts follow. Three things learnt in Excel 16 with add-in 3.2.1
 # (19 Nov 2026): a formula that fills other cells must be stored the way Excel stores its own dynamic arrays (a
 # marker on the cell and a part named metadata.xml), or Excel reads it as =@ES.Table(...) and shows one cell;
 # the fill must be "#N/A", because the default leaves "" before a series' first value and a chart draws text as
-# zero; and a chart can read the fixed range rows 4 to 369 (366 days at most), since it skips the empty cells
-# under a weekly series' 53 rows.
+# zero; and the table has a row for every day (366 rows, 4 to 369), which is also the fixed range the charts read:
+# a weekly or monthly series has its values on their own days and #N/A between, and the line spans the gaps.
 HISTORY_DAYS = 365
 HISTORY_COLUMN = 18                                  # R
 HISTORY_LAST_ROW = FIRST_ROW + HISTORY_DAYS          # C1-365 to C1 is 366 days
@@ -296,7 +296,7 @@ HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the f
                  "the table behind them starts in column R")
 HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
                 "first three series) and as a table from column R, filled by the one formula in R4. Both follow "
-                "C1 and the Series cells. A day with no value shows #N/A in grey; do not type inside the table. "
+                "C1 and the Series cells. The table has a row for every day; a day with no value shows #N/A in grey. Do not type inside it. "
                 "This part needs Excel 365 or Excel 2021.")
 _EPOCH = dt.date(1899, 12, 30)   # day 0 of Excel's calendar
 _STYLE_NUMBER, _STYLE_DATE, _STYLE_HEAD = 1, 2, 3
@@ -339,7 +339,10 @@ def _column(n: int) -> str:
 def history_formula(count: int) -> str:
     """The one formula of the history table, as the file stores it, for a tab with `count` series."""
     first, last = _column(HISTORY_COLUMN + 1), _column(HISTORY_COLUMN + count)
-    return f'_xll.ES.Table({first}{HEADER_ROW}:{last}{HEADER_ROW},$C$1-{HISTORY_DAYS},$C$1,"#N/A")'
+    # The frequency is "D", a row for every day. Left to itself ES.Table puts a weekly series on a regular
+    # weekly grid counted from its first date, and a report dated on another weekday (a holiday week) falls
+    # off it: 155 of 156 weekly positioning reports, seen in Excel. On a daily grid nothing can fall off.
+    return f'_xll.ES.Table({first}{HEADER_ROW}:{last}{HEADER_ROW},$C$1-{HISTORY_DAYS},$C$1,"#N/A","D")'
 
 
 def _moved(formula: str) -> str:
