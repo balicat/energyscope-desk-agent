@@ -398,8 +398,12 @@ def _same_date(d: dt.date, years_back: int) -> dt.date:
         return d.replace(year=d.year - years_back, day=28)
 
 
-def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | None:
-    """Latest value against the same time of year in each of the previous `years` years."""
+def seasonal_points(source: DataSource, series_id: str, years: int = 5):
+    """The latest date and value, and the (date, value) taken for each of the previous `years` years.
+
+    None when the series is unknown or a year has no observation near enough. The Excel sheet for a seasonal
+    reading names these same dates, so this is the one place the choice is made.
+    """
     hit = source.meta(series_id)
     if hit is None or not 2 <= years <= 10:
         return None
@@ -410,7 +414,7 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | No
     window = 16 if hit.frequency == "M" else 5
     # A weekly series is matched on the report week (ISO week number), as EIA and ES.Seasonal do, so the
     # five-year average here is the same number they publish. Other series take the nearest date.
-    by_week = {(d.isocalendar()[0], d.isocalendar()[1]): v for d, v in hist} if hit.frequency == "W" else {}
+    by_week = {(d.isocalendar()[0], d.isocalendar()[1]): (d, v) for d, v in hist} if hit.frequency == "W" else {}
     year, week = d1.isocalendar()[0], d1.isocalendar()[1]
     prior = []
     for k in range(1, years + 1):
@@ -420,9 +424,20 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | No
         target = _same_date(d1, k)
         near = min(hist, key=lambda o: abs((o[0] - target).days))
         if abs((near[0] - target).days) <= window:
-            prior.append(near[1])
+            prior.append(near)
     if len(prior) < years:
         return None
+    return d1, v1, prior
+
+
+def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading | None:
+    """Latest value against the same time of year in each of the previous `years` years."""
+    points = seasonal_points(source, series_id, years)
+    if points is None:
+        return None
+    hit = source.meta(series_id)
+    d1, v1, dated = points
+    prior = [v for _, v in dated]
     avg = sum(prior) / len(prior)
     values = {
         "latest": v1,

@@ -31,6 +31,7 @@ from es_agent.readings import WATCHLIST
 from es_agent.scripted import is_rejection, scripted
 from es_agent.sources import DataSource, FixtureSource, FlightSource, ParquetLakeSource, RecordingSource
 from es_agent.verify import verify
+from es_agent import excel
 
 WTI, BRENT = "PET.RWTC.D", "PET.RBRTE.D"
 US_CRUDE = ["PET.WCESTUS1.W", "PET.WCRSTUS1.W"]  # excl. or incl. SPR: both are defensible readings
@@ -138,6 +139,31 @@ class Grounded(Evaluator[str, DeskAnswer]):
 
 
 @dataclass
+class ExcelReproduces(Evaluator[str, DeskAnswer]):
+    """Every Excel sheet written for the answer gives the reported values when its formulas are computed from the
+    source, and every fact and spread has a sheet. A sheet that does not reproduce would be hidden from a visitor;
+    here it fails the release."""
+
+    def evaluate(self, ctx: EvaluatorContext[str, DeskAnswer]) -> EvaluationReason:
+        good, wrong = excel.sheets(ctx.output, SOURCE)
+        owed = len(ctx.output.facts) + len(ctx.output.spreads)
+        kinds = [r.key.split(":", 1)[0] for r in ctx.output.readings if not r.hypothetical]
+        covered = sum(k in ("curve", "crack", "seasonal") for k in kinds)
+        EXCEL["sheets"] += len(good)
+        EXCEL["rows"] += sum(len(s.rows) for s in good)
+        EXCEL["readings"] += len(kinds)
+        EXCEL["readings_with_a_sheet"] += covered
+        if wrong:
+            return EvaluationReason(False, "; ".join(wrong)[:400])
+        if len(good) < owed + covered:
+            return EvaluationReason(False, f"{owed + covered} sheets owed, {len(good)} written")
+        return EvaluationReason(True, f"{len(good)} sheets reproduce")
+
+
+EXCEL = {"sheets": 0, "rows": 0, "readings": 0, "readings_with_a_sheet": 0}
+
+
+@dataclass
 class SummaryTraceable(Evaluator[str, DeskAnswer]):
     """No number or date, in the summary or in a caveat the model wrote, that is not in the facts, spreads or readings."""
 
@@ -199,7 +225,7 @@ class OwnWords(Evaluator[str, DeskAnswer]):
 
 def build_dataset() -> Dataset:
     cases = [Case(name=n, inputs=q, metadata={"expect": e}) for n, q, e, _, _ in SUITE]
-    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), DirectionRight(), OwnWords(), MaxToolCalls(max_calls=6)])
+    return Dataset(name="energyscope-desk", cases=cases, evaluators=[Grounded(), ExcelReproduces(), SummaryTraceable(), RightSeries(), ScenarioLabelled(), DirectionRight(), OwnWords(), MaxToolCalls(max_calls=6)])
 
 
 def spent(messages) -> float:
@@ -246,7 +272,7 @@ def make_task(model_name: str, enforce: bool = True):
 
 
 # A wrong, untraceable or unlabelled what-if number, or a wrong direction word: never tolerated
-HARD = ("Grounded", "SummaryTraceable", "ScenarioLabelled", "DirectionRight", "OwnWords")
+HARD = ("Grounded", "ExcelReproduces", "SummaryTraceable", "ScenarioLabelled", "DirectionRight", "OwnWords")
 
 
 def tally(report) -> tuple[int, int, int, list[tuple[str, str, str]]]:
@@ -306,6 +332,8 @@ def main() -> int:
                   + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
     usd = sum(r.get("usd", 0.0) for r in by_case.values())
     print(f"cost: ${usd:.4f} for this run, from the model's own usage figures")
+    print(f"excel: {EXCEL['sheets']} sheets, {EXCEL['rows']} formulas reproduced; "
+          f"{EXCEL['readings_with_a_sheet']} of {EXCEL['readings']} readings have a sheet")
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
           f"ran out: {ran_out or 'none'}")
 

@@ -21,6 +21,7 @@ import json
 import os
 import secrets
 import statistics
+import sys
 import threading
 import time
 import urllib.request
@@ -38,6 +39,7 @@ from es_agent.memory import Sessions, with_context
 from es_agent.scripted import is_rejection, scripted
 from es_agent.sources import FixtureSource, FlightSource, ParquetLakeSource
 from es_agent.verify import verify
+from es_agent import excel
 
 MODEL = os.environ.get("LIBRARIAN_MODEL", "scripted")
 KEY_FILE = os.environ.get("LIBRARIAN_KEY_FILE", "/opt/energyscope/.anthropic_api_key")
@@ -213,6 +215,14 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         out["charts"] = charts_for(output, _source)
     except Exception:
         out["charts"] = []
+    try:  # formulas that reproduce the numbers in Excel; written and checked by code, never by the model
+        good, wrong = excel.sheets(output, _source)
+        out["excel"] = [{"title": s.title, "rows": [r.model_dump() for r in s.rows], "tsv": excel.tsv(s)} for s in good]
+        if wrong:
+            print("excel: sheets not shown:", "; ".join(wrong)[:600], file=sys.stderr, flush=True)
+    except Exception as e:
+        out["excel"] = []
+        print(f"excel: {type(e).__name__}: {e}"[:300], file=sys.stderr, flush=True)
     seconds = round(time.time() - t0, 2)
     usd = _cost(usage, messages)
     with _state_lock:

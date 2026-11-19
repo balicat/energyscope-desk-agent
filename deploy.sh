@@ -3,7 +3,7 @@
 # visitors only if the candidate passes, in order:
 #   1. the suite on frozen data, answers equal to the golden file;
 #      and the prose control: sentences that are wrong over true tables must be rejected  (free)
-#   2. the control run: validator off, exactly three assertions fail   (free)
+#   2. the control run: validator off, exactly four assertions fail   (free)
 #   3. the suite on today's lake with the scripted model               (free)
 #   4. the suite on today's lake with the live model                   (a few cents; LIVE=0 skips it)
 #      A live model does not make the same choices twice, so this step is split: every number check
@@ -35,7 +35,9 @@ echo "candidate $SHA, model $MODEL"
 
 echo "1/4 frozen data + golden answers";      $PY run_evals.py --source fixture --gate --golden check | grep -E "^assertions|^golden|^gate"
 LIBRARIAN_TODAY=$($PY -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") $PY prose_controls.py | tail -1
-echo "2/4 control run";                       $PY run_evals.py --source fixture --no-guard --expect-failures 3 | grep -E "^assertions"
+LIBRARIAN_TODAY=$($PY -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") $PY excel_controls.py | tail -1
+# Four since the Excel sheets (19 Nov 2026): the planted wrong price also makes its sheet fail to reproduce.
+echo "2/4 control run";                       $PY run_evals.py --source fixture --no-guard --expect-failures 4 | grep -E "^assertions"
 echo "3/4 today's lake, scripted model";      $PY run_evals.py --gate | grep -E "^assertions|^gate"
 if [ "${LIVE:-1}" = "1" ]; then
   export ANTHROPIC_API_KEY=$(tr -d '\r\n' < /opt/energyscope/.anthropic_api_key)

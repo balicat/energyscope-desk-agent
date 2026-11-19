@@ -223,6 +223,27 @@ How the suite got here, including the failures:
 | 18 Nov | not released: 224/224 on Haiku in three full live runs of branch `slots`, with 16 to about 30 validator corrections a run | the summary rebuilt so that the model places slots and code writes every figure, noun, unit, date and direction. It passes every check and about a third of the answers read like a form; half the questions need one correction. Measuring it exposed the retry undercount above and exhausted the API key |
 | 18 Nov | 224/224 on Haiku, **12 retries in 11 of 32 questions**, $0.10, one live run | the retry count made true and reported in every answer; the gate counts its own cost; no 5xx for a failure; a percentile on a series shorter than its window says so in a caveat. The first live run of the day whose retries were counted |
 
+## Reproduce in Excel (branch `excel`, not released)
+
+Under each answer, code writes a small sheet for every fact, spread, futures curve, crack spread and seasonal
+comparison: a label, a formula and the value reported. Pasted at cell A1 with the EnergyScope add-in loaded, the
+formulas fetch each input on a fixed date (`=INDEX(ES.Get("PET.RWTC.D","2026-11-11","2026-11-11"),2,2)`) and do
+the arithmetic in plain Excel (`=(2*B2*42+B3*42)/3-B1`), so a reader can check a number without trusting the model
+or this service. The model writes none of it (`es_agent/excel.py`).
+
+A sheet is shown only if it reproduces: a small interpreter computes every formula from the same data the answer
+was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen
+data: 21 sheets and 85 formulas reproduce across the 32 questions (new hard evaluator `ExcelReproduces`), and a
+control (`excel_controls.py`) plants ten errors in true sheets, such as the day before, a reference one row off,
+41 gallons to the barrel and an average over one year too few; all ten are reported.
+
+What this does not show. The interpreter proves the logic of a sheet (series, dates, arithmetic); it does not run
+Excel, and the form of the `ES.Get` call was read from the add-in's source, not executed. The check compares
+values, so a formula fetching the wrong date passes when the series had the same value on both days (the control
+found one: WTI on a US holiday). Dates are fixed, so a later revision of the data will make a sheet disagree with
+the answer it came from. Ten of the fifteen readings in the suite have no sheet yet: percentiles and positioning
+(they rank a whole window), scenarios, evidence and watch lists; the page names them.
+
 ## Release gate
 
 `deploy.sh` is how a change to the code, the prompt or the model reaches the public service. The candidate must
