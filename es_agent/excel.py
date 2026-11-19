@@ -226,13 +226,15 @@ def _tab_names(titles: list[str]) -> list[str]:
     names: list[str] = []
     for i, title in enumerate(titles, 1):
         name = re.sub(r"[\[\]:*?/\\]", " ", title).strip().strip("'")[:31].rstrip() or f"Sheet {i}"
-        if name.lower() in (n.lower() for n in names):
-            # The position makes it distinct, and the cut leaves room for it whatever its length: a name of
-            # 27 characters plus " (10)" is 32, and Excel then refuses to open the file (found by the reviewer
-            # with ten tabs; the first control had four).
-            suffix = f" ({i})"
-            name = name[:31 - len(suffix)].rstrip() + suffix
-        assert len(name) <= 31 and name.lower() not in (n.lower() for n in names), name
+        base, k = name, i
+        while name.lower() in (n.lower() for n in names):
+            # A number makes it distinct, and the cut leaves room for it whatever its length: a name of 27
+            # characters plus " (10)" is 32, and Excel then refuses to open the file (found by the reviewer
+            # with ten tabs; the first control had four). The number starts at the tab's position and moves on
+            # if a title already ends that way ("A (3)", "A", "A").
+            suffix = f" ({k})"
+            name = base[:31 - len(suffix)].rstrip() + suffix
+            k += 1
         names.append(name)
     return names
 

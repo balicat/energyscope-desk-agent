@@ -154,7 +154,8 @@ says so and uses a tanker ETF as a proxy), and no news.
 
 ## Evaluation
 
-Thirty-two questions, seven evaluators each (224 assertions): `Grounded` (recompute from source),
+Thirty-two questions, eight evaluators each (256 assertions): `Grounded` (recompute from source),
+`ExcelReproduces` (every Excel sheet offered with the answer gives the reported values, and none was dropped),
 `SummaryTraceable` (no number or date, in the summary or a caveat, that traces to nothing), `RightSeries` (an acceptable series for each thing asked, or
 a correct refusal), `ScenarioLabelled` (a what-if is stated as a condition), `DirectionRight` (the prose points the same way as the data: backwardation or contango, rose or fell), `OwnWords` (nothing on the page is the visitor's sentence handed back), `MaxToolCalls(6)`. The questions cover prices, stocks, spreads, the curve, cracks, the
 arbitrage and a what-if on it, why spot and futures spreads disagree, the evidence for and against a tight crude market, the week's surprises and watch list, "when was it last this high", seasonal and
@@ -163,8 +164,8 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 
 | Run | Assertions | What it shows |
 |---|---|---|
-| scripted model, frozen data (`--source fixture`) | **224/224**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
-| scripted model, validator off (`--no-guard`) | **221/224** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
+| scripted model, frozen data (`--source fixture`) | **256/256**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
+| scripted model, validator off (`--no-guard`) | **252/256** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `ExcelReproduces`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
 | `anthropic:claude-haiku-5-5`, live lake | **224/224, 0 retries** | the latest release run (32 cases, seven evaluators), one live run, no question retried. The runs before it scored 186/186 with 0 retries (31 cases, six evaluators), 186/186 (retries not yet counted), 180/180 (30 cases), 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
@@ -223,26 +224,52 @@ How the suite got here, including the failures:
 | 18 Nov | not released: 224/224 on Haiku in three full live runs of branch `slots`, with 16 to about 30 validator corrections a run | the summary rebuilt so that the model places slots and code writes every figure, noun, unit, date and direction. It passes every check and about a third of the answers read like a form; half the questions need one correction. Measuring it exposed the retry undercount above and exhausted the API key |
 | 18 Nov | 224/224 on Haiku, **12 retries in 11 of 32 questions**, $0.10, one live run | the retry count made true and reported in every answer; the gate counts its own cost; no 5xx for a failure; a percentile on a series shorter than its window says so in a caveat. The first live run of the day whose retries were counted |
 
-## Reproduce in Excel (branch `excel`, not released)
+## Reproduce in Excel
 
 Under each answer, code writes a small sheet for every fact, spread, futures curve, crack spread and seasonal
-comparison: a label, a formula and the value reported. Pasted at cell A1 with the EnergyScope add-in loaded, the
-formulas fetch each input on a fixed date (`=ES.Value("PET.RWTC.D","2026-11-11")`) and do
-the arithmetic in plain Excel (`=(2*B2*42+B3*42)/3-B1`), so a reader can check a number without trusting the model
-or this service. The model writes none of it (`es_agent/excel.py`).
+comparison: a label, a formula and the value reported. With the EnergyScope add-in loaded, the formulas fetch each
+input on a fixed date (`=ES.Value("PET.RWTC.D","2026-11-11")`) and do the arithmetic in plain Excel
+(`=(2*B2*42+B3*42)/3-B1`), so a reader can check a number without trusting the model or this service. The model
+writes none of it (`es_agent/excel.py`).
 
-A sheet is shown only if it reproduces: a small interpreter computes every formula from the same data the answer
+The sheets reach the reader two ways. The page shows them, with a button that copies one to paste at cell A1. And
+the answer carries the same sheets as one workbook to download, a tab each, written by `excel.workbook` with the
+standard library (an .xlsx is a zip of small XML files). The workbook is the one that works everywhere: pasted
+text is read by the reader's locale, and where Excel separates arguments with a semicolon and writes decimals
+with a comma, a pasted formula is refused and "2.538" becomes 2538; a file stores formulas and numbers the same
+way in every locale. In the workbook column D says "same" when the formula's result equals the reported value
+within the tolerance the service's own check applies, and gives the difference otherwise. Under the rows it says
+what a reader needs: Enable Editing, Refresh All, the add-in version, and when the answer was given.
+
+A sheet is offered only if it reproduces: a small interpreter computes every formula from the same data the answer
 was checked against, and a sheet whose result differs from the reported value is dropped and logged. On the frozen
-data: 21 sheets and 85 formulas reproduce across the 32 questions (new hard evaluator `ExcelReproduces`), and a
+data: 21 sheets and 85 formulas reproduce across the 32 questions (hard evaluator `ExcelReproduces`), and a
 control (`excel_controls.py`) plants ten errors in true sheets, such as the day before, a reference one row off,
-41 gallons to the barrel and an average over one year too few; all ten are reported.
+41 gallons to the barrel and an average over one year too few; all ten are reported. The same control requires
+that the workbook reads back as the sheets, that the same sheets give the same bytes, and that 112 tab names,
+with repeats, come out legal and distinct.
 
-What this does not show. The interpreter proves the logic of a sheet (series, dates, arithmetic); it does not run
-Excel, and the form of the `ES.Get` call was read from the add-in's source, not executed. The check compares
-values, so a formula fetching the wrong date passes when the series had the same value on both days (the control
-found one: WTI on a US holiday). Dates are fixed, so a later revision of the data will make a sheet disagree with
-the answer it came from. Ten of the fifteen readings in the suite have no sheet yet: percentiles and positioning
-(they rank a whole window), scenarios, evidence and watch lists; the page names them.
+`ES.Value` was added to the add-in for this (version 3.2.0, 19 Nov 2026): one value of one series in one cell, or
+the words "no value on <date>", never a neighbouring day. Building it showed that the add-in's cache answered a
+formula from rows fetched for other dates; a second reviewer found that in real Excel, and it was fixed in the
+same release. The earlier form, `=INDEX(ES.Get(series, date, date), 2, 2)`, showed `#REF!` for every failure.
+
+What was run in Excel, and what was not. With add-in 3.2.0 in Excel 16 on 19 Nov 2026: five sheets entered one
+after another (24 cells, the second reviewer), a workbook of four tabs (30 cells) and one of twelve tabs with
+repeated titles (90 cells), and a workbook downloaded through the page in a browser under the site's content
+security policy (4 cells). Every formula cell equalled the reported value. Not run by anyone: a semicolon-locale
+Excel, a real clipboard paste (the runs typed the formulas in), 32-bit Excel, and a person opening a
+browser-downloaded add-in file, which Excel may block until it is unblocked. The first version of the workbook
+gave a tab a 32-character name when an answer had ten or more sheets and Excel refused the whole file; the
+reviewer found it before release.
+
+What this does not show. The interpreter proves the logic of a sheet (series, dates, arithmetic), not Excel. The
+check compares values, so a formula fetching the wrong date passes when the series had the same value on both
+days (the control found one: WTI on a US holiday). Dates are fixed, but sources revise: of 212 values fetched a
+day after the data was frozen, 37 differed, all futures closes of the last day or two, so a sheet can disagree
+with the answer it came from, and the workbook says when the answer was given. A reader needs a key, and a key
+is sent by a person, not at once. Ten of the fifteen readings in the suite have no sheet yet: percentiles and
+positioning (they rank a whole window), scenarios, evidence and watch lists; the page names them.
 
 ## Release gate
 

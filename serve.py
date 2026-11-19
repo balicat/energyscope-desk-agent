@@ -220,9 +220,12 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         good, wrong = excel.sheets(output, _source)
         out["excel"] = [{"title": s.title, "rows": [r.model_dump() for r in s.rows], "tsv": excel.tsv(s)} for s in good]
         if good:  # the same sheets as one workbook, which every locale of Excel reads the same way
-            given_at = time.strftime("%d %B %Y, %H:%M UTC", time.gmtime())
-            out["excel_file"] = {"xlsx": base64.b64encode(excel.workbook(good, given_at)).decode("ascii"),
-                                 "given_at": given_at, "addin": excel.ADDIN_VERSION}
+            try:
+                given_at = time.strftime("%d %B %Y, %H:%M UTC", time.gmtime())
+                out["excel_file"] = {"xlsx": base64.b64encode(excel.workbook(good, given_at)).decode("ascii"),
+                                     "given_at": given_at, "addin": excel.ADDIN_VERSION}
+            except Exception as e:  # the file is an extra: without it the sheets above are still shown
+                print(f"excel: workbook not written: {type(e).__name__}: {e}"[:300], file=sys.stderr, flush=True)
         if wrong:
             print("excel: sheets not shown:", "; ".join(wrong)[:600], file=sys.stderr, flush=True)
     except Exception as e:
