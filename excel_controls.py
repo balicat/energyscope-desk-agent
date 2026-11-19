@@ -163,7 +163,8 @@ layout = []
 _C1_NOTE = ("The Date in cell C1 belongs to the rows whose Date cell shows the same date: change C1 and those rows "
             "follow, with everything calculated from them. A row with another date keeps its own cell and does not "
             "move, so where a tab compares dates (a change over thirty days, the same week of earlier years) moving "
-            "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value.")
+            "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value and "
+            "the history beside them jumps to the first year of the series.")
 _HEAD, _FIRST = 3, 4
 _serial = lambda day: (_dt.date.fromisoformat(day) - _dt.date(1899, 12, 30)).days
 for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
@@ -329,7 +330,10 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     stated = {("H", 1): ("text", _HISTORY_LABEL, True, None), ("R", _HEAD): ("text", "Date", True, None),
               ("R", _FIRST): ("spill", f'R{_FIRST}: _xll.ES.Table(S{_HEAD}:{last}{_HEAD},$C$1-365,$C$1,"#N/A","D")', False, "yyyy-mm-dd")}
     for k, sid in enumerate(ids):
-        stated[(_col(19 + k), _HEAD)] = ("stored text", f"B{first[sid]} = {sid}", True, None)
+        # never empty, never a number: an emptied Series cell must reach ES.Table as a name it does not know,
+        # which keeps the column's place (a number is skipped, an empty text at either end is trimmed, and the
+        # columns to the right would sit under the wrong headers and chart titles)
+        stated[(_col(19 + k), _HEAD)] = ("stored text", f'IF(B{first[sid]}="","(empty)",B{first[sid]}&"") = {sid}', True, None)
     for key, (kind, content, bold, shown) in stated.items():
         got = c.get(key, (None, "nothing", ""))
         if got[1:] != (kind, content) or (bold and not _bold(got[0])) or (shown and _shown(got[0]) != shown):
@@ -391,8 +395,11 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             layout.append(f"{at}: not one line on one date axis and one value axis")
         if '<c:dispBlanksAs val="span"/>' not in chart:
             layout.append(f"{at}: days without a value would break the line or draw it at zero")
-        if "<c:title>" not in chart or '<c:autoTitleDeleted val="0"/>' not in chart:
-            layout.append(f"{at}: no title, so nothing says which series it is")
+        # the title is the automatic one, taken from the series' name, which is the header cell: a title typed
+        # into the chart would not follow the Series cell (the reviewer's "Price" passed the first control)
+        title = _re.search(r"<c:title>(.*?)</c:title>", chart)
+        if not title or '<c:autoTitleDeleted val="0"/>' not in chart or "<c:tx>" in title[1] or "<a:t>" in title[1]:
+            layout.append(f"{at}: no title, or one typed into the chart: nothing then says which series it is")
 if not _tabs or not _styles:
     layout.append("the workbook has no worksheets or no styles")
 failures += layout[:6]

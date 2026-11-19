@@ -376,7 +376,13 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
                    f'<c r="C1" s="{_STYLE_DATE}"><v>{_serial(shared)}</v></c>'
                    f'{_text("H1", HISTORY_LABEL, _STYLE_HEAD)}</row>')
     # the history's header: each series cell REFERS to the Series cell of the first row that names it (the ID is
-    # stored beside the reference, as the date is beside =$C$1, for Protected View)
+    # stored beside the reference, as the date is beside =$C$1, for Protected View). The reference is never
+    # empty and never a number: =IF(B4="","(empty)",B4&""). A bare =B4 of an emptied cell is the NUMBER 0, and
+    # ES.Table skips a number without keeping its place: every column to the right then sat under its
+    # neighbour's header and chart title (the reviewer emptied B4 of a crack tab and gasoline's chart drew
+    # heating oil). B4&"" alone was not enough: ES.Table keeps the place of an empty text BETWEEN series but
+    # trims one at either end, so emptying the first Series cell still shifted the rest (seen in Excel). A name
+    # it does not know keeps its column, all #N/A.
     series = tab_series(sheet)
     named = {}
     for i, row in enumerate(sheet.rows):
@@ -386,7 +392,8 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
     d = _column(HISTORY_COLUMN)
     head = (_text(f"{d}{HEADER_ROW}", "Date", _STYLE_HEAD)
             + "".join(f'<c r="{_column(HISTORY_COLUMN + 1 + k)}{HEADER_ROW}" s="{_STYLE_HEAD}" t="str">'
-                      f'<f>B{named[sid]}</f><v>{escape(sid)}</v></c>' for k, sid in enumerate(series))) if series else ""
+                      f'<f>IF(B{named[sid]}="","(empty)",B{named[sid]}&amp;"")</f><v>{escape(sid)}</v></c>'
+                      for k, sid in enumerate(series))) if series else ""
     xml.append(f'<row r="{HEADER_ROW}">'
                + "".join(_text(f"{col}{HEADER_ROW}", name, _STYLE_HEAD) for col, name in zip("ABCDEF", HEADER))
                + head + "</row>")
@@ -526,7 +533,8 @@ def _drawing(count: int) -> str:
 C1_NOTE = ("The Date in cell C1 belongs to the rows whose Date cell shows the same date: change C1 and those rows "
            "follow, with everything calculated from them. A row with another date keeps its own cell and does not "
            "move, so where a tab compares dates (a change over thirty days, the same week of earlier years) moving "
-           "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value.")
+           "C1 alone changes what is compared. C1 must hold a date: emptied, the rows that follow it find no value and "
+           "the history beside them jumps to the first year of the series.")
 
 
 def notes(given_at: str) -> list[str]:
