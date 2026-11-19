@@ -409,8 +409,9 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
                     metrics.close(getattr(f, n), getattr(src, n)) for n in ("latest_value", "base_value", "change_abs", "change_pct")):
                 f.latest_value, f.base_period, f.base_value = src.latest_value, src.base_period, src.base_value
                 f.change_abs, f.change_pct = src.change_abs, src.change_pct
+                f.name, f.units = src.name, src.units   # a mistyped unit would go straight into a sheet's label
         elif isinstance(src, Observation) and f.latest_period == src.period and metrics.close(f.latest_value, src.value):
-            f.latest_value = src.value
+            f.latest_value, f.name, f.units = src.value, src.name, src.units
     # The model's caveats are held to the same tracing as the summary: one that states a number or a
     # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
     # What the visitor wrote: the prompt without the lines that quote The Librarian's own earlier answers.
