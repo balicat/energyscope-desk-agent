@@ -90,7 +90,7 @@ planted = [
     ("a percent the model rounded to two decimals", fact_sheet(2)),
     # the window sheets
     ("a percentile counted from the top (at or above)", edited(good["percentile"], 1, '"<="', '">="')),
-    ("a percentile rounded to a whole number", edited(good["percentile"], 1, "*100,1)", "*100,0)")),
+    ("a percentile rounded to a whole number", edited(good["percentile"], 1, "*100,1),", "*100,0),")),
     ("the highest of the window where the lowest belongs", edited(good["percentile"], 2, "MIN(W)", "MAX(W)")),
     ("deviations from the highest, not from the average", edited(good["percentile"], 5, "(B1-B5)", "(B1-B4)")),
     ("a window that starts a month late", windowed(good["percentile"], days=30)),
@@ -265,6 +265,11 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
                 for name, code in (("MIN", 5), ("MAX", 4), ("AVERAGE", 1), ("STDEV.P", 8)):
                     moved = moved.replace(f"{name}(W)", f"_xlfn.AGGREGATE({code},6,{rng})")
                 moved = moved.replace("COUNT(W)", f"COUNT({rng})").replace("COUNTIF(W,", f"COUNTIF({rng},")
+                # a rank over the window must show nothing when the value it ranks is not a number: unguarded,
+                # COUNTIF counts nothing and the cell shows 0.00, "the lowest of the window" (the reviewer moved
+                # the date thirty days on and read exactly that)
+                if "COUNTIF(W" in row.formula and not _re.fullmatch(r'=IF\(ISNUMBER\(B\d+\),.*,""\)', row.formula):
+                    layout.append(f"{at}: a rank over the window with no guard for a value that is not a number")
                 if "W" in _re.sub(r"[A-Za-z_.]+\(", "", moved).replace("ROUND", ""):
                     layout.append(f"{at}: a statistic over the window that this control cannot place: {row.formula}")
             moved = _re.sub(r"\bB(\d+)\b", lambda m: f"D{int(m[1]) + _FIRST - 1}", moved)
@@ -351,7 +356,9 @@ _WINDOW_NOTE = ("To the right: this sheet's series from the date in C2 to the da
                 "series) and as a table from column R, filled by the one formula in R4. The statistics in the rows are "
                 "taken over that table: AGGREGATE(5,6,..), (4,6,..), (1,6,..) and (8,6,..) are MIN, MAX, AVERAGE and "
                 "STDEV.P that skip the days with no value, which show #N/A in grey. Move C2 or C1 and the window, the "
-                "statistics and the charts follow; do not type inside the table. This part needs Excel 365 or Excel 2021.")
+                "statistics and the charts follow; do not type inside the table. C2 must hold a date: emptied, the "
+                "window becomes the whole history of the series and the charts show only its first eleven years. Without "
+                "the add-in the statistics read #REF! or 0, not #NAME?. This part needs Excel 365 or Excel 2021.")
 _HISTORY_LABEL = ("History: the year to the date in C1. A chart for each of the first three series; "
                   "the table behind them starts in column R")
 _HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "

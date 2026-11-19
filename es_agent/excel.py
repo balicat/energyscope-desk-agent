@@ -141,7 +141,10 @@ def _seasonal(r: Reading, source: DataSource) -> Sheet | None:
     return Sheet(title=r.title, rows=rows)
 
 
-RANK = '=ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1)'     # the share of the window at or below the latest, as _rank
+# The share of the window at or below the latest, as _rank. Guarded: when the latest is not a number (the
+# reader moved the date to a day without a value, and the cell says "no value on ...") COUNTIF counts nothing and
+# the bare formula showed 0.00, which reads as "the lowest of the window". It shows nothing instead.
+RANK = '=IF(ISNUMBER(B1),ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1),"")'
 
 
 def _percentile(r: Reading, source: DataSource) -> Sheet | None:
@@ -236,6 +239,7 @@ def _arithmetic(node) -> float:
 _W_STAT = re.compile(r"\b(COUNT|MIN|MAX|AVERAGE|STDEV\.P)\(W\)")
 _W_RANK = re.compile(r'COUNTIF\(W,"<="&B(\d+)\)')
 _ROUND = re.compile(r"ROUND\((.*),(\d+)\)")
+_GUARD = re.compile(r'IF\(ISNUMBER\(B\d+\),(.*),""\)')
 
 
 def excel_round(x: float, places: int) -> float:
@@ -278,6 +282,9 @@ def evaluate(sheet: Sheet, source: DataSource) -> list[float]:
             return repr({"AVERAGE": sum(cells) / len(cells), "MIN": min(cells), "MAX": max(cells)}[m[1]])
 
         text, places = row.formula.lstrip("="), None
+        guarded = _GUARD.fullmatch(text)        # IF(ISNUMBER(B1), x, ""): here B1 is a number, so it is x
+        if guarded:
+            text = guarded[1]
         rounded = _ROUND.fullmatch(text)
         if rounded:
             text, places = rounded[1], int(rounded[2])
@@ -405,7 +412,9 @@ WINDOW_NOTE = ("To the right: this sheet's series from the date in C2 to the dat
                "series) and as a table from column R, filled by the one formula in R4. The statistics in the rows are "
                "taken over that table: AGGREGATE(5,6,..), (4,6,..), (1,6,..) and (8,6,..) are MIN, MAX, AVERAGE and "
                "STDEV.P that skip the days with no value, which show #N/A in grey. Move C2 or C1 and the window, the "
-               "statistics and the charts follow; do not type inside the table. This part needs Excel 365 or Excel 2021.")
+               "statistics and the charts follow; do not type inside the table. C2 must hold a date: emptied, the "
+               "window becomes the whole history of the series and the charts show only its first eleven years. Without "
+               "the add-in the statistics read #REF! or 0, not #NAME?. This part needs Excel 365 or Excel 2021.")
 _AGGREGATE = {"MIN": 5, "MAX": 4, "AVERAGE": 1, "STDEV.P": 8}
 HISTORY_NOTE = ("To the right: the history of this sheet's series over the year to the date in C1, as charts (the "
                 "first three series) and as a table from column R, filled by the one formula in R4. Both follow "

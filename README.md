@@ -296,7 +296,7 @@ sheet disagree with the answer is reported and the sheet withheld. Excel taught 
 `AGGREGATE` written into a file by hand reads #NAME? unless spelled `_xlfn.AGGREGATE`; and the weekly grid lost a
 report, which is why every table is now daily. In Excel with add-in 3.2.1: percentile 7 of 7 and positioning 8 of 8
 values equal the reported ones. Such a sheet works in the workbook only: the page shows its rows and says what W
-is, with no copy button. Not reproduced: when the level was last this high or low (the reading's own sentence).
+is, with no copy button. The percentile is guarded, `IF(ISNUMBER(B1), ..., "")`: the reviewer moved the date to a day without a value and the bare formula showed 0.00, "the lowest of the window", because COUNTIF counts nothing against a text. Six of the 254 window sheets the frozen data can make are withheld for a rounding tie (41.25 is 41.2 to the reading and 41.3 to Excel); the page now lists a reading under "No sheet yet" whenever no sheet came for it, whatever its kind. Owed: readings that round as Excel does, so that nothing need be withheld. Not reproduced: when the level was last this high or low (the reading's own sentence).
 A reader who moves C1 gets the rank within C2 to C1, a shorter window, not "the last N years to that day". The charts and the grey rule cannot follow a table that grows, so on these tabs they reach eleven years down. Run in Excel with add-in 3.2.1: with
 C1 of the crack tab set to another day all three legs and the spread moved and Check showed the differences; set
 back, every row read "same" again. Values show with thousands separators and two decimals while the cells keep every
