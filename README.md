@@ -166,7 +166,7 @@ a follow-up, a cross-unit "spread" that must not be computed, a prompt injection
 |---|---|---|
 | scripted model, frozen data (`--source fixture`) | **256/256**, answers equal `results/golden.json` | tools, arithmetic, validator and evaluators agree with the recorded answers; no lake, no key, no cost. Runs in GitHub Actions on every push |
 | scripted model, validator off (`--no-guard`) | **252/256** | the control: one case misquotes a price by 5% on purpose and one calls a backwardated curve contango. With the validator on, the run rejects both and retries; with it off, `Grounded`, `ExcelReproduces`, `SummaryTraceable` and `DirectionRight` fail them. A green run means something |
-| `anthropic:claude-haiku-5-5`, live lake | **224/224, 0 retries** | the latest release run (32 cases, seven evaluators), one live run, no question retried. The runs before it scored 186/186 with 0 retries (31 cases, six evaluators), 186/186 (retries not yet counted), 180/180 (30 cases), 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
+| `anthropic:claude-haiku-5-5`, live lake | **256/256, 12 retries in 12 of 32 questions** | the latest release run (19 Nov 2026, 32 cases, eight evaluators, $0.09), the first run of its commit; the commit before it was blocked twice (history below). Before that 224/224 with 12 retries in 11 questions (seven evaluators), and, with retries undercounted (see the correction below), 224/224, 186/186 (31 cases, six evaluators), 186/186 (retries not yet counted), 180/180 (30 cases), 174/174 (29 cases), 145/145 (29 cases, five evaluators) and 140/140 (28 cases); the two before that, on 26 cases, 129/130 and 128/130: every number right, one or two questions over their tool budget or on a different series than expected. About 2.5 tool calls and 6 s a question, $0.003 each. On the earlier 20-case suite the same model scored 78 to 80 of 80 across five runs; the misses were one question, traced to a bug (below) |
 | `anthropic:claude-sonnet-5-5`, live lake (19 cases, before `get_surprises`) | **74/76** | 4.1 tool calls and 8.1 s, $0.057 each. It made 17 tool calls on the EU gas storage question and gave no series on the cross-unit question |
 
 **Correction, 18 Nov 2026, evening: every "0 retries" in this file is an undercount of unknown size.** The
@@ -181,6 +181,15 @@ recovered, so their rows are left as they were written and this paragraph stands
 count on the release line: 224/224 with 11 retries in 10 of 32 questions, then 12 in 11, at about $0.10 a run.**
 The first of those was blocked by the gate's budget of eight retries, a limit that had been chosen from a count
 of zero; the budget is now 16, one correction for half the questions, and it is a number to bring down.
+
+Why the count sits where it does (19 Nov 2026). Five live runs have been counted: 11, 12, 18, 13 and 12. Eight
+questions are sent back once in every one of them, and almost every rejection is the same sentence: the series
+"was not returned by any tool call in this run", which is the model naming its series before it has called the
+tool. That is a fault in the instructions, not chance, and every visitor asking those questions pays for it in
+seconds. So half the budget is spent before a run starts, and three or four chance retries tip it over, as the
+run of 18 did. The gate allows one more run of a blocked commit; that rule is weaker than it reads, because a
+second run inside the budget proves as little as the first proved the opposite. The fix is in the prompt, and it
+is the first thing to do if the agent is opened again: with those eight gone the budget could be eight.
 
 **The same evening, the test gate took the public service down for about ten minutes.** The gate's live runs
 and the public service shared one API key with a monthly limit of six dollars; nothing counted what the gate
@@ -223,6 +232,10 @@ How the suite got here, including the failures:
 | 18 Nov | 224/224 on Haiku, 0 retries, one live run | round 4 of the review: a visitor could dictate a caveat that was shown under the tick. Closed, with a seventh evaluator and a new case; asked again on the public site, the model declined to include the sentence and said why |
 | 18 Nov | not released: 224/224 on Haiku in three full live runs of branch `slots`, with 16 to about 30 validator corrections a run | the summary rebuilt so that the model places slots and code writes every figure, noun, unit, date and direction. It passes every check and about a third of the answers read like a form; half the questions need one correction. Measuring it exposed the retry undercount above and exhausted the API key |
 | 18 Nov | 224/224 on Haiku, **12 retries in 11 of 32 questions**, $0.10, one live run | the retry count made true and reported in every answer; the gate counts its own cost; no 5xx for a failure; a percentile on a series shorter than its window says so in a caveat. The first live run of the day whose retries were counted |
+| 19 Nov | not pushed: a page whose script did not parse | the Excel block's wording was edited and a pair of double quotes landed inside a double-quoted string. The page is one inline script, so no question could have been asked, in any browser, within a minute of a push. Nothing in the page's checks read the script as a program; the reviewer did, with `node --check`, before the push. The page's `check.sh` now does the same first, and fails on that commit |
+| 19 Nov | blocked: 256/256 on Haiku, **18 retries in 14 questions** against a budget of 16 | the Excel sheets (below). Every number right; the count was over. The record showed the same eight questions as every run plus four chance retries |
+| 19 Nov | blocked on the one rerun allowed: **255/256**, 13 retries | a real fault, and only the live model could show it: it wrote a 30-day change as -17.26 percent where the tool had returned -17.262664; the validator accepts a fact that is close; the Excel sheet for that fact did not reproduce the rounded figure. Both runs of that commit were spent, so it was not released |
+| 19 Nov | **256/256 on Haiku, 12 retries in 12 of 32 questions**, $0.09, one live run | released. The validator copies the tool's figures, name and units into a fact it accepts, so the table shows them and the model cannot round them; the scripted model rounds a percent as the live one did, and with the copy switched off the frozen suite blocks on four questions. A looser tolerance for the sheets was written first and dropped on the reviewer's advice: it would have called a one-cent revision "same". Eight evaluators, 32 cases. Asked on the public site afterwards, the question that had failed gave a sheet, and its workbook gave the reported values in Excel |
 
 ## Reproduce in Excel
 
