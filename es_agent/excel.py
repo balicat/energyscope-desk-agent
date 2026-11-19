@@ -21,8 +21,9 @@ Two rules keep it honest:
     The release gate requires that none is dropped on the golden questions.
 
 What `evaluate` proves is the logic of the sheet: the right series, the right dates, the right arithmetic.
-It does not run Excel. That was done by hand and by a second reviewer on 19 Nov 2026, with add-in 3.2.0 in
-Excel 16: the sheets this module writes, entered one after another, gave the reported value in every cell.
+It does not run Excel. That was done on 19 Nov 2026 with add-in 3.2.0 in Excel 16, on a few sheets, not on
+all of them: five sheets entered one after another by a second reviewer (24 cells) and a workbook of four tabs
+written by `workbook` (30 cells) gave the reported value in every cell.
 It compares values, so a formula that fetches the wrong date passes when the series had the same value on
 both days (found by this module's own control: WTI on a US holiday).
 
@@ -47,6 +48,7 @@ from es_agent.sources import DataSource
 
 ADDIN_URL = "https://energyscope.io/excel"
 ADDIN_VERSION = "3.2.0"   # the first with ES.Value
+TOLERANCE_ABS, TOLERANCE_REL = 5e-5, 1e-6   # a formula reproduces a reported value within the larger of these
 
 
 class Row(BaseModel):
@@ -194,7 +196,7 @@ def problems(sheet: Sheet, source: DataSource) -> list[str]:
         return [f"{sheet.title}: {type(e).__name__}: {e}"]
     return [f"{sheet.title}: {row.label}: the formula gives {g:.6g}, the answer says {row.value:.6g}"
             for row, g in zip(sheet.rows, got)
-            if abs(g - row.value) > max(5e-5, 1e-6 * abs(row.value))]
+            if abs(g - row.value) > max(TOLERANCE_ABS, TOLERANCE_REL * abs(row.value))]
 
 
 def sheets(answer: DeskAnswer, source: DataSource) -> tuple[list[Sheet], list[str]]:
@@ -225,7 +227,12 @@ def _tab_names(titles: list[str]) -> list[str]:
     for i, title in enumerate(titles, 1):
         name = re.sub(r"[\[\]:*?/\\]", " ", title).strip().strip("'")[:31].rstrip() or f"Sheet {i}"
         if name.lower() in (n.lower() for n in names):
-            name = f"{name[:27].rstrip()} ({i})"
+            # The position makes it distinct, and the cut leaves room for it whatever its length: a name of
+            # 27 characters plus " (10)" is 32, and Excel then refuses to open the file (found by the reviewer
+            # with ten tabs; the first control had four).
+            suffix = f" ({i})"
+            name = name[:31 - len(suffix)].rstrip() + suffix
+        assert len(name) <= 31 and name.lower() not in (n.lower() for n in names), name
         names.append(name)
     return names
 
@@ -234,6 +241,13 @@ def _file_formula(formula: str) -> str:
     """A formula as a workbook stores it: no leading equals sign, and an add-in function carries the prefix
     Excel gives every function that comes from an XLL."""
     return formula.lstrip("=").replace("ES.Value(", "_xll.ES.Value(")
+
+
+def _same(i: int) -> str:
+    """Column D: "same" when B equals C by the tolerance `problems` uses, otherwise B minus C. A plain B minus C
+    showed -2.3E-07 on a percent the answer reports to six decimals, and 1E-14 of floating point elsewhere."""
+    return (f'IF(ISNUMBER(B{i}),IF(ABS(B{i}-C{i})<=MAX({TOLERANCE_ABS:.5f},{TOLERANCE_REL:.6f}*ABS(C{i})),'
+            f'"same",B{i}-C{i}),"")')
 
 
 def _text(ref: str, text: str) -> str:
@@ -248,7 +262,7 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
         xml.append(f'<row r="{i}">{_text(f"A{i}", row.label)}'
                    f'<c r="B{i}"><f>{escape(_file_formula(row.formula))}</f></c>'
                    f'<c r="C{i}"><v>{row.value!r}</v></c>'
-                   f'<c r="D{i}"><f>IF(ISNUMBER(B{i}),B{i}-C{i},"")</f></c></row>')
+                   f'<c r="D{i}"><f>{escape(_same(i))}</f></c></row>')
     for j, note in enumerate(notes, len(sheet.rows) + 2):
         xml.append(f'<row r="{j}">{_text(f"A{j}", note)}</row>')
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -260,9 +274,14 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
 def notes(given_at: str) -> list[str]:
     """What a reader needs under the rows of every tab. `given_at` is when the answer was given, as text."""
     return [
-        "Column A says what the row is. B is the formula. C is the value The Librarian reported. D is B minus C.",
-        f"B needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}",
-        "If column B is empty, press Refresh All on the EnergyScope tab. If it reads #NAME?, the add-in is not loaded.",
+        "If Excel shows a yellow bar saying Protected View, click Enable Editing first: until then nothing here calculates.",
+        "Then press Refresh All on the EnergyScope tab. Before that the cells in column B that fetch a value are "
+        "empty, and the ones that calculate from them read #VALUE! or #DIV/0!.",
+        "Column A says what the row is. B is the formula. C is the value The Librarian reported. D says \"same\" when "
+        "B equals C to within 0.00005 or one part in a million, which is the check the service applies; otherwise "
+        "it is B minus C.",
+        f"B needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If B reads "
+        "#NAME?, the add-in is not loaded; with no key, B says so in words.",
         f"The answer was given on {given_at}. A difference on the latest day or two of a futures series is a "
         "revision at the source after that time, not an error in the sheet.",
     ]

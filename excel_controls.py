@@ -75,9 +75,13 @@ if back != want:
     failures.append("the workbook does not say what the sheets say")
 if excel.workbook(list(good.values()), "19 November 2026, 16:00 UTC") != book:
     failures.append("the same sheets gave two different workbooks")
-tabs = excel._tab_names(["Brent/WTI: spread [futures]", "brent/wti: spread [futures]", "x" * 40, ""])
+# Twelve tabs, so that a repeat falls at a two-digit position: the first version made a 32-character name there
+# and Excel refused the file. Long titles, repeats in another case, characters Excel forbids, an empty title.
+long = "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year"
+tabs = excel._tab_names(["Brent/WTI: spread [futures]", "brent/wti: spread [futures]", "x" * 40, ""]
+                        + [long] * 4 + ["x" * 27] * 4 + [long.upper()] * 100)
 if (len({t.lower() for t in tabs}) != len(tabs) or any(len(t) > 31 or not t or set(t) & set("[]:*?/\\") for t in tabs)):
-    failures.append(f"tab names Excel would refuse: {tabs}")
+    failures.append(f"tab names Excel would refuse: {[t for t in tabs if len(t) > 31][:3]}")
 for line in failures:
     print(line)
 print(f"excel control: {len(planted) - len(failures)} of {len(planted)} planted errors reported; "
