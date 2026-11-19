@@ -265,9 +265,12 @@ reviewer found it before release.
 
 What this does not show. The interpreter proves the logic of a sheet (series, dates, arithmetic), not Excel. The
 check compares values, so a formula fetching the wrong date passes when the series had the same value on both
-days (the control found one: WTI on a US holiday). Dates are fixed, but sources revise: of 212 values fetched a
-day after the data was frozen, 37 differed, all futures closes of the last day or two, so a sheet can disagree
-with the answer it came from, and the workbook says when the answer was given. A reader needs a key, and a key
+days (the control found one: WTI on a US holiday). "Same" means within 0.00005 or one part in a million,
+whichever is larger, so on a series whose values are themselves that small the check says nothing. Dates are
+fixed, but sources revise: the reviewer opened all 77 sheets the suite can produce as one workbook a day after
+the data was frozen, and of 367 formula cells 86 differed, every one traced to a futures close revised at the
+source (Brent for 17 Nov, NYMEX for 18 Nov) and none to arithmetic. So a sheet can disagree with the answer it
+came from, and the workbook says when the answer was given and what a difference on the latest days means. A reader needs a key, and a key
 is sent by a person, not at once. Ten of the fifteen readings in the suite have no sheet yet: percentiles and
 positioning (they rank a whole window), scenarios, evidence and watch lists; the page names them.
 

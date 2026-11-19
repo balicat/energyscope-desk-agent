@@ -279,13 +279,15 @@ def notes(given_at: str) -> list[str]:
         "If Excel shows a yellow bar saying Protected View, click Enable Editing first: until then nothing here calculates.",
         "Then press Refresh All on the EnergyScope tab. Before that the cells in column B that fetch a value are "
         "empty, and the ones that calculate from them read #VALUE! or #DIV/0!.",
+        # Second, not last: the reviewer opened all 77 sheets a day after the data was frozen and 86 of 367
+        # cells differed, every one from a futures close revised at the source (Brent 17 Nov, NYMEX 18 Nov).
+        f"The answer was given on {given_at}. If column D shows a number on the latest day or two of a futures "
+        "series, the source has revised that price since; it is not an error in the sheet.",
         "Column A says what the row is. B is the formula. C is the value The Librarian reported. D says \"same\" when "
         "B equals C to within 0.00005 or one part in a million, which is the check the service applies; otherwise "
         "it is B minus C.",
         f"B needs the EnergyScope add-in, version {ADDIN_VERSION} or later, and a key: {ADDIN_URL}. If B reads "
         "#NAME?, the add-in is not loaded; with no key, B says so in words.",
-        f"The answer was given on {given_at}. A difference on the latest day or two of a futures series is a "
-        "revision at the source after that time, not an error in the sheet.",
     ]
 
 
