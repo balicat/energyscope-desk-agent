@@ -37,6 +37,7 @@ import datetime as dt
 import io
 import operator
 import re
+import textwrap
 import zipfile
 from xml.sax.saxutils import escape
 
@@ -299,6 +300,15 @@ HISTORY_NOTE = ("To the right: the history of this sheet's series over the year 
                 "This part needs Excel 365 or Excel 2021.")
 _EPOCH = dt.date(1899, 12, 30)   # day 0 of Excel's calendar
 _STYLE_NUMBER, _STYLE_DATE, _STYLE_HEAD = 1, 2, 3
+# A note is written as LINES, one row each, with an empty row between notes. Left as one long cell it ran on to
+# the right under the charts; as a merged, wrapped cell its tall row ran through the history table and stretched
+# a chart (seen in a picture of the tab in Excel). A line of 130 characters ends well inside columns A to F,
+# which are 148 characters wide.
+NOTE_LINE = 130
+
+
+def note_lines(note: str) -> list[str]:
+    return textwrap.wrap(note, NOTE_LINE, break_long_words=False, break_on_hyphens=False)
 
 
 def tab_date(sheet: Sheet) -> str | None:
@@ -394,8 +404,12 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
         xml.append(f'<row r="{r}">{_text(f"A{r}", row.label)}{inputs}'
                    f'<c r="E{r}" s="{_STYLE_NUMBER}"><v>{row.value!r}</v></c>'
                    f'<c r="F{r}"><f>{escape(_same(r))}</f></c>{table}</row>')
-    for j, note in enumerate(notes, FIRST_ROW + len(sheet.rows) + 1):
-        xml.append(f'<row r="{j}">{_text(f"A{j}", note)}</row>')
+    j = FIRST_ROW + len(sheet.rows) + 1
+    for note in notes:
+        for line in note_lines(note):
+            xml.append(f'<row r="{j}">{_text(f"A{j}", line)}</row>')
+            j += 1
+        j += 1          # an empty row between notes
     history = ""
     if series:
         first, last = _column(HISTORY_COLUMN + 1), _column(HISTORY_COLUMN + len(series))
@@ -412,8 +426,10 @@ def _worksheet(sheet: Sheet, notes: list[str]) -> str:
             '<col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="3" customWidth="1"/>'
             f'<col min="{HISTORY_COLUMN - 1}" max="{HISTORY_COLUMN - 1}" width="3" customWidth="1"/>'
             f'<col min="{HISTORY_COLUMN}" max="{HISTORY_COLUMN}" width="12" style="{_STYLE_DATE}" customWidth="1"/>'
-            f'<col min="{HISTORY_COLUMN + 1}" max="{HISTORY_COLUMN + max(1, len(series))}" width="20" '
-            f'style="{_STYLE_NUMBER}" customWidth="1"/></cols>'
+            # a series column is as wide as its ID in bold: at a fixed 20 the longer IDs were cut in the header
+            + "".join(f'<col min="{HISTORY_COLUMN + 1 + k}" max="{HISTORY_COLUMN + 1 + k}" width="{max(16, len(sid) + 6)}" '
+                      f'style="{_STYLE_NUMBER}" customWidth="1"/>' for k, sid in enumerate(series))
+            + '</cols>'
             f'<sheetData>{"".join(xml)}</sheetData>{history}</worksheet>')
 
 

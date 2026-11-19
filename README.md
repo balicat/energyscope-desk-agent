@@ -278,7 +278,7 @@ gallon, so each series has its own chart. The control states every cell of the t
 from the sheets alone; 44 faults planted in the table, the charts, their placing and the metadata part are all
 reported. In Excel with add-in 3.2.1 the rows beside the table still equal the reported values (31 of 31), the
 table's last row equals what `ES.Value` fetched for the same date on every tab, and table and charts follow a
-changed C1 and a changed Series cell. Needs Excel 365 or 2021; an older Excel shows the first cell of the table. Run in Excel with add-in 3.2.1: with
+changed C1 and a changed Series cell. Needs Excel 365 or 2021; an older Excel shows the first cell of the table. A picture of the finished tab, taken in Excel, showed two faults no cell check had seen: the notes under the rows, each one long cell, ran on beneath the charts, and wrapped into tall merged cells their rows ran through the table and stretched the first chart. A note is now written as lines of ordinary height that end before the charts, and a table column is as wide as its series ID. The control holds both. Run in Excel with add-in 3.2.1: with
 C1 of the crack tab set to another day all three legs and the spread moved and Check showed the differences; set
 back, every row read "same" again. Values show with thousands separators and two decimals while the cells keep every
 digit; dates are real dates. Check says "same" when Value equals Reported to within 0.00005 or one part in a

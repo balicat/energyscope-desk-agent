@@ -128,6 +128,24 @@ def _cells(xml):
     return out
 
 
+def _notes(c, start):
+    """The notes under a tab's rows, put back together: a note is written as consecutive lines in column A,
+    notes are separated by an empty row. Also the longest line and any cell beside a line."""
+    rows = sorted(r for (col, r) in c if col == "A" and r >= start)
+    notes, lines, last = [], [], None
+    for r in rows:
+        if last is not None and r != last + 1 and lines:
+            notes.append(" ".join(lines))
+            lines = []
+        lines.append(c[("A", r)][2] if c[("A", r)][1] == "text" else "")
+        last = r
+    if lines:
+        notes.append(" ".join(lines))
+    longest = max((len(c[("A", r)][2]) for r in rows), default=0)
+    beside = sorted(k for k in c if k[1] in rows and k[0] in "BCDEFG")
+    return notes, longest, beside
+
+
 with _zip.ZipFile(_io.BytesIO(book)) as _z:
     _tabs = [_z.read(f"xl/worksheets/sheet{i}.xml").decode("utf-8") for i in range(1, len(good) + 1)]
     _styles = _z.read("xl/styles.xml").decode("utf-8") if "xl/styles.xml" in _z.namelist() else ""
@@ -245,7 +263,11 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
     if min(widths.get(4, 0), widths.get(5, 0)) < 12 or widths.get(3, 0) < 10:
         layout.append(f"tab {_t}: the Date, Value or Reported column is too narrow to show its values: {widths}")
     c = _cells(_xml)
-    notes = [v[2] for (col, r), v in c.items() if col == "A" and r >= _FIRST + len(_sheet.rows) and v[1] == "text"]
+    notes, _longest, _beside = _notes(c, _FIRST + len(_sheet.rows))
+    # a note line must end before column G, or it runs under the charts; nothing may stand beside it, or it is cut
+    if _longest > 130 or _beside:
+        layout.append(f"tab {_t}: a note line of {_longest} characters, or cells beside the notes {_beside[:3]}: "
+                      "the text would run under the charts or be cut")
     for needed, why in (("Protected View", "what to do when nothing calculates"), (GIVEN_AT, "when the answer was given"),
                         ("3.2.0", "which add-in the formulas need"), ("Refresh All", "how to make the values appear")):
         if not any(needed in n for n in notes):
@@ -320,12 +342,14 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
             cols[n] = (float(w), st or None)
     if cols.get(18, (0, None))[0] < 10 or _shown(cols.get(18, (0, None))[1]) != "yyyy-mm-dd":
         layout.append(f"{where}: column R would not show the history's dates as yyyy-mm-dd")
-    if any(cols.get(19 + k, (0, None))[0] < 12 or _shown(cols.get(19 + k, (0, None))[1]) != "#,##0.00" for k in range(len(ids))):
-        layout.append(f"{where}: a series column of the history is too narrow or not shown as #,##0.00")
+    # a series column must hold its ID in bold (the header) and a value like 1,234,567.89
+    if any(cols.get(19 + k, (0, None))[0] < max(14, len(sid) + 4) or _shown(cols.get(19 + k, (0, None))[1]) != "#,##0.00"
+           for k, sid in enumerate(ids)):
+        layout.append(f"{where}: a series column of the history is too narrow for its ID or not shown as #,##0.00")
     if (f'<conditionalFormatting sqref="S{_FIRST}:{last}369"><cfRule type="containsErrors" dxfId="0" priority="1">'
             f'<formula>ISERROR(S{_FIRST})</formula></cfRule></conditionalFormatting>') not in _xml:
         layout.append(f"{where}: the history's days without a value are not shown in grey over S{_FIRST}:{last}369")
-    notes = [v[2] for (col, r), v in c.items() if col == "A" and r >= _FIRST + len(_sheet.rows) and v[1] == "text"]
+    notes = _notes(c, _FIRST + len(_sheet.rows))[0]
     if _HISTORY_NOTE not in notes:
         layout.append(f"{where}: the note on the history is missing or reworded")
     # the charts
