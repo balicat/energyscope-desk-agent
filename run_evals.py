@@ -258,14 +258,15 @@ def make_task(model_name: str, enforce: bool = True):
             except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
                 # The validator's own record is used too: inside the evaluation harness the captured messages can be empty.
                 RUNS[question] = {"retries": max(len(said(seen)), len(deps.rejections)), "ran_out": f"{type(e).__name__}: {e}"[:300],
-                                  "validator": said(seen) or [r[:600] for r in deps.rejections], "usd": round(spent(seen), 5)}
+                                  "validator": said(seen) or [r[:600] for r in deps.rejections], "usd": round(spent(seen), 5),
+                                  "repeats": list(deps.repeats)}
                 raise
         parts = [p for m in result.all_messages() for p in m.parts]
         # The validator's own record is the count. Until 18 Nov 2026 only the messages were counted, and a live
         # model's rejections arrive as a part type that count did not know: live runs were reported with no retries.
         retried = max(len(deps.rejections), sum(is_rejection(p) for p in parts))
         RUNS[question] = {"retries": retried, "ran_out": None, "validator": [r[:600] for r in deps.rejections] or said(result.all_messages()),
-                          "usd": round(spent(result.all_messages()), 5)}
+                          "usd": round(spent(result.all_messages()), 5), "repeats": list(deps.repeats)}
         increment_eval_metric("retries", retried)
         increment_eval_metric("tool_calls", sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for p in parts))
         increment_eval_metric("tokens", result.usage.total_tokens or 0)
@@ -335,6 +336,10 @@ def main() -> int:
                   + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
     usd = sum(r.get("usd", 0.0) for r in by_case.values())
     print(f"cost: ${usd:.4f} for this run, from the model's own usage figures")
+    # Facts the validator dropped because they only repeated a cited reading (not sent back, so not a retry).
+    repeats = {n: r["repeats"] for n, r in by_case.items() if r.get("repeats")}
+    print(f"repeats dropped: {sum(len(v) for v in repeats.values())} fact(s) in {len(repeats)} of {len(SUITE)} cases"
+          + (": " + ", ".join(sorted(repeats)) if repeats else ""))
     print(f"excel: {EXCEL['sheets']} sheets, {EXCEL['rows']} formulas reproduced; "
           f"{EXCEL['readings_with_a_sheet']} of {EXCEL['readings']} readings have a sheet")
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "

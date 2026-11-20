@@ -31,6 +31,7 @@ class Deps:
     emit: Callable[[str, dict], None] = lambda tool, args: None  # progress hook: called as each tool starts
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
     rejections: list[str] = field(default_factory=list)  # what the validator sent back in this run
+    repeats: list[str] = field(default_factory=list)  # facts dropped because they only repeated a cited reading
 
 
 SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
@@ -391,6 +392,19 @@ def tables_only(deps: Deps) -> DeskAnswer:
     return answer
 
 
+def repeats_of_readings(facts: list[SeriesFact], readings: list[Reading], ledger: dict) -> list[SeriesFact]:
+    """The facts that no fact tool returned and that a cited reading already carries.
+
+    After a curve, a crack or a positioning reading the model tends to list the reading's series again as facts
+    (a curve's M1 and M12, a crack's three legs), typed from the reading. No tool returned them as facts, so the
+    answer was sent back: 11 to 13 of the 15 or 16 answers sent back in each live run on 20 Nov 2026, and the same
+    eight questions in every run before. The reading shows those numbers, copied in by code, so such a fact adds
+    nothing a reader can see and is dropped. Nothing is loosened by it: a fact that no cited reading explains is
+    still sent back, and so is a summary number that only a dropped fact carried."""
+    carried = {sid for r in readings for sid in r.series_ids}
+    return [f for f in facts if (f.series_id, f.lookback_days) not in ledger and f.series_id in carried]
+
+
 @agent.output_validator
 def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     """Reject any fact that differs from what a tool returned, and any summary number that traces to no fact."""
@@ -436,6 +450,10 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     answer.caveats = kept + code_caveats(ctx.deps.source, answer)
     if not ctx.deps.enforce:
         return answer
+    repeated = repeats_of_readings(answer.facts, answer.readings, ctx.deps.ledger)
+    if repeated:
+        ctx.deps.repeats += [f"{f.series_id} (lookback {f.lookback_days})" for f in repeated]
+        answer.facts = [f for f in answer.facts if not any(f is r for r in repeated)]
     for f in answer.facts:
         src = ctx.deps.ledger.get((f.series_id, f.lookback_days))
         if src is None:

@@ -22,6 +22,8 @@ jobs:
         run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python prose_controls.py
       - name: Excel control, errors planted in true sheets must all be reported
         run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python excel_controls.py
+      - name: Fact control, a fact may be dropped only when a cited reading carries it
+        run: python fact_controls.py
       # Four since the Excel sheets (19 Nov 2026): the planted wrong price also makes its sheet fail to reproduce.
       - name: Control run, validator off, exactly four assertions must fail
         run: python run_evals.py --source fixture --no-guard --expect-failures 4
