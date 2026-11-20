@@ -416,6 +416,19 @@ def repeats_of_readings(facts: list[SeriesFact], readings: list[Reading], ledger
     return [f for f in facts if (f.series_id, f.lookback_days) not in ledger and f.series_id in carried]
 
 
+def newer_than_its_reading(src: Observation | Change, series_id: str, readings: list[Reading]) -> dt.date | None:
+    """The date of the reading that carries this series, when the series has a value NEWER than that date.
+
+    A reading is computed as of one date: a curve uses the last day every month has a price, so on a day when
+    the far months are a day behind, the curve is yesterday's while the first month already has today's. A fact
+    is by definition the series' latest value (the independent check recomputes it so). Shown together they
+    would put two prices for one contract on one page, so such a fact is not added: the reading stands alone,
+    with its date."""
+    latest = src.latest_period if isinstance(src, Change) else src.period
+    dated = [r.period for r in readings if series_id in r.series_ids]
+    return min(dated) if dated and latest > min(dated) else None
+
+
 def fact_from_data(src: Observation | Change) -> SeriesFact:
     """A fact with the tool's own figures, name and units: nothing in it was typed by the model."""
     if isinstance(src, Observation):
@@ -480,6 +493,11 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
             src = ctx.deps.ledger.get(key) or read_fact(ctx.deps.source, *key)   # a twin earlier in the list filled it
             if src is None:   # the data has no such fact (too little history for the change): nothing to show
                 ctx.deps.repeats.append(f"{f.series_id} (lookback {f.lookback_days}): dropped")
+                continue
+            behind = newer_than_its_reading(src, f.series_id, answer.readings)
+            if behind is not None:
+                ctx.deps.repeats.append(f"{f.series_id} (lookback {f.lookback_days}): dropped, the reading is dated {behind} "
+                                        "and the series has a newer value")
                 continue
             ctx.deps.ledger[key] = src
             ctx.deps.repeats.append(f"{f.series_id} (lookback {f.lookback_days}): read from the data")

@@ -14,7 +14,7 @@ import datetime as dt
 import sys
 
 from es_agent import clock
-from es_agent.agent import fact_from_data, read_fact, repeats_of_readings
+from es_agent.agent import fact_from_data, newer_than_its_reading, read_fact, repeats_of_readings
 from es_agent.models import Change, Observation, Reading, SeriesFact, SeriesHit
 
 D = clock.today()   # the stand-in data moves with the clock, so the change's window always holds it
@@ -84,6 +84,18 @@ def main() -> int:
                   and (ch.base_period, ch.base_value, ch.change_abs) == (D - dt.timedelta(days=2), 10.0, 2.0)))
     extra.append(("a series the data does not have gives nothing to show", read_fact(src, "NOPE.D", None) is None))
     extra.append(("a change with too little history gives nothing to show", read_fact(src, "X.D", 4000) is None))
+    # a reading dated before the series' latest: the fact would show a newer price beside the reading's
+    def reading(day):
+        return Reading(key="curve:x", title="x", period=day, units="u", series_ids=["X.D"], values={"M1": 11.0})
+    yesterday = D - dt.timedelta(days=1)
+    extra.append(("a series with a value newer than its reading's date is not added as a fact",
+                  newer_than_its_reading(obs, "X.D", [reading(yesterday)]) == yesterday))
+    extra.append(("a series whose latest is the reading's date is added", newer_than_its_reading(obs, "X.D", [reading(D)]) is None))
+    extra.append(("a series older than the reading's date is added (the reading used that value)",
+                  newer_than_its_reading(obs, "X.D", [reading(D + dt.timedelta(days=2))]) is None))
+    extra.append(("with two readings carrying the series, the earlier date decides",
+                  newer_than_its_reading(obs, "X.D", [reading(D), reading(yesterday)]) == yesterday))
+    extra.append(("a change is judged by its latest date", newer_than_its_reading(ch, "X.D", [reading(yesterday)]) == yesterday))
     for what, ok in extra:
         wrong += not ok
         print(("ok    " if ok else "WRONG ") + what)
