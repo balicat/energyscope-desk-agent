@@ -31,7 +31,7 @@ class Deps:
     emit: Callable[[str, dict], None] = lambda tool, args: None  # progress hook: called as each tool starts
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
     rejections: list[str] = field(default_factory=list)  # what the validator sent back in this run
-    repeats: list[str] = field(default_factory=list)  # facts dropped because they only repeated a cited reading
+    repeats: list[str] = field(default_factory=list)  # facts that repeated a cited reading: fetched by code, or dropped
 
 
 SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
@@ -151,16 +151,27 @@ def search_series(ctx: RunContext[Deps], query: str, dataset: str | None = None,
     return ctx.deps.source.search(query, limit, dataset)
 
 
+def read_fact(source: DataSource, series_id: str, lookback_days: int | None) -> Observation | Change | None:
+    """What get_latest (no lookback) or get_change returns for a series, or None when the series is unknown or
+    has too little history. The two tools and the validator all read a fact through this one function."""
+    hit = source.meta(series_id)
+    if hit is None:
+        return None
+    if lookback_days is None:
+        return metrics.latest_obs(hit, source.history(series_id))
+    hist = source.history(series_id, start=clock.today() - dt.timedelta(days=lookback_days + 400))
+    return metrics.change_over(hit, hist, lookback_days)
+
+
 @agent.tool
 def get_latest(ctx: RunContext[Deps], series_ids: list[str]) -> list[Observation]:
     """Latest observation (date and value) for one or more series IDs."""
     ctx.deps.emit("get_latest", {"series_ids": series_ids})
     out = []
     for sid in series_ids:
-        hit = ctx.deps.source.meta(sid)
-        if hit is None:
+        if ctx.deps.source.meta(sid) is None:
             raise ModelRetry(f"Unknown series_id {sid!r}. Use search_series to find a valid ID.")
-        obs = metrics.latest_obs(hit, ctx.deps.source.history(sid))
+        obs = read_fact(ctx.deps.source, sid, None)
         if obs:
             ctx.deps.ledger[(sid, None)] = obs
             out.append(obs)
@@ -171,11 +182,9 @@ def get_latest(ctx: RunContext[Deps], series_ids: list[str]) -> list[Observation
 def get_change(ctx: RunContext[Deps], series_id: str, lookback_days: int) -> Change:
     """Latest value against the value `lookback_days` earlier (e.g. 7 = week, 28 = four weeks, 365 = year)."""
     ctx.deps.emit("get_change", {"series_id": series_id, "lookback_days": lookback_days})
-    hit = ctx.deps.source.meta(series_id)
-    if hit is None:
+    if ctx.deps.source.meta(series_id) is None:
         raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
-    hist = ctx.deps.source.history(series_id, start=clock.today() - dt.timedelta(days=lookback_days + 400))
-    ch = metrics.change_over(hit, hist, lookback_days)
+    ch = read_fact(ctx.deps.source, series_id, lookback_days)
     if ch is None:
         raise ModelRetry(f"Not enough history in {series_id} for a {lookback_days}-day change.")
     ctx.deps.ledger[(series_id, lookback_days)] = ch
@@ -398,11 +407,21 @@ def repeats_of_readings(facts: list[SeriesFact], readings: list[Reading], ledger
     After a curve, a crack or a positioning reading the model tends to list the reading's series again as facts
     (a curve's M1 and M12, a crack's three legs), typed from the reading. No tool returned them as facts, so the
     answer was sent back: 11 to 13 of the 15 or 16 answers sent back in each live run on 20 Nov 2026, and the same
-    eight questions in every run before. The reading shows those numbers, copied in by code, so such a fact adds
-    nothing a reader can see and is dropped. Nothing is loosened by it: a fact that no cited reading explains is
-    still sent back, and so is a summary number that only a dropped fact carried."""
+    eight questions in every run before. Sent back, the model would call get_latest or get_change for those series
+    and answer again. The validator now does that itself (`fact_from_data`): the fact is read from the data by the
+    same function the tools use and shown with those figures, so the reader keeps the fact row and its Excel sheet
+    and no second answer is needed. Nothing is loosened: a fact that no cited reading explains is still sent back,
+    and the summary's numbers are still traced after the facts are replaced."""
     carried = {sid for r in readings for sid in r.series_ids}
     return [f for f in facts if (f.series_id, f.lookback_days) not in ledger and f.series_id in carried]
+
+
+def fact_from_data(src: Observation | Change) -> SeriesFact:
+    """A fact with the tool's own figures, name and units: nothing in it was typed by the model."""
+    if isinstance(src, Observation):
+        return SeriesFact(series_id=src.series_id, name=src.name, units=src.units, latest_period=src.period,
+                          latest_value=src.value, also=src.also)
+    return SeriesFact(**src.model_dump())
 
 
 @agent.output_validator
@@ -452,8 +471,21 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         return answer
     repeated = repeats_of_readings(answer.facts, answer.readings, ctx.deps.ledger)
     if repeated:
-        ctx.deps.repeats += [f"{f.series_id} (lookback {f.lookback_days})" for f in repeated]
-        answer.facts = [f for f in answer.facts if not any(f is r for r in repeated)]
+        kept = []
+        for f in answer.facts:
+            if not any(f is r for r in repeated):
+                kept.append(f)
+                continue
+            key = (f.series_id, f.lookback_days)
+            src = ctx.deps.ledger.get(key) or read_fact(ctx.deps.source, *key)   # a twin earlier in the list filled it
+            if src is None:   # the data has no such fact (too little history for the change): nothing to show
+                ctx.deps.repeats.append(f"{f.series_id} (lookback {f.lookback_days}): dropped")
+                continue
+            ctx.deps.ledger[key] = src
+            ctx.deps.repeats.append(f"{f.series_id} (lookback {f.lookback_days}): read from the data")
+            if not any(k.series_id == f.series_id and k.lookback_days == f.lookback_days for k in kept):
+                kept.append(fact_from_data(src))
+        answer.facts = kept
     for f in answer.facts:
         src = ctx.deps.ledger.get((f.series_id, f.lookback_days))
         if src is None:

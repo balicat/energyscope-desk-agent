@@ -244,6 +244,12 @@ def spent(messages) -> float:
     return total
 
 
+REPEATS_MOST = 60   # a live run had 38 and 39 on 20 Nov 2026; the gate blocks above this
+REPEATS_SEEN = {"arb_us_europe", "brent_curve", "brent_wti_spread", "crack_321", "crude_vs_5y", "freight_history", "futures_spread",
+                "henry_hub_percentile", "oman_curve", "spot_vs_futures", "week_surprises", "week_watch", "wti_curve",
+                "wti_positioning"}
+
+
 def make_task(model_name: str, enforce: bool = True):
     async def task(question: str) -> DeskAnswer:
         model = scripted(*PLANS[question]) if model_name == "scripted" else model_name
@@ -336,10 +342,16 @@ def main() -> int:
                   + " | ".join(" ".join(m.split())[:220] for m in r["validator"]))
     usd = sum(r.get("usd", 0.0) for r in by_case.values())
     print(f"cost: ${usd:.4f} for this run, from the model's own usage figures")
-    # Facts the validator dropped because they only repeated a cited reading (not sent back, so not a retry).
+    # Facts that only repeated a cited reading: the validator reads them from the data itself (not sent back, so
+    # not a retry). Measured on 20 Nov 2026: 38 and 39 a run, in the 14 questions named below. More than
+    # REPEATS_MOST, or a question outside that list, is something to look at before releasing.
     repeats = {n: r["repeats"] for n, r in by_case.items() if r.get("repeats")}
-    print(f"repeats dropped: {sum(len(v) for v in repeats.values())} fact(s) in {len(repeats)} of {len(SUITE)} cases"
+    repeated = sum(len(v) for v in repeats.values())
+    print(f"repeats: {repeated} fact(s) read from the data by the validator in {len(repeats)} of {len(SUITE)} cases"
           + (": " + ", ".join(sorted(repeats)) if repeats else ""))
+    new = sorted(set(repeats) - REPEATS_SEEN)
+    if new:
+        print(f"repeats in cases not seen doing it before: {', '.join(new)}")
     print(f"excel: {EXCEL['sheets']} sheets, {EXCEL['rows']} formulas reproduced; "
           f"{EXCEL['readings_with_a_sheet']} of {EXCEL['readings']} readings have a sheet")
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
@@ -373,6 +385,9 @@ def main() -> int:
         hard = [f for f in failed if f[1] in HARD]
         if over:
             print(f"gate: blocked ({retries} retries, budget {args.max_retries})")
+            code = 1
+        elif repeated > REPEATS_MOST:
+            print(f"gate: blocked ({repeated} facts repeated from readings, most allowed {REPEATS_MOST})")
             code = 1
         elif errored or hard or len(failed) - len(hard) > args.allow_soft:
             print(f"gate: blocked ({len(hard)} number failures, {len(failed) - len(hard)} behaviour failures, {errored} errors)")
