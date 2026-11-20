@@ -347,7 +347,7 @@ def main() -> int:
     # REPEATS_MOST, or a question outside that list, is something to look at before releasing.
     repeats = {n: r["repeats"] for n, r in by_case.items() if r.get("repeats")}
     repeated = sum(len(v) for v in repeats.values())
-    print(f"repeats: {repeated} fact(s) read from the data by the validator in {len(repeats)} of {len(SUITE)} cases"
+    print(f"repeats: {repeated} fact(s) handled by the validator (read from the data, or left out) in {len(repeats)} of {len(SUITE)} cases"
           + (": " + ", ".join(sorted(repeats)) if repeats else ""))
     new = sorted(set(repeats) - REPEATS_SEEN)
     if new:
