@@ -111,12 +111,24 @@ Benchmarks (use these IDs directly; no search is needed for them)
 Datasets (pass one as `dataset` to narrow a search)
 """ + "\n".join(f"- {k}: {v}" for k, v in DATASETS.items()) + "\n"
 
+# Prompt caching (Anthropic models; any other model ignores these keys). An answer takes several requests, and
+# each one resends the same tool descriptions and instructions (about 4,000 tokens) plus the tool results so
+# far. Marked as cacheable, a request reads what the one before it wrote at a tenth of the input price or less;
+# the first write costs a quarter more. Entries live five minutes, so a lone question still gains from its
+# second request on. Nothing the model is sent changes: the same text in the same order.
+CACHING = {
+    "anthropic_cache_tool_definitions": True,   # the tool descriptions, which come first in a request
+    "anthropic_cache_instructions": True,       # then the instructions
+    "anthropic_cache": True,                    # then the conversation as it grows: the server moves this one forward
+}
+
 agent = Agent(
     deps_type=Deps,
     output_type=DeskAnswer,
     instructions=INSTRUCTIONS,
     retries=3,  # the prose rules are strict; a third attempt is cheaper than an answer that cannot be shown
     name="energyscope-desk",
+    model_settings=CACHING,
 )
 
 
