@@ -95,18 +95,30 @@ class Server:
     def _connect(self):
         if self._client is None:
             from pyarrow import flight
-            self._client = flight.connect(self.address)
-            self._headers = [self._client.authenticate_basic_token(self.key, "")] if self.key else []
+            client = flight.connect(self.address)
+            # set both only when the handshake succeeded: a client kept without its token would call
+            # unauthenticated for the life of the service
+            self._headers = [client.authenticate_basic_token(self.key, "")] if self.key else []
+            self._client = client
         return self._client
 
     def action(self, name: str, request: dict) -> dict | list:
         from pyarrow import flight
-        client = self._connect()
-        try:
-            results = list(client.do_action(flight.Action(name, json.dumps(request).encode()),
-                                            flight.FlightCallOptions(headers=self._headers, timeout=120)))
-        except flight.FlightError as e:
-            raise ServerError(str(e).split("\n")[0][:300]) from None
+        for attempt in (1, 2):
+            try:
+                client = self._connect()  # the login can fail too: a refused key, or a server still starting
+                results = list(client.do_action(flight.Action(name, json.dumps(request).encode()),
+                                                flight.FlightCallOptions(headers=self._headers, timeout=120)))
+                break
+            except flight.FlightUnauthenticatedError as e:
+                # The server keeps its bearer tokens in memory: after it restarts, every token issued
+                # before is refused (21 Nov 2026: get_signals said "authentication error" until the
+                # service was restarted). Log in again once.
+                self._client, self._headers = None, []
+                if attempt == 2:
+                    raise ServerError(str(e).split("\n")[0][:300]) from None
+            except flight.FlightError as e:
+                raise ServerError(str(e).split("\n")[0][:300]) from None
         if not results:
             raise ServerError(f"{name}: no answer")
         return _checked(json.loads(results[0].body.to_pybytes().decode()))

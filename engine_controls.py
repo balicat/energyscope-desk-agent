@@ -114,6 +114,55 @@ for name, reading in (("eia_weekly report", engine.report(source, "eia_weekly"))
     checks.append((f"the {name}'s own sentences quoted back: {len(sentences) - len(refused)} of {len(sentences)} pass",
                    not refused, "; ".join(refused)[:600]))
 
+# 10. a server restart forgets its bearer tokens: the next action logs in again instead of failing for the life
+# of the service (21 Nov 2026: get_signals said "authentication error" after the Flight restart)
+import json as _json
+from types import SimpleNamespace as _NS
+
+from pyarrow import flight as _flight
+from es_agent.sources import Server as _Server
+
+
+class _RestartedServer:
+    """Accepts only the token of its latest handshake, as the real server does after a restart."""
+
+    def __init__(self):
+        self.token, self.handshakes = "old-process-token", 0
+
+    def authenticate_basic_token(self, key, _password):
+        self.handshakes += 1
+        self.token = f"token-{self.handshakes}"
+        return (b"authorization", f"Bearer {self.token}".encode())
+
+    def do_action(self, action, options):
+        if options.headers and dict(options.headers).get(b"authorization") == f"Bearer {self.token}".encode():
+            return [_NS(body=_NS(to_pybytes=lambda: _json.dumps({"ok": True}).encode()))]
+        raise _flight.FlightUnauthenticatedError("Invalid bearer token")
+
+
+fake = _RestartedServer()
+srv = _Server(address="grpc://unused", key="demo")
+srv._client, srv._headers = fake, [(b"authorization", b"Bearer stale-token")]  # a token from before the restart
+_orig_connect = _flight.connect
+_flight.connect = lambda address: fake
+try:
+    got = srv.action("healthcheck", {})
+    checks.append(("after a server restart the next action logs in again and answers",
+                   got == {"ok": True} and fake.handshakes == 1, f"{got}, handshakes {fake.handshakes}"))
+    fake.token = "another-restart"
+    got = srv.action("healthcheck", {})
+    checks.append(("and again after a second restart", got == {"ok": True} and fake.handshakes == 2,
+                   f"{got}, handshakes {fake.handshakes}"))
+    fake.authenticate_basic_token = lambda k, p: (_ for _ in ()).throw(_flight.FlightUnauthenticatedError("Invalid API key"))
+    fake.token = "third"
+    try:
+        srv.action("healthcheck", {})
+        checks.append(("a refused key is a ServerError, not a loop", False, "answered"))
+    except ServerError as e:
+        checks.append(("a refused key is a ServerError, not a loop", srv._client is None, str(e)[:90]))
+finally:
+    _flight.connect = _orig_connect
+
 wrong = 0
 for what, ok, detail in checks:
     wrong += not ok
