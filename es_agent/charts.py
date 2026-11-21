@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 
 from . import clock, readings
+from .sources import parse_period
 from .models import DeskAnswer
 from .sources import DataSource
 
@@ -32,6 +33,22 @@ def _line(title: str, units: str, hist, lines: dict[str, float] | None = None) -
 
 def _bands(values: dict[str, float], prefix: str = "") -> dict[str, float]:
     return {"90th percentile": values[f"{prefix}p90"], "10th percentile": values[f"{prefix}p10"]}
+
+
+# server readings drawn from the table the server sent with them: (column, what the line is)
+_SERVER_ROWS = {"volatility": ("rolling_vol", "rolling volatility"), "rolling_correlation": ("correlation", "rolling correlation"),
+                "hp_filter": ("trend", "trend")}
+# server readings drawn as the series itself over the reading's window
+_SERIES_CHART = {"history", "stats", "returns", "breakpoints", "outliers", "bubble_test", "seasonality", "unit_root", "acf",
+                 "describe"}
+
+
+def _start(r) -> dt.date:
+    """The first day of a reading's window: its request's start, or a year before its date."""
+    try:
+        return dt.date.fromisoformat((r.request or {}).get("body", {}).get("start", ""))
+    except ValueError:
+        return r.period - dt.timedelta(days=366)
 
 
 def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
@@ -68,8 +85,9 @@ def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
             out.append(_line(f"{rest} crack spread", "Dollars per Barrel", readings.crack_history(source, rest), _bands(r.values, "crack_")))
         elif kind == "percentile":
             sid = r.series_ids[0]
-            hist = source.history(sid, start=clock.today() - dt.timedelta(days=366 * int(r.values["years"])))
-            out.append(_line(r.title, r.units, hist, _bands(r.values)))
+            hist = [(d, v) for d, v in source.history(sid, start=_start(r)) if d <= r.period]
+            out.append(_line(r.title, r.units, hist, {"95th percentile": r.values["p95"], "5th percentile": r.values["p5"]}
+                             if "p95" in r.values and "p5" in r.values else None))
         elif kind == "positioning":
             hist = source.history(r.series_ids[0], start=clock.today() - dt.timedelta(days=7 * readings.PERCENTILE_WEEKS + 30))
             out.append(_line(f"{r.title}: net position", "contracts", hist[-readings.PERCENTILE_WEEKS:], _bands(r.values, "net_")))
@@ -77,7 +95,29 @@ def charts_for(answer: DeskAnswer, source: DataSource) -> list[dict]:
             sid = r.series_ids[0]
             hist = source.history(sid, start=clock.today() - dt.timedelta(days=366 * 2))
             out.append(_line(f"{source.meta(sid).name}, last two years", r.units, hist,
-                             {"average, same time of year": r.values["prior_average"]}))
+                             {"average, same time of year": r.values["seasonal_avg"]} if "seasonal_avg" in r.values else None))
+        elif r.request and kind in _SERVER_ROWS:
+            # the server's own table behind the reading: a rolling volatility, a rolling correlation, a trend
+            column, label = _SERVER_ROWS[kind]
+            try:
+                rows = source.action(r.request["action"], r.request["body"]).get("rows") or []
+            except Exception:
+                rows = []
+            pts = []
+            for row in rows:
+                try:
+                    pts.append((parse_period(str(row["period"])), float(row[column])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            out.append(_line(f"{r.title}: {label}", r.units, pts))
+        elif kind == "spread_stats":
+            a, b = r.series_ids
+            out.append(_line(r.title, r.units, readings.spread_history(source, a, b, (r.period - _start(r)).days + 1),
+                             {"mean": r.values["mean"]} if "mean" in r.values else None))
+        elif r.request and r.series_ids and kind in _SERIES_CHART:
+            sid = r.series_ids[0]
+            hist = [(d, v) for d, v in source.history(sid, start=_start(r)) if d <= r.period]
+            out.append(_line(f"{source.meta(sid).name}, {_start(r)} to {r.period}", source.meta(sid).units, hist))
     for s in answer.spreads:
         if not readings.pairing_note(s.series_a, s.series_b)[1]:
             continue  # a monthly-average contract against a dated one: the line would step at every roll

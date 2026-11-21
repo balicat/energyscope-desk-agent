@@ -150,9 +150,36 @@ cites it, and does not speculate.
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
 | `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |
 | `get_arbitrage` | a price indicator for a transatlantic route, not an executable arbitrage: the spread on futures of one delivery month and its percentile, a freight proxy, curve slope, a score, and the spot spread beside the futures spread |
-| `get_seasonal` | latest against the same time of year in the previous N years |
-| `get_percentile` | where the latest value ranks in its own last N years |
 | `get_positioning` | managed-money net, long, short, change on the week, three-year percentile |
+
+The tools below are the EnergyScope server's own analytics (`es_agent/engine.py`): each sends one request to one
+of the Flight server's actions, the same actions the Excel add-in's functions and the EnergyScope MCP server call,
+so a question gets the same number from all three. The reading keeps the request it sent (`request`); the check
+sends it again, and the Excel sheet calls the add-in function that sends it.
+
+| Tool | Server action, add-in function | Returns |
+|---|---|---|
+| `get_signals` | `derived_signals` over the live metric snapshot, `ES.Signals` | which of the server's signals fire, with the rule that fired each, and which contradictions (signals that fire together) are active |
+| `get_report` | `report`, `ES.Report` and `ES.Brief` | a standing weekly report (US petroleum, natural gas, positioning, rigs) and its written brief: headline, lede, extremes, signals |
+| `get_seasonal` | `seasonal`, `ES.Seasonal` | latest against the same week or month of the previous N years, each year's value, z-score, percentile |
+| `get_percentile` | `percentile`, `ES.Percentile` | where the latest value ranks in its own last N years, with z-score and quartiles |
+| `get_history` | (the series itself) | a series over N years: ends, range, change; the page draws it and the workbook lists every value |
+| `get_stats`, `get_volatility`, `get_returns` | `stats`, `volatility`, `returns` | descriptive statistics; rolling and GARCH volatility; return and largest drawdown |
+| `get_correlation`, `get_rolling_correlation`, `get_spread_stats` | `correlation`, `rolling_correlation`, `spread` | correlation matrix; how a correlation moved; a spread against its own history with half-life |
+| `get_breakpoints`, `get_outliers`, `get_seasonality`, `get_trend_cycle` | `breakpoints`, `outliers`, `seasonality`, `hp_filter` | regime changes; outliers; seasonal decomposition; trend and cycle |
+| `get_unit_root`, `get_cointegration`, `get_granger`, `get_acf`, `get_bubble_test` | `unit_root`, `cointegration`, `var`, `acf`, `bubble_test` | the statistical tests |
+| `get_changes`, `get_maintenance`, `get_events`, `describe_series` | `changes`, `maintenance_signal`, `upcoming_events`, `describe` | the most unusual moves among series of one frequency; refinery maintenance weeks; scheduled releases; the card for one series |
+
+What the check proves for a server reading: the numbers shown are the server's answer to the request it keeps,
+copied unchanged, and the server gives the same answer when the request is sent again. It does not compute them a
+second way. Where they can be rebuilt from the series' values in plain Excel (a percentile, a history), the
+workbook does that too. The forecasting actions are not tools: the service says it does not forecast.
+
+Found while moving `get_seasonal` and `get_percentile` onto the server (21 Nov 2026): the Librarian's own seasonal
+comparison and the server's (`ES.Seasonal`) chose different weeks of earlier years, so the same question gave
+different five-year averages (US crude stocks: 432,432 here, 433,637 in Excel). They now have one definition, the
+server's. The server ranks a percentile as scipy's `percentileofscore(kind="rank")`, which differs from COUNTIF
+`"<="` when other days share the latest value (Henry Hub had 15 such days: 65.93 against 66.93).
 
 What it cannot do: there are no route freight rates or physical differentials in the data (the arbitrage reading
 says so and uses a tanker ETF as a proxy), and no news.
@@ -250,8 +277,11 @@ How the suite got here, including the failures:
 
 ## Reproduce in Excel
 
-Under each answer, code writes a small sheet for every fact, spread, futures curve, crack spread and seasonal
-comparison: a label, a formula and the value reported. With the EnergyScope add-in loaded, the formulas fetch each
+Under each answer, code writes a small sheet for every fact, spread, futures curve, crack spread, percentile and
+history: a label, a formula and the value reported. A reading the server computed gets a sheet that calls the
+add-in's own function (`=ES.Seasonal`, `=ES.Percentile`, `=ES.Stats`, `=ES.Spread`, `=ES.RollingCorr`), one row
+per field it reports, picked out of the function's table with INDEX and MATCH, so the reader sees the add-in's
+answer beside The Librarian's. With the EnergyScope add-in loaded, the formulas fetch each
 input on a fixed date (`=ES.Value("PET.RWTC.D","2026-11-11")`) and do the arithmetic in plain Excel
 (`=(2*B2*42+B3*42)/3-B1`), so a reader can check a number without trusting the model or this service. The model
 writes none of it (`es_agent/excel.py`).
@@ -428,7 +458,8 @@ fills them (the slot change above).
 ## Files
 
 ```
-es_agent/agent.py     the agent: instructions, seventeen tools, the output validator
+es_agent/agent.py     the agent: instructions, 39 tools, the output validator
+es_agent/engine.py    readings the EnergyScope server computes: one request to one Flight action each, kept on the reading
 es_agent/models.py    typed shapes: tool returns and the answer
 es_agent/metrics.py   change and spread arithmetic, the number-tracing rule
 es_agent/readings.py  curve, crack, arbitrage, scenarios, evidence, surprises, watch, seasonal, percentile, positioning; compute(source, key) rebuilds any of them
@@ -439,13 +470,13 @@ es_agent/memory.py    what a follow-up is allowed to remember
 librarian_mcp.py      an MCP server over the public API
 prose_controls.py     wrong sentences over true tables: the control for the prose checks
 ops/watch_public.sh   is the public address answering? run every two minutes
-es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder
+es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder; the server's actions
 es_agent/scripted.py  offline stand-in for the model (Pydantic AI FunctionModel)
 es_agent/clock.py     today's date, pinnable for the frozen data
 run_evals.py          the suite, the gates, golden answers, fixture recording
 serve.py              HTTP service: JSON and streaming answers, limits, live check, stats
 deploy.sh             the release gate
-fixtures/series.json  frozen copy of the series the suite reads (18 Nov 2026)
+fixtures/series.json  frozen copy of the series the suite reads and the server's answers to its requests (21 Nov 2026)
 results/              eval reports and golden answers
 ```
 

@@ -1,6 +1,9 @@
-"""The agent: seventeen tools over EnergyScope data, a typed answer, and a
-validator that sends the model back when a number cannot be traced to a
-tool result.
+"""The agent: tools over EnergyScope data, a typed answer, and a validator that
+sends the model back when a number cannot be traced to a tool result.
+
+Most analytics are the EnergyScope server's own (engine.py): the same Flight actions the Excel add-in and the
+MCP server call, so the three agree on every number. The curve, crack, arbitrage, positioning, evidence and
+watch readings are still computed here (readings.py).
 
 The model is chosen at run time (agent.run_sync(..., model=...)), so the
 same agent runs against Anthropic, OpenAI, or the offline scripted model.
@@ -14,10 +17,10 @@ from typing import Callable, Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from . import metrics, prose, readings
+from . import engine, metrics, prose, readings
 from .models import Change, DeskAnswer, Observation, Reading, SeriesFact, SeriesHit, Spread
 from . import clock
-from .sources import DATASETS, DataSource
+from .sources import DATASETS, DataSource, ServerError
 
 
 @dataclass
@@ -49,7 +52,19 @@ How to work
   Brent-WTI spread as traded: futures of one delivery month), get_futures_crack (refining margin on futures), get_crack_spread (refining margin),
   get_seasonal (a level against its usual level for the time of year), get_percentile (is a level high or low
   against recent years), get_positioning (what funds are doing).
+  The EnergyScope server's own analytics, the same the Excel add-in shows: get_signals (which of the server's
+  signals and contradictions fire now: the regime read), get_report (a standing weekly report with its written
+  brief: US petroleum, natural gas, positioning, rigs), get_history (a series over several years: the data
+  itself), get_stats, get_volatility, get_returns (returns and drawdown), get_correlation,
+  get_rolling_correlation, get_spread_stats (a spread against its own history, with half-life), get_breakpoints
+  (regime changes), get_outliers, get_seasonality (trend and seasonal pattern), get_trend_cycle,
+  get_unit_root, get_cointegration, get_granger (does one series lead another), get_acf, get_bubble_test,
+  get_changes (which of several series moved most, by how unusual the move is), get_maintenance (refinery
+  maintenance weeks), get_events (scheduled releases), describe_series (what a series is, its coverage and
+  where it is used).
   Each returns a reading with a key. List every key you used in cites; quote the reading's values in the summary.
+- A reading's text (`context`) from get_report and get_signals was written by the server's rules. Lead with its
+  headline or the contradictions that fire, in your own words, with its numbers unchanged.
 - A reading's `context` says whether the level is unusual and when it was last seen. Use it: say how unusual
   the level is, how long it has been so, and when it was last like this, in your own words but with its numbers
   and dates unchanged.
@@ -267,15 +282,25 @@ def get_crack_spread(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", "
     return _keep(ctx, readings.crack(ctx.deps.source, kind), "The three spot prices share no date in the last 60 days.")
 
 
+def _server(ctx: RunContext[Deps], tool: str, args: dict, build) -> Reading:
+    """Run one server-backed reading: progress, the server's refusal as a retry the model can act on, and the
+    reading kept for the validator."""
+    ctx.deps.emit(tool, args)
+    try:
+        reading = build()
+    except ServerError as e:
+        raise ModelRetry(f"{tool}: {e}")
+    return _keep(ctx, reading, f"{tool} returned nothing.")
+
+
 @agent.tool
 def get_seasonal(ctx: RunContext[Deps], series_id: str, years: int = 5) -> Reading:
-    """Latest value of a series against the average, low and high at the same time of year in the previous
-    `years` years (2 to 10). Use for 'versus the five-year average' or 'is this high for the season'."""
-    ctx.deps.emit("get_seasonal", {"series_id": series_id, "years": years})
-    if ctx.deps.source.meta(series_id) is None:
-        raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
-    return _keep(ctx, readings.seasonal(ctx.deps.source, series_id, years),
-                 f"{series_id} lacks {years} earlier years of history (or years is outside 2 to 10).")
+    """Latest value of a series against the same week (weekly series) or month (monthly) in each of the previous
+    `years` years (2 to 10): the average, low and high of those years, the difference from the average, its
+    z-score and percentile, and each year's value. Use for 'versus the five-year average' or 'is this high for
+    the season'. The server's ES.Seasonal."""
+    return _server(ctx, "get_seasonal", {"series_id": series_id, "years": years},
+                   lambda: engine.seasonal(ctx.deps.source, series_id, years))
 
 
 @agent.tool
@@ -288,13 +313,196 @@ def get_positioning(ctx: RunContext[Deps], market: Literal["wti", "brent", "gaso
 
 @agent.tool
 def get_percentile(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Reading:
-    """Where the latest value of a series ranks in its own last `years` years (1 to 10): percentile, low, high,
-    average and z-score. Use for 'is this high', 'is this stretched', 'how unusual is this'."""
-    ctx.deps.emit("get_percentile", {"series_id": series_id, "years": years})
-    if ctx.deps.source.meta(series_id) is None:
-        raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
-    return _keep(ctx, readings.percentile(ctx.deps.source, series_id, years),
-                 f"{series_id} has too little history in the last {years} years (or years is outside 1 to 10).")
+    """Where the latest value of a series ranks in its own last `years` years (1 to 10): percentile, z-score,
+    min, max, mean, median and quartiles of the window. Use for 'is this high', 'is this stretched', 'how
+    unusual is this'. The server's ES.Percentile."""
+    return _server(ctx, "get_percentile", {"series_id": series_id, "years": years},
+                   lambda: engine.percentile(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_signals(ctx: RunContext[Deps]) -> Reading:
+    """The EnergyScope server's signal catalogue over its live metric snapshot: which signals fire (stocks
+    against their seasonal range, cracks, curve, Cushing, freight, positioning, refinery runs, OPEC, EU gas,
+    weather), with the rule that fired each, and which contradictions (signals that fire together and tell a
+    story, e.g. backwardation with punishing carry) are active. Use for 'what is the regime', 'what stands out',
+    'what matters now', 'give me the big picture'. Describes the data; not a forecast."""
+    return _server(ctx, "get_signals", {}, lambda: engine.signals(ctx.deps.source))
+
+
+@agent.tool
+def get_report(ctx: RunContext[Deps], preset: Literal["eia_weekly", "gas_weekly", "cot_weekly", "rig_count"],
+               as_of: dt.date | None = None) -> Reading:
+    """A standing weekly report and its written brief, the server's ES.Report and ES.Brief. eia_weekly: US
+    petroleum stocks, supply, retail and spot prices (the table that went with This Week in Petroleum);
+    gas_weekly: natural gas storage, prices and rigs; cot_weekly: fund positioning and open interest (CFTC and
+    ICE); rig_count: Baker Hughes rigs. Each row has the latest value, the change on the week and on the year,
+    how unusual the move is and where the level sits against the same week of earlier years; the context has
+    the headline, lede, extremes and the signals firing. `as_of` gives the report as it read on that date.
+    Use for 'what happened in this week's EIA report', 'give me the weekly', 'summarise the COT report'."""
+    return _server(ctx, "get_report", {"preset": preset, "as_of": str(as_of) if as_of else None},
+                   lambda: engine.report(ctx.deps.source, preset, str(as_of) if as_of else None))
+
+
+@agent.tool
+def get_history(ctx: RunContext[Deps], series_id: str, years: int = 5) -> Reading:
+    """A series over the last `years` years (1 to 40): first and latest value, low and high with their dates,
+    average, the change over the window, and the number of values. The page charts every value and the Excel
+    workbook lists them all. Use for 'show me five years of', 'give me the history of', 'the data for'."""
+    return _server(ctx, "get_history", {"series_id": series_id, "years": years},
+                   lambda: engine.history(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_stats(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Reading:
+    """Descriptive statistics of a series over its last `years` years: count, mean, median, standard deviation,
+    min, max, skewness, kurtosis, percentiles 5/25/75/95, first and last value and the change between them.
+    The server's ES.Stats."""
+    return _server(ctx, "get_stats", {"series_id": series_id, "years": years},
+                   lambda: engine.stats(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_volatility(ctx: RunContext[Deps], series_id: str, window: int = 20, years: int = 3) -> Reading:
+    """Annualised volatility of a price: rolling over `window` observations and from a GARCH(1,1) model, latest
+    value. Use for 'how volatile is', 'has volatility picked up'. The server's ES.Volatility."""
+    return _server(ctx, "get_volatility", {"series_id": series_id, "window": window, "years": years},
+                   lambda: engine.volatility(ctx.deps.source, series_id, years, window=window))
+
+
+@agent.tool
+def get_returns(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Reading:
+    """Total return over the window, the largest fall from a peak (drawdown) with its dates, average return,
+    volatility of returns, and how many periods rose or fell. The server's ES.Returns."""
+    return _server(ctx, "get_returns", {"series_id": series_id, "years": years},
+                   lambda: engine.returns(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_correlation(ctx: RunContext[Deps], series_ids: list[str], years: int = 3) -> Reading:
+    """Pairwise correlation of 2 to 8 series over their common dates in the last `years` years. Prefer series
+    of one frequency. The server's ES.Corr."""
+    return _server(ctx, "get_correlation", {"series_ids": series_ids, "years": years},
+                   lambda: engine.correlation(ctx.deps.source, series_ids, years))
+
+
+@agent.tool
+def get_rolling_correlation(ctx: RunContext[Deps], series_a: str, series_b: str, window: int = 90, years: int = 3) -> Reading:
+    """How the correlation of two series has moved: over the whole window, now (the last `window`
+    observations), and its low and high. Use for 'has the link between A and B broken down'. ES.RollingCorr."""
+    return _server(ctx, "get_rolling_correlation", {"series_a": series_a, "series_b": series_b, "window": window, "years": years},
+                   lambda: engine.rolling_correlation(ctx.deps.source, series_a, series_b, years, window=window))
+
+
+@agent.tool
+def get_spread_stats(ctx: RunContext[Deps], series_a: str, series_b: str, years: int = 3) -> Reading:
+    """series_a minus series_b against its own history over `years` years: current spread, mean, standard
+    deviation, min, max, z-score, percentile and half-life (how fast it has returned to its mean). Same units
+    and kind (spot with spot, future with future). The server's ES.Spread."""
+    return _server(ctx, "get_spread_stats", {"series_a": series_a, "series_b": series_b, "years": years},
+                   lambda: engine.spread_stats(ctx.deps.source, series_a, series_b, years))
+
+
+@agent.tool
+def get_breakpoints(ctx: RunContext[Deps], series_id: str, n_breaks: int = 3, years: int = 3) -> Reading:
+    """Structural breaks: the dates where the level of a series shifted, with the mean before and after each.
+    Use for 'when did the regime change'. The server's ES.Breakpoints."""
+    return _server(ctx, "get_breakpoints", {"series_id": series_id, "n_breaks": n_breaks, "years": years},
+                   lambda: engine.breakpoints(ctx.deps.source, series_id, years, n_bkps=n_breaks))
+
+
+@agent.tool
+def get_outliers(ctx: RunContext[Deps], series_id: str, threshold: float = 3.0, years: int = 3) -> Reading:
+    """Observations more than `threshold` standard deviations from the mean of the window, with their dates.
+    The server's ES.Outliers."""
+    return _server(ctx, "get_outliers", {"series_id": series_id, "threshold": threshold, "years": years},
+                   lambda: engine.outliers(ctx.deps.source, series_id, years, method="zscore", threshold=threshold))
+
+
+@agent.tool
+def get_seasonality(ctx: RunContext[Deps], series_id: str, years: int = 10) -> Reading:
+    """The seasonal decomposition of a series (trend, seasonal factor, residual), latest values. Use for 'does
+    this have a seasonal pattern', 'what is the trend once the season is removed'. ES.Seasonality."""
+    return _server(ctx, "get_seasonality", {"series_id": series_id, "years": years},
+                   lambda: engine.seasonality(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_trend_cycle(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Reading:
+    """The latest value split into trend and cycle (boosted Hodrick-Prescott filter): is the price above or
+    below its trend, and by how much. The server's ES.HPFilter."""
+    return _server(ctx, "get_trend_cycle", {"series_id": series_id, "years": years},
+                   lambda: engine.hp_filter(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_unit_root(ctx: RunContext[Deps], series_id: str, years: int = 3) -> Reading:
+    """Unit-root tests (ADF, KPSS, Phillips-Perron) and their consensus: does the series wander (non-stationary)
+    or return to a mean. The server's ES.UnitRoot."""
+    return _server(ctx, "get_unit_root", {"series_id": series_id, "years": years},
+                   lambda: engine.unit_root(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_cointegration(ctx: RunContext[Deps], series_ids: list[str], years: int = 3) -> Reading:
+    """Engle-Granger cointegration test of 2 or more series: do they share a long-run relationship, so that
+    their spread returns to a mean. The server's ES.Cointegration."""
+    return _server(ctx, "get_cointegration", {"series_ids": series_ids, "years": years},
+                   lambda: engine.cointegration(ctx.deps.source, series_ids, years))
+
+
+@agent.tool
+def get_granger(ctx: RunContext[Deps], series_ids: list[str], lags: int = 2, years: int = 3) -> Reading:
+    """Granger causality from a vector autoregression of 2 to 8 series: do past values of one help predict
+    another. Use for 'does A lead B'. The server's ES.VAR."""
+    return _server(ctx, "get_granger", {"series_ids": series_ids, "lags": lags, "years": years},
+                   lambda: engine.var(ctx.deps.source, series_ids, years, lags=lags))
+
+
+@agent.tool
+def get_acf(ctx: RunContext[Deps], series_id: str, lags: int = 10, years: int = 3) -> Reading:
+    """Autocorrelation and partial autocorrelation by lag, with the Ljung-Box test: how much a series
+    remembers its past. The server's ES.ACF."""
+    return _server(ctx, "get_acf", {"series_id": series_id, "lags": lags, "years": years},
+                   lambda: engine.acf(ctx.deps.source, series_id, years, nlags=lags))
+
+
+@agent.tool
+def get_bubble_test(ctx: RunContext[Deps], series_id: str, years: int = 5) -> Reading:
+    """GSADF test for explosive (bubble-like) behaviour, with the episodes found and their dates.
+    The server's ES.BubbleTest."""
+    return _server(ctx, "get_bubble_test", {"series_id": series_id, "years": years},
+                   lambda: engine.bubble_test(ctx.deps.source, series_id, years))
+
+
+@agent.tool
+def get_changes(ctx: RunContext[Deps], series_ids: list[str], lookback_days: int = 7) -> Reading:
+    """Of 2 to 20 series OF ONE FREQUENCY (all weekly, or all daily), which moved most over `lookback_days`,
+    ranked by how unusual each move is against that series' own moves. The server's ES.Changes."""
+    return _server(ctx, "get_changes", {"series_ids": series_ids, "lookback_days": lookback_days},
+                   lambda: engine.changes(ctx.deps.source, series_ids, lookback_days))
+
+
+@agent.tool
+def get_maintenance(ctx: RunContext[Deps]) -> Reading:
+    """US refinery maintenance: the weeks in the last year when refinery utilisation ran unusually low against
+    its trend, grouped into events with their dates and depth."""
+    return _server(ctx, "get_maintenance", {}, lambda: engine.maintenance(ctx.deps.source))
+
+
+@agent.tool
+def get_events(ctx: RunContext[Deps], days: int = 14) -> Reading:
+    """Scheduled market events in the next `days` days: EIA and API weekly stock reports, CFTC, OPEC and IEA
+    reports, contract expiries. The server's ES.Events."""
+    return _server(ctx, "get_events", {"days": days}, lambda: engine.events(ctx.deps.source, days))
+
+
+@agent.tool
+def describe_series(ctx: RunContext[Deps], series_id: str) -> Reading:
+    """What a series is: its description and publisher, coverage and gaps, latest value and change, how fresh
+    it is, and which reports and contradictions use it. Use for 'what is this series', 'where does this data
+    come from'. The server's ES.Describe."""
+    return _server(ctx, "describe_series", {"series_id": series_id}, lambda: engine.describe(ctx.deps.source, series_id))
 
 
 @agent.tool

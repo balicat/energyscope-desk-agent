@@ -27,8 +27,17 @@ written by `workbook` (30 cells) gave the reported value in every cell.
 It compares values, so a formula that fetches the wrong date passes when the series had the same value on
 both days (found by this module's own control: WTI on a US holiday).
 
-Covered: latest values, changes, spreads, futures curves, crack spreads, seasonal comparisons. Not yet:
-percentiles and positioning (they rank a whole window), scenarios, evidence and watch lists.
+A reading the EnergyScope server computed (engine.py) gets a sheet that calls the add-in function sending the
+same request: =ES.Seasonal, =ES.Percentile, =ES.Stats, =ES.Spread, =ES.RollingCorr. Each row picks one field
+out of the table the function fills (INDEX and MATCH on the field's name), so the reader sees the add-in's own
+answer beside the one The Librarian gave. `evaluate` sends the same request to the server and rounds as the
+add-in does. Where the figures can also be rebuilt from the series' own values (a percentile: COUNTIF over
+the window), a second sheet does that in plain Excel.
+
+Covered: latest values, changes, spreads, futures curves, crack spreads, seasonal comparisons, percentiles,
+positioning, a series' history, and the server readings above. Not yet: scenarios, evidence, watch lists, the
+standing reports and the signals (their answers are text), and the server analytics whose add-in table has no
+field names to look up (volatility, returns, breaks, tests).
 """
 from __future__ import annotations
 
@@ -124,21 +133,125 @@ def _crack(r: Reading) -> Sheet:
     ])
 
 
-def _seasonal(r: Reading, source: DataSource) -> Sheet | None:
-    series_id, years = r.series_ids[0], int(r.values["years"])
-    points = readings.seasonal_points(source, series_id, years)
-    if points is None or points[0] != r.period:
+# ---- the add-in's own analytics functions
+#
+# Each sends one request to one server action and fills a two-column table, the field's name on the left (the
+# add-in's code, Functions.cs, names the fields and rounds the numbers). A row here is one field of that table:
+#     =INDEX(ES.Seasonal("PET.WCESTUS1.W",5),MATCH("seasonal_avg",INDEX(ES.Seasonal("PET.WCESTUS1.W",5),0,1),0),2)
+# The function appears twice in the formula; the add-in answers both from one request.
+
+FUNCTIONS = {
+    # reading tool: (add-in function, server action, request fields in the function's argument order, places)
+    "seasonal": ("Seasonal", "seasonal", ("series", "lookback_years", "start"), 4),
+    "percentile": ("Percentile", "percentile", ("series", "as_of", "start", "end"), 4),
+    "stats": ("Stats", "stats", ("series", "start", "end"), None),
+    "spread_stats": ("Spread", "spread", ("series_a", "series_b", "start", "end"), 4),
+    "rolling_correlation": ("RollingCorr", "rolling_correlation", ("series_a", "series_b", "window", "start", "end"), 4),
+}
+# the fields a sheet shows, with the words for them; a value_in_YYYY field is the row the add-in labels YYYY
+SHOWN = {
+    "seasonal": [("current_value", "Latest value"), ("seasonal_avg", "Average of the same week or month in earlier years"),
+                 ("seasonal_min", "Lowest of those years"), ("seasonal_max", "Highest of those years"),
+                 ("delta_vs_avg", "Latest minus that average"), ("pct_vs_avg", "That difference, percent of the average"),
+                 ("zscore", "Standard deviations from the average"), ("percentile", "Percentile among those years")],
+    "percentile": [("target_value", "Latest value"), ("percentile", "Percentile in the window"),
+                   ("zscore", "Standard deviations from the window's mean"), ("mean", "Mean of the window"),
+                   ("median", "Median"), ("min", "Lowest"), ("max", "Highest"), ("observations", "Values in the window")],
+    "stats": [("count", "Values in the window"), ("mean", "Mean"), ("median", "Median"), ("std", "Standard deviation"),
+              ("min", "Lowest"), ("max", "Highest"), ("first_value", "First value"), ("last_value", "Last value"),
+              ("pct_change", "Change from first to last, percent")],
+    "spread_stats": [("current_spread", "Spread on the latest common date"), ("mean", "Mean of the spread"),
+                     ("std", "Standard deviation"), ("min", "Lowest"), ("max", "Highest"), ("zscore", "z-score now"),
+                     ("percentile", "Percentile now"), ("half_life", "Half-life, observations"),
+                     ("observations", "Common dates in the window")],
+    "rolling_correlation": [("overall_correlation", "Correlation over the whole window"),
+                            ("current_correlation", "Correlation now (the last window)"),
+                            ("min_correlation", "Lowest"), ("max_correlation", "Highest"),
+                            ("observations", "Common dates")],
+}
+_FN = re.compile(r'^=INDEX\(ES\.(\w+)\((.*)\),MATCH\("([^"]+)",INDEX\(ES\.\1\(\2\),0,1\),0\),2\)$')
+
+
+def _arg(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return repr(v)
+    return '"' + str(v).replace('"', '""') + '"'
+
+
+def fn_call(tool: str, body: dict) -> str:
+    """The add-in call that sends this request: ES.Seasonal("PET.WCESTUS1.W",5). Trailing empty arguments are dropped."""
+    name, _, fields, _ = FUNCTIONS[tool]
+    args = [_arg(body.get(f)) for f in fields]
+    while args and args[-1] == "":
+        args.pop()
+    return f"ES.{name}({','.join(args)})"
+
+
+def fn_formula(tool: str, body: dict, field: str) -> str:
+    call = fn_call(tool, body)
+    return f'=INDEX({call},MATCH("{field}",INDEX({call},0,1),0),2)'
+
+
+def _function_sheet(r: Reading) -> Sheet | None:
+    tool = (r.request or {}).get("tool")
+    if tool not in FUNCTIONS:
         return None
-    _, latest, prior = points
-    rows = [Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=latest)]
-    rows += [Row(label=f"The same time of year, {d}", formula=_get(series_id, d), value=v) for d, v in prior]
-    last = 1 + len(prior)
-    rows.append(Row(label=f"Average of the previous {years} years", formula=f"=AVERAGE(B2:B{last})",
-                    value=r.values["prior_average"]))
-    rows.append(Row(label="Latest minus that average", formula=f"=B1-B{last + 1}", value=r.values["difference"]))
-    rows.append(Row(label="Difference, percent", formula=f"=(B1-B{last + 1})/B{last + 1}*100",
-                    value=r.values["difference_pct"]))
-    return Sheet(title=r.title, rows=rows)
+    body = r.request["body"]
+    rows = []
+    for field, words in SHOWN[tool]:
+        if field in r.values:
+            rows.append(Row(label=f"{words} ({field})", formula=fn_formula(tool, body, field), value=r.values[field]))
+    if tool == "seasonal":
+        for k, v in r.values.items():
+            if k.startswith("value_in_"):
+                year = k.removeprefix("value_in_")
+                rows.append(Row(label=f"The value in {year}", formula=fn_formula(tool, body, year), value=v))
+    if not rows:
+        return None
+    # the function first: a tab name is cut at 31 characters, and several tabs of one answer share a series name
+    return Sheet(title=f"ES.{FUNCTIONS[tool][0]}: {r.title}", rows=rows)
+
+
+def _parse_args(text: str) -> list:
+    """The arguments of an add-in call as written by `fn_call`: quoted text, numbers, or empty."""
+    out, i, n = [], 0, len(text)
+    while i <= n:
+        if i < n and text[i] == '"':
+            j, buf = i + 1, []
+            while j < n:
+                if text[j] == '"' and j + 1 < n and text[j + 1] == '"':
+                    buf.append('"'); j += 2; continue
+                if text[j] == '"':
+                    break
+                buf.append(text[j]); j += 1
+            out.append("".join(buf)); i = j + 2
+        else:
+            j = text.find(",", i)
+            j = n if j < 0 else j
+            tok = text[i:j].strip()
+            out.append(None if tok == "" else (int(tok) if re.fullmatch(r"-?\d+", tok) else float(tok)))
+            i = j + 1
+    return out
+
+
+def _function_value(name: str, args: str, field: str, source: DataSource) -> float:
+    """What the add-in shows for one field: the server's answer to the request the call sends, rounded as the
+    add-in rounds it."""
+    spec = next((v for v in FUNCTIONS.values() if v[0] == name), None)
+    if spec is None:
+        raise ValueError(f"ES.{name} is not a function this module writes")
+    _, action, fields, places = spec
+    body = {f: v for f, v in zip(fields, _parse_args(args)) if v is not None}
+    doc = source.action(action, body)
+    if field.isdigit():
+        raw = (doc.get("history_by_year") or {}).get(field)
+    else:
+        raw = doc.get(field)
+    if raw is None or isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise ValueError(f"ES.{name} has no number for {field}")
+    return float(raw) if places is None else round(float(raw), places)
 
 
 # The share of the window at or below the latest, as _rank. Guarded: when the latest is not a number (the
@@ -147,31 +260,60 @@ def _seasonal(r: Reading, source: DataSource) -> Sheet | None:
 RANK = '=IF(ISNUMBER(B1),ROUND(COUNTIF(W,"<="&B1)/COUNT(W)*100,1),"")'
 
 
+# The percentile the server reports, rebuilt from the window's values. The server ranks as scipy's
+# percentileofscore(kind="rank") does: the share below the latest and the share at or below it are averaged,
+# with the latest itself counted as half a value (it is always in the window: the window ends on its date).
+# Without ties that is COUNTIF "<=" alone; with ties it is not: Henry Hub had 15 days at the latest price on
+# 21 Nov 2026 and COUNTIF "<=" gave 66.93 where the server says 65.93.
+RANK_EXACT = '=IF(ISNUMBER(B1),(COUNTIF(W,"<"&B1)+COUNTIF(W,"<="&B1)+1)/2/COUNT(W)*100,"")'
+
+
 def _percentile(r: Reading, source: DataSource) -> Sheet | None:
-    """The latest value against its own last N years: the window is every observation the reading ranked."""
-    series_id, years = r.series_ids[0], int(r.values["years"])
+    """The latest value against its own last N years, rebuilt in plain Excel from every value of the window
+    the server ranked (from the request's start to the latest date)."""
+    series_id = r.series_ids[0]
     # No sheet for a quarterly series: ES.Table returns no value for one at any window (the server's date filter
     # for quarterly periods; tried in Excel at one year and five), so the statistics would have nothing under
     # them, and the check without Excel could not see that.
     hit = source.meta(series_id)
-    if hit is None or hit.frequency == "Q" or series_id.endswith(".Q"):
+    if hit is None or hit.frequency == "Q" or series_id.endswith(".Q") or not r.request:
         return None
-    hist = source.history(series_id, start=readings._since(366 * years))
+    start = dt.date.fromisoformat(r.request["body"]["start"])
+    hist = [(d, v) for d, v in source.history(series_id, start=start) if d <= r.period]
     if len(hist) < 20 or hist[-1][0] != r.period:
         return None
     rows = [
-        Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=r.values["latest"]),
-        Row(label="Percentile: the share of the window's values at or below the latest", formula=RANK,
+        Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=r.values["target_value"]),
+        Row(label="Percentile: the share of the window's values at or below the latest", formula=RANK_EXACT,
             value=r.values["percentile"]),
+        Row(label="Lowest value of the window", formula="=MIN(W)", value=r.values["min"]),
+        Row(label="Highest value of the window", formula="=MAX(W)", value=r.values["max"]),
+        Row(label="Mean of the window", formula="=AVERAGE(W)", value=r.values["mean"]),
+        Row(label="Values in the window", formula="=COUNT(W)", value=r.values["observations"]),
+    ]
+    return Sheet(title=f"Rank from the values: {r.title}", rows=rows, window=Window(series_id=series_id, start=hist[0][0]))
+
+
+def _history(r: Reading, source: DataSource) -> Sheet | None:
+    """A series over its window: the table beside the rows holds every value; the rows check the ends and range."""
+    series_id = r.series_ids[0]
+    hit = source.meta(series_id)
+    if hit is None or hit.frequency == "Q" or series_id.endswith(".Q") or not r.request:
+        return None
+    start = dt.date.fromisoformat(r.request["body"]["start"])
+    hist = [(d, v) for d, v in source.history(series_id, start=start) if d <= r.period]
+    if len(hist) < 2 or hist[-1][0] != r.period:
+        return None
+    return Sheet(title=f"History: {r.title}", window=Window(series_id=series_id, start=hist[0][0]), rows=[
+        Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=r.values["latest"]),
+        Row(label=f"First value of the window, {hist[0][0]}", formula=_get(series_id, hist[0][0]), value=r.values["first"]),
+        Row(label="Change over the window", formula="=B1-B2", value=r.values["change"]),
+        Row(label="Change, percent", formula="=(B1-B2)/B2*100", value=r.values["change_pct"]),
         Row(label="Lowest value of the window", formula="=MIN(W)", value=r.values["low"]),
         Row(label="Highest value of the window", formula="=MAX(W)", value=r.values["high"]),
-        Row(label="Average of the window", formula="=AVERAGE(W)", value=r.values["average"]),
-    ]
-    if len({v for _, v in hist}) > 1:       # with every value the same there is no deviation to divide by
-        rows.append(Row(label="Standard deviations from that average", formula="=ROUND((B1-B5)/STDEV.P(W),2)",
-                        value=r.values["z_score"]))
-    rows.append(Row(label="Values in the window", formula="=COUNT(W)", value=r.values["observations"]))
-    return Sheet(title=r.title, rows=rows, window=Window(series_id=series_id, start=hist[0][0]))
+        Row(label="Mean of the window", formula="=AVERAGE(W)", value=r.values["average"]),
+        Row(label="Values in the window", formula="=COUNT(W)", value=r.values["observations"]),
+    ])
 
 
 def _positioning(r: Reading, source: DataSource) -> Sheet | None:
@@ -197,21 +339,24 @@ def _positioning(r: Reading, source: DataSource) -> Sheet | None:
     return Sheet(title=r.title, rows=rows, window=Window(series_id=net_id, start=net[0][0]))
 
 
-def for_reading(r: Reading, source: DataSource) -> Sheet | None:
+def for_reading(r: Reading, source: DataSource) -> list[Sheet]:
+    """The sheets for one reading: one that calls the add-in's own function where there is one, and one that
+    rebuilds the figures from the series' values where that can be done in plain Excel."""
     kind = r.key.split(":", 1)[0]
     if r.hypothetical:
-        return None
+        return []
+    built = [_function_sheet(r)]
     if kind == "percentile":
-        return _percentile(r, source)
-    if kind == "positioning":
-        return _positioning(r, source)
-    if kind == "curve":
-        return _curve(r)
-    if kind == "crack":
-        return _crack(r)
-    if kind == "seasonal":
-        return _seasonal(r, source)
-    return None
+        built.append(_percentile(r, source))
+    elif kind == "history":
+        built.append(_history(r, source))
+    elif kind == "positioning":
+        built.append(_positioning(r, source))
+    elif kind == "curve":
+        built.append(_curve(r))
+    elif kind == "crack":
+        built.append(_crack(r))
+    return [s for s in built if s is not None]
 
 
 # ---- checking a sheet against the data, without Excel
@@ -237,7 +382,7 @@ def _arithmetic(node) -> float:
 
 
 _W_STAT = re.compile(r"\b(COUNT|MIN|MAX|AVERAGE|STDEV\.P)\(W\)")
-_W_RANK = re.compile(r'COUNTIF\(W,"<="&B(\d+)\)')
+_W_RANK = re.compile(r'COUNTIF\(W,"(<=|<)"&B(\d+)\)')
 _ROUND = re.compile(r"ROUND\((.*),(\d+)\)")
 _GUARD = re.compile(r'IF\(ISNUMBER\(B\d+\),(.*),""\)')
 
@@ -267,6 +412,10 @@ def evaluate(sheet: Sheet, source: DataSource) -> list[float]:
     if sample is not None and not sample:
         raise ValueError(f"the window of {sheet.window.series_id} from {sheet.window.start} holds no value")
     for row in sheet.rows:
+        fn = _FN.match(row.formula)
+        if fn:
+            out.append(_function_value(fn[1], fn[2], fn[3], source))
+            continue
         fetch = _GET.match(row.formula)
         if fetch:
             series_id, day = fetch.groups()
@@ -289,7 +438,8 @@ def evaluate(sheet: Sheet, source: DataSource) -> list[float]:
         if rounded:
             text, places = rounded[1], int(rounded[2])
         if sample is not None:
-            text = _W_RANK.sub(lambda m: repr(float(sum(x <= out[int(m[1]) - 1] for x in sample))), text)
+            text = _W_RANK.sub(lambda m: repr(float(sum((x <= out[int(m[2]) - 1]) if m[1] == "<=" else (x < out[int(m[2]) - 1])
+                                                       for x in sample))), text)
             text = _W_STAT.sub(lambda m: f"({_statistic(m[1], sample)!r})", text)
         text = _RANGE.sub(over, text)
         text = _REF.sub(lambda m: f"({out[int(m[1]) - 1]!r})", text)
@@ -312,7 +462,7 @@ def problems(sheet: Sheet, source: DataSource) -> list[str]:
 def sheets(answer: DeskAnswer, source: DataSource) -> tuple[list[Sheet], list[str]]:
     """The sheets for an answer that reproduce its numbers, and what was wrong with any that did not."""
     built = [for_fact(f) for f in answer.facts] + [for_spread(s) for s in answer.spreads]
-    built += [s for s in (for_reading(r, source) for r in answer.readings) if s is not None]
+    built += [s for r in answer.readings for s in for_reading(r, source)]
     good, wrong = [], []
     for sheet in built:
         found = problems(sheet, source)
@@ -493,6 +643,10 @@ def _moved(formula: str, sheet: Sheet | None = None) -> str:
     In a file AGGREGATE carries the prefix _xlfn. (a function newer than the format): without it Excel 16
     showed #NAME? in every such cell."""
     text = formula.lstrip("=")
+    if _FN.match(formula):
+        # an add-in function: its arguments are written into the formula, so nothing moves; the file names an
+        # add-in function with the prefix _xll., as it does ES.Value and ES.Table
+        return re.sub(r"\bES\.", "_xll.ES.", text)
     if sheet is not None and sheet.window is not None:
         rng = window_range(sheet)
         text = re.sub(r"\b(MIN|MAX|AVERAGE|STDEV\.P)\(W\)", lambda m: f"_xlfn.AGGREGATE({_AGGREGATE[m[1]]},6,{rng})", text)
@@ -828,7 +982,10 @@ def read_back(data: bytes) -> list[list[tuple[str, str, float]]]:
                     # a statistic over the window comes back as the sheet writes it: AGGREGATE(5,6,range) is MIN(W)
                     text = _FILE_AGGREGATE.sub(lambda m: f"{_AGGREGATE_NAME[m[1]]}(W)", unescape(formula))
                     text = _FILE_COUNT.sub(lambda m: f"{m[1]}(W{m[2]}", text)
-                    canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - FIRST_ROW + 1}", text)
+                    if "_xll.ES." in text:   # an add-in function's row: nothing in it was moved
+                        canonical = "=" + text.replace("_xll.ES.", "ES.")
+                    else:
+                        canonical = "=" + _FILE_REF.sub(lambda m: f"B{int(m[1]) - FIRST_ROW + 1}", text)
                 rows.append((unescape(label), canonical, float(value)))
             tabs.append(rows)
     return tabs

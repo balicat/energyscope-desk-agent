@@ -67,6 +67,8 @@ class Reading(BaseModel):
     context: str = Field("", description="Written by code: whether the level is unusual and when it was last seen.")
     hypothetical: bool = Field(False, description="True for a what-if scenario: its scenario_ values are not observations.")
     counter: str = Field("", description="Written by code: the lines of evidence that point against the balance. Code adds it to the caveats.")
+    request: dict | None = Field(None, description="Written by code: for a reading the EnergyScope server computed, the "
+                                 "tool, the server action and the request sent. The check sends it again.")
 
 
 class SeriesFact(BaseModel):

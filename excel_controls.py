@@ -8,7 +8,7 @@ takes a sheet that reproduces on the frozen data, breaks one thing a careless ed
 """
 import sys
 
-from es_agent import excel, metrics, readings
+from es_agent import engine, excel, metrics, readings
 from es_agent.models import SeriesFact, Spread
 from es_agent.sources import FixtureSource
 
@@ -47,16 +47,31 @@ def fact_sheet(percent_places: int) -> excel.Sheet:
                                      change_pct=round(c.change_pct, percent_places)))
 
 
+def one(sheets: list, add_in: bool) -> excel.Sheet | None:
+    """Of a reading's sheets, the one that calls the add-in's own function, or the one in plain Excel."""
+    picked = [x for x in sheets if any(excel._FN.match(r.formula) for r in x.rows) == add_in]
+    return picked[0] if picked else None
+
+
+# The server's readings are replayed from the fixture's recording: the same requests the eval cases send.
+_pct = excel.for_reading(engine.percentile(source, "NG.RNGWHHD.D", 3), source)
+_hist = excel.for_reading(engine.history(source, "PET.RWTC.D", 5), source)
 good = {
     "fact": fact_sheet(6),
     "spread": spread_sheet(),
-    "curve": excel.for_reading(readings.curve(source, "brent"), source),
-    "crack": excel.for_reading(readings.crack(source, "3-2-1"), source),
-    "seasonal": excel.for_reading(readings.seasonal(source, "PET.WCESTUS1.W", 5), source),
+    "curve": excel.for_reading(readings.curve(source, "brent"), source)[0],
+    "crack": excel.for_reading(readings.crack(source, "3-2-1"), source)[0],
     # two whose statistics are taken over a window of observations: a daily series against its last three
     # years, and weekly positioning against its last 156 reports
-    "percentile": excel.for_reading(readings.percentile(source, "NG.RNGWHHD.D", 3), source),
-    "positioning": excel.for_reading(readings.positioning(source, "wti"), source),
+    "percentile": one(_pct, add_in=False),
+    "positioning": excel.for_reading(readings.positioning(source, "wti"), source)[0],
+    "history": one(_hist, add_in=False),
+    # the add-in's own functions: each row picks one field out of the table the function fills
+    "seasonal": one(excel.for_reading(engine.seasonal(source, "PET.WCESTUS1.W", 5), source), add_in=True),
+    "percentile_fn": one(_pct, add_in=True),
+    "stats": one(excel.for_reading(engine.stats(source, "PET.RWTC.D", 3), source), add_in=True),
+    "spread_fn": one(excel.for_reading(engine.spread_stats(source, BRENT, WTI, 3), source), add_in=True),
+    "rollcorr": one(excel.for_reading(engine.rolling_correlation(source, WTI, BRENT, 3, window=90), source), add_in=True),
 }
 failures = []
 for name, sheet in good.items():
@@ -69,7 +84,14 @@ if failures:
 day = str(good["spread"].rows[0].formula).split('"')[3]
 earlier = str(readings.aligned(source, [BRENT, WTI], 30)[-2][0])
 n_curve = len(good["curve"].rows) - 2
-last_prior = len(good["seasonal"].rows) - 3
+
+
+def row_of(sheet: excel.Sheet, field: str) -> int:
+    return next(i for i, r in enumerate(sheet.rows) if f'MATCH("{field}"' in r.formula)
+
+
+_years = [r.formula.split('MATCH("')[1].split('"')[0] for r in good["seasonal"].rows if 'MATCH("20' in r.formula]
+hist_first = good["history"].rows[1].formula.split('"')[3]
 planted = [
     ("the other series", edited(good["spread"], 0, BRENT, WTI)),
     # Brent, not WTI: on the frozen data WTI has the same price on both days (a US holiday), and a wrong date
@@ -79,9 +101,18 @@ planted = [
     ("a reference one row off", edited(good["curve"], n_curve + 1, f"=B1-B{n_curve}", f"=B1-B{n_curve - 1}")),
     ("41 gallons to the barrel", edited(good["crack"], 3, "B3*42", "B3*41")),
     ("the weights of the 3-2-1 swapped", edited(good["crack"], 3, "(2*B2*42+B3*42)", "(B2*42+2*B3*42)")),
-    ("an average over one year too few", edited(good["seasonal"], last_prior, f"B2:B{last_prior}", f"B2:B{last_prior - 1}")),
-    ("an average that includes this year", edited(good["seasonal"], last_prior, f"B2:B{last_prior}", f"B1:B{last_prior}")),
-    ("percent of the wrong base", edited(good["seasonal"], last_prior + 2, f"/B{last_prior + 1}*100", "/B1*100")),
+    # the add-in's functions: a field read from the wrong row of its table, or a year's value from another year
+    ("the five-year average read from the row of the lowest year",
+     edited(good["seasonal"], row_of(good["seasonal"], "seasonal_avg"), '"seasonal_avg"', '"seasonal_min"')),
+    ("one year's value read from the next year's row",
+     edited(good["seasonal"], row_of(good["seasonal"], _years[0]), f'"{_years[0]}"', f'"{_years[1]}"')),
+    ("the z-score read where the percentile is",
+     edited(good["percentile_fn"], row_of(good["percentile_fn"], "zscore"), '"zscore"', '"percentile"')),
+    ("the median given as the mean", edited(good["stats"], row_of(good["stats"], "mean"), '"mean"', '"median"')),
+    ("the spread's z-score where its percentile belongs",
+     edited(good["spread_fn"], row_of(good["spread_fn"], "percentile"), '"percentile"', '"zscore"')),
+    ("the correlation now given as over the whole window",
+     edited(good["rollcorr"], row_of(good["rollcorr"], "current_correlation"), '"current_correlation"', '"overall_correlation"')),
     ("a date with no observation", edited(good["spread"], 0, f'"{day}")', '"2026-01-01")')),
     ("the percent of the wrong base", edited(good["fact"], 3, "/B2*100", "/B1*100")),
     # The reported value wrong, not the formula: a percent to two decimals where the data gives six. This is what
@@ -90,10 +121,14 @@ planted = [
     ("a percent the model rounded to two decimals", fact_sheet(2)),
     # the window sheets
     ("a percentile counted from the top (at or above)", edited(good["percentile"], 1, '"<="', '">="')),
-    ("a percentile rounded to a whole number", edited(good["percentile"], 1, "*100,1),", "*100,0),")),
+    # the server averages the share below and the share at or below; with ties in the window they differ
+    ("ties counted once, not averaged", edited(good["percentile"], 1, '(COUNTIF(W,"<"&B1)+COUNTIF(W,"<="&B1)+1)/2', 'COUNTIF(W,"<="&B1)')),
     ("the highest of the window where the lowest belongs", edited(good["percentile"], 2, "MIN(W)", "MAX(W)")),
-    ("deviations from the highest, not from the average", edited(good["percentile"], 5, "(B1-B5)", "(B1-B4)")),
     ("a window that starts a month late", windowed(good["percentile"], days=30)),
+    ("a history whose first value is taken a week late",
+     edited(good["history"], 1, f'"{hist_first}"', f'"{(__import__("datetime").date.fromisoformat(hist_first) + __import__("datetime").timedelta(days=7))}"')),
+    ("a history's change reversed", edited(good["history"], 2, "=B1-B2", "=B2-B1")),
+    ("a history window a month short", windowed(good["history"], days=30)),
     ("the change on the week reversed", edited(good["positioning"], 5, "=B1-B5", "=B5-B1")),
     ("the net position ranked in the window of the longs", windowed(good["positioning"], series=good["positioning"].rows[1].formula.split('"')[1])),
     ("a window one report short", windowed(good["positioning"], days=7)),
@@ -245,6 +280,14 @@ for _t, (_xml, _sheet) in enumerate(zip(_tabs, good.values()), 1):
                 layout.append(f"{at}: the Date cell should be {wanted[1]} ({day}) shown yyyy-mm-dd, the file has {date[2]}")
             if value[1:] != ("formula", f"_xll.ES.Value(B{r},C{r})"):
                 layout.append(f"{at}: Value does not fetch from this row's series and date cells: {value[2]}")
+        elif _re.match(r"^=INDEX\(ES\.[A-Za-z]+\(", row.formula):
+            # an add-in function's row: its arguments are written into the formula, so in the file it is the same
+            # formula with the prefix _xll. that the file format gives an add-in's function, and nothing else
+            expected = _re.sub(r"\bES\.", "_xll.ES.", row.formula[1:])
+            if value[1:] != ("formula", expected):
+                layout.append(f"{at}: Value should be {expected[:80]}, the file has {value[2][:80]}")
+            if ("B", r) in c or ("C", r) in c:
+                layout.append(f"{at}: an add-in function's row has something in Series or Date")
         else:
             # the sheet's arithmetic names cells of the pasted form (formula in column B, first row 1); in the
             # file the same cells are column D, three rows down. No other column may be named.

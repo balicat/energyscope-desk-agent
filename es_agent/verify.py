@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from . import clock, metrics, readings
+from . import clock, engine, metrics, readings
 from .models import DeskAnswer
 from .sources import DataSource
 
@@ -50,7 +50,8 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
         ):
             problems.append(f"spread {s.series_a} minus {s.series_b}: history differs from source")
     for r in answer.readings:
-        truth = readings.compute(source, r.key)
+        # A reading the server computed is checked by sending its request again; one computed here is rebuilt here.
+        truth = engine.rebuild(source, r) if r.request else readings.compute(source, r.key)
         if truth is None or truth.period != r.period or truth.context != r.context or truth.counter != r.counter or set(truth.values) != set(r.values) or not all(
             metrics.close(truth.values[k], r.values[k]) for k in r.values
         ):

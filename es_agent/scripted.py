@@ -59,7 +59,7 @@ def _answer(returns: list[ToolReturnPart], question: str) -> dict:
                 f"{body['name_a']} was {body['value_a']:.2f} and {body['name_b']} was {body['value_b']:.2f} "
                 f"{body['units']} on {body['period']}: a spread of {body['spread']:.2f}."
             )
-        elif r.tool_name in ("get_curve", "get_crack_spread", "get_seasonal", "get_positioning", "get_percentile", "get_arbitrage", "get_surprises", "get_watch", "get_arbitrage_scenario", "get_crack_scenario", "get_futures_spread", "get_futures_crack", "get_evidence"):
+        elif isinstance(body, dict) and "key" in body and "values" in body:   # any reading, ours or the server's
             cites.append(body["key"])
             # A change is written with its direction, as the prose rules require of any model.
             shown = ", ".join(f"{k} {'up' if v > 0 else 'down'} {abs(v):.2f}" if "change" in k and v else f"{k} {v:.2f}"

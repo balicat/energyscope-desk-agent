@@ -9,6 +9,12 @@ implementations:
 - FlightSource: the same calls over Arrow Flight with the public
   energyscope-client package (needs ENERGYSCOPE_API_KEY).
 
+Every source also answers `action(name, request)`: one of the EnergyScope server's own computations
+(percentile, seasonal, stats, the signals and the standing reports), the same Flight actions the Excel
+add-in's ES.Percentile, ES.Seasonal, ES.Brief ... and the MCP server call, so one question gets one number
+whichever of the three asks it. `snapshot()` is the server's live metric snapshot, the input of its signals.
+The fixture source replays both from a recording, so the offline suite needs no server.
+
 Arithmetic (changes, percentages) lives in metrics.py, not in the model.
 """
 
@@ -19,6 +25,7 @@ import glob
 import json
 import os
 import re
+import urllib.request
 from typing import Protocol
 
 import polars as pl
@@ -51,6 +58,69 @@ class DataSource(Protocol):
     def search(self, query: str, limit: int = 10, dataset: str | None = None) -> list[SeriesHit]: ...
     def meta(self, series_id: str) -> SeriesHit | None: ...
     def history(self, series_id: str, start: dt.date | None = None) -> list[tuple[dt.date, float]]: ...
+    def action(self, name: str, request: dict) -> dict | list: ...
+    def snapshot(self) -> dict: ...
+
+
+class ServerError(RuntimeError):
+    """The server refused or could not answer (an unknown series, too little history, a refused request)."""
+
+
+def request_key(name: str, request: dict) -> str:
+    """One string per (action, request): how a recording finds an answer again."""
+    return name + " " + json.dumps(request, sort_keys=True, separators=(",", ":"))
+
+
+def _checked(result):
+    if isinstance(result, dict) and result.get("error"):
+        raise ServerError(str(result["error"]))
+    return result
+
+
+class Server:
+    """The EnergyScope Flight server's actions, over pyarrow.flight (no other dependency).
+
+    LIBRARIAN_FLIGHT is the address, LIBRARIAN_ES_KEY the API key, and LIBRARIAN_SNAPSHOT the URL of the server's
+    live metric snapshot (its HTTP side). The defaults are the server beside the lake on ms02, where the service
+    and its gate run; elsewhere set LIBRARIAN_FLIGHT=grpc+tls://data.energyscope.io:443 (the snapshot is not
+    published outside ms02, so get_signals then says it cannot be read)."""
+
+    def __init__(self, address: str | None = None, key: str | None = None, snapshot_url: str | None = None):
+        self.address = address or os.environ.get("LIBRARIAN_FLIGHT", "grpc://localhost:8815")
+        self.key = key or os.environ.get("LIBRARIAN_ES_KEY", "demo")
+        self.snapshot_url = snapshot_url or os.environ.get("LIBRARIAN_SNAPSHOT", "http://localhost:8816/workspace/live_snapshot")
+        self._client = None
+        self._headers = []
+
+    def _connect(self):
+        if self._client is None:
+            from pyarrow import flight
+            self._client = flight.connect(self.address)
+            self._headers = [self._client.authenticate_basic_token(self.key, "")] if self.key else []
+        return self._client
+
+    def action(self, name: str, request: dict) -> dict | list:
+        from pyarrow import flight
+        client = self._connect()
+        try:
+            results = list(client.do_action(flight.Action(name, json.dumps(request).encode()),
+                                            flight.FlightCallOptions(headers=self._headers, timeout=120)))
+        except flight.FlightError as e:
+            raise ServerError(str(e).split("\n")[0][:300]) from None
+        if not results:
+            raise ServerError(f"{name}: no answer")
+        return _checked(json.loads(results[0].body.to_pybytes().decode()))
+
+    def snapshot(self) -> dict:
+        try:
+            with urllib.request.urlopen(self.snapshot_url, timeout=60) as r:
+                doc = json.loads(r.read())
+        except (OSError, ValueError) as e:
+            raise ServerError(f"the live metric snapshot could not be read: {e}") from None
+        metrics = doc.get("metrics") or {}
+        if not metrics:
+            raise ServerError("the live metric snapshot is empty")
+        return {"metrics": metrics, "fetched_at": (doc.get("_meta") or {}).get("fetched_at", "")}
 
 
 # Datasets the agent may search, with the one line the model is given about each.
@@ -85,9 +155,11 @@ DATASETS = {
 class ParquetLakeSource:
     """Reads <root>/<DATASET>/series_meta.parquet and year=*/data.parquet."""
 
-    def __init__(self, root: str = "/opt/energyscope/data", datasets: tuple[str, ...] = tuple(DATASETS)):
+    def __init__(self, root: str = "/opt/energyscope/data", datasets: tuple[str, ...] = tuple(DATASETS),
+                 server: Server | None = None):
         self.root = root
         self.datasets = datasets
+        self.server = server or Server()
         frames = []
         for ds in datasets:
             m = pl.read_parquet(f"{root}/{ds}/series_meta.parquet", columns=["series_id", "name", "units", "f"])
@@ -147,6 +219,12 @@ class ParquetLakeSource:
         )
         return _clean(df.iter_rows(), start)
 
+    def action(self, name: str, request: dict) -> dict | list:
+        return self.server.action(name, request)
+
+    def snapshot(self) -> dict:
+        return self.server.snapshot()
+
 
 def _clean(rows, start: dt.date | None) -> list[tuple[dt.date, float]]:
     """Sorted (date, value) pairs: no nulls, no unreadable periods, nothing dated after today (forecasts)."""
@@ -176,6 +254,8 @@ class FixtureSource:
         self.as_of = doc["as_of"]
         self._meta = {m["series_id"]: SeriesHit(**m) for m in doc["meta"]}
         self._data = {sid: [(dt.date.fromisoformat(d), v) for d, v in rows] for sid, rows in doc["data"].items()}
+        self._actions = doc.get("actions", {})   # request_key -> the server's answer, or {"error": ...}
+        self._snapshot = doc.get("snapshot")
 
     def search(self, query: str, limit: int = 10, dataset: str | None = None) -> list[SeriesHit]:
         tokens = [t for t in _norm(query).split() if t]
@@ -187,6 +267,17 @@ class FixtureSource:
 
     def history(self, series_id, start=None):
         return _clean(self._data.get(series_id, []), start)
+
+    def action(self, name: str, request: dict) -> dict | list:
+        key = request_key(name, request)
+        if key not in self._actions:
+            raise ServerError(f"not in the recording: {key[:200]}")
+        return _checked(self._actions[key])
+
+    def snapshot(self) -> dict:
+        if not self._snapshot:
+            raise ServerError("the recording holds no metric snapshot")
+        return self._snapshot
 
 
 class FlightSource:
@@ -219,6 +310,16 @@ class FlightSource:
         df = self._c.get(series_id, start=start.isoformat() if start else None)
         return _clean(df.select("period", "value").iter_rows(), start)
 
+    def action(self, name: str, request: dict) -> dict | list:
+        try:
+            raw = self._c._action(name, json.dumps(request).encode())
+        except Exception as e:
+            raise ServerError(str(e).split("\n")[0][:300]) from None
+        return _checked(json.loads(raw))
+
+    def snapshot(self) -> dict:
+        return Server().snapshot()
+
 
 class RecordingSource:
     """Wraps a source and remembers every series it served, to write the fixture file from a real run."""
@@ -227,6 +328,22 @@ class RecordingSource:
         self.inner = inner
         self._meta: dict[str, SeriesHit] = {}
         self._data: dict[str, dict[dt.date, float]] = {}
+        self._actions: dict[str, dict | list] = {}
+        self._snapshot: dict | None = None
+
+    def action(self, name: str, request: dict) -> dict | list:
+        try:
+            out = self.inner.action(name, request)
+        except ServerError as e:
+            self._actions[request_key(name, request)] = {"error": str(e)}   # a refusal replays as a refusal
+            raise
+        self._actions[request_key(name, request)] = out
+        return out
+
+    def snapshot(self) -> dict:
+        if self._snapshot is None:
+            self._snapshot = self.inner.snapshot()
+        return self._snapshot
 
     def search(self, query: str, limit: int = 10, dataset: str | None = None) -> list[SeriesHit]:
         hits = self.inner.search(query, limit, dataset)
@@ -250,6 +367,8 @@ class RecordingSource:
             "as_of": clock.today().isoformat(),
             "meta": [m.model_dump() for _, m in sorted(self._meta.items())],
             "data": {sid: [[d.isoformat(), v] for d, v in sorted(rows.items())] for sid, rows in sorted(self._data.items())},
+            "actions": dict(sorted(self._actions.items())),
+            "snapshot": self._snapshot,
         }
         with open(path, "w", encoding="utf-8") as f:
             json.dump(doc, f, separators=(",", ":"))

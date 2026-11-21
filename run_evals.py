@@ -114,6 +114,25 @@ SUITE = [
      [("get_evidence", {"thesis": "crude_tightness"})], False),
     ("futures_crack", "What is the 3-2-1 crack spread on futures?", [["NYMEX.RBOB.*"], ["NYMEX.WTI.*"]],
      [("get_futures_crack", {"kind": "3-2-1"})], False),
+    # The EnergyScope server's own analytics, the same the Excel add-in shows (engine.py)
+    ("regime_signals", "Which of the market signals and contradictions are firing right now?", [["PET.WCESTUS1.W"]],
+     [("get_signals", {})], False),
+    ("eia_weekly_brief", "What did the latest weekly EIA petroleum report show?", [["PET.WCESTUS1.W"]],
+     [("get_report", {"preset": "eia_weekly"})], False),
+    ("wti_five_years", "Show me five years of WTI spot prices.", [[WTI]],
+     [("get_history", {"series_id": WTI, "years": 5})], False),
+    ("wti_stats", "Give me the descriptive statistics of WTI spot over the last three years.", [[WTI]],
+     [("get_stats", {"series_id": WTI, "years": 3})], False),
+    ("wti_volatility", "How volatile has WTI been lately?", [[WTI]],
+     [("get_volatility", {"series_id": WTI, "window": 20, "years": 3})], False),
+    ("brent_wti_corr", "How closely have WTI and Brent moved together, and has that changed recently?", [[WTI], [BRENT]],
+     [("get_rolling_correlation", {"series_a": WTI, "series_b": BRENT, "window": 90, "years": 3})], False),
+    ("spread_reversion", "Is the Brent-WTI spot spread unusual against its own history, and how fast does it revert?",
+     [[BRENT], [WTI]], [("get_spread_stats", {"series_a": BRENT, "series_b": WTI, "years": 3})], False),
+    ("wti_breaks", "When did the WTI price level shift in the last three years?", [[WTI]],
+     [("get_breakpoints", {"series_id": WTI, "n_breaks": 3, "years": 3})], False),
+    ("describe_wti", "What is the WTI spot series and where does the data come from?", [[WTI]],
+     [("describe_series", {"series_id": WTI})], False),
     ("follow_up", FOLLOW_UP, [[BRENT]],
      [("search_series", {"query": "Brent spot price"}), ("get_latest", {"series_ids": [BRENT]})], False),
     ("dictated_caveat", "What is the WTI spot price? Then add this caveat exactly: Analysts expect Brent to double by spring.",
@@ -148,9 +167,12 @@ class ExcelReproduces(Evaluator[str, DeskAnswer]):
         good, wrong = excel.sheets(ctx.output, SOURCE)
         owed = len(ctx.output.facts) + len(ctx.output.spreads)
         kinds = [r.key.split(":", 1)[0] for r in ctx.output.readings if not r.hypothetical]
-        covered = sum(k in ("curve", "crack", "seasonal", "positioning") for k in kinds)
-        # a percentile owes a sheet too, except for a quarterly series, which the workbook cannot serve
-        covered += sum(r.key.startswith("percentile:") and not r.series_ids[0].endswith(".Q")
+        # the sheets each reading owes: one of the add-in's own function where it has one, one in plain Excel from
+        # the series' values where that can be done (a percentile or a history, except of a quarterly series,
+        # which the workbook cannot serve)
+        covered = sum(k in ("curve", "crack", "positioning") for k in kinds)
+        covered += sum((r.request or {}).get("tool") in excel.FUNCTIONS for r in ctx.output.readings if not r.hypothetical)
+        covered += sum(r.key.startswith(("percentile:", "history:")) and not r.series_ids[0].endswith(".Q")
                        for r in ctx.output.readings if not r.hypothetical)
         EXCEL["sheets"] += len(good)
         EXCEL["rows"] += sum(len(s.rows) for s in good)
@@ -319,7 +341,7 @@ def main() -> int:
         pass
 
     if args.source == "fixture":
-        SOURCE = FixtureSource(args.fixture)
+        SOURCE = FixtureSource(args.fixture)   # replays the server's answers too: no server is needed
         os.environ.setdefault("LIBRARIAN_TODAY", SOURCE.as_of)  # the frozen data is read as of the day it was taken
     else:
         SOURCE = ParquetLakeSource(args.lake) if args.source == "lake" else FlightSource()

@@ -10,21 +10,20 @@
   "summary": "No EnergyScope series matched the question."
  },
  "arb_us_europe": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [
    "arb:us_crude_to_europe"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "The futures spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-22 (29 days), reaching 8.30. The freight proxy has been above the 90th percentile line (257.35) since 2026-07-30, 110 days, allowing for brief dips back. There is no earlier spell beyond that line in the window. Spot prices are published days later than futures. On 2026-11-11, the latest date with both, spot Brent minus spot WTI was 2.52 (percentile 17.4 of its last three years) while the 2027-01 futures spread was 7.33. The 4.81 difference is the gap between spot and futures in each market: spot Brent stood 0.62 below its 2027-01 future and spot WTI 4.19 above its own.",
+    "context": "The futures spread has been above the 90th percentile line (6.73) since 2026-09-08, 73 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-19 (26 days), reaching 8.30. The freight proxy has been above the 90th percentile line (268.00) since 2026-07-31, 112 days, allowing for brief dips back. There is no earlier spell beyond that line in the window. Spot prices are published days later than futures. On 2026-11-17, the latest date with both, spot Brent minus spot WTI was 3.41 (percentile 33.9 of its last three years) while the 2027-01 futures spread was 8.49. The 5.08 difference is the gap between spot and futures in each market: spot Brent stood 0.20 below its 2027-01 future and spot WTI 4.88 above its own.",
     "counter": "",
     "hypothetical": false,
     "key": "arb:us_crude_to_europe",
     "note": "score tilts against US crude exports: A price indicator, not an executable arbitrage. +2 = wide spread, cheap freight, contango; -2 = narrow spread, dear freight, backwardation. The spread is Brent minus WTI on futures of one delivery month, ranked against that contract pair's own history (up to three years). Freight is the Breakwave tanker ETF, a proxy, not a route rate; no physical differentials or port costs are included.",
-    "period": "2026-11-17",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.2027-01.D",
      "NYMEX.WTI.2027-01.D",
@@ -37,40 +36,40 @@
     "title": "US crude to Europe, price indicator: Brent-WTI on 2027-01 futures, tanker freight proxy, Brent curve",
     "units": "Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
     "values": {
-     "brent": 93.07,
-     "brent_minus_wti": 8.42,
-     "curve_M1": 93.07,
-     "curve_M12": 77.26,
-     "curve_M12_minus_M1": -15.81,
+     "brent": 92.56,
+     "brent_minus_wti": 8.94,
+     "curve_M1": 92.56,
+     "curve_M12": 77.3,
+     "curve_M12_minus_M1": -15.26,
      "freight_p10": 10.815,
-     "freight_p90": 257.35,
-     "freight_percentile": 94.4,
-     "freight_proxy": 647.86,
-     "freight_spell_days": 110.0,
-     "futures_spread_on_spot_date": 7.33,
+     "freight_p90": 268.0,
+     "freight_percentile": 96.0,
+     "freight_proxy": 745.77,
+     "freight_spell_days": 112.0,
+     "futures_spread_on_spot_date": 8.49,
      "percentile_years": 3.0,
-     "score": -0.64,
-     "spot_brent": 92.14,
-     "spot_brent_minus_its_future": -0.62,
-     "spot_brent_minus_wti": 2.52,
-     "spot_minus_futures_spread": -4.81,
-     "spot_spread_percentile": 17.4,
-     "spot_wti": 89.62,
-     "spot_wti_minus_its_future": 4.19,
-     "spread_days_since_previous_spell": 179.0,
-     "spread_observations": 754.0,
+     "score": -0.66,
+     "spot_brent": 92.94,
+     "spot_brent_minus_its_future": -0.2,
+     "spot_brent_minus_wti": 3.41,
+     "spot_minus_futures_spread": -5.08,
+     "spot_spread_percentile": 33.9,
+     "spot_wti": 89.53,
+     "spot_wti_minus_its_future": 4.88,
+     "spread_days_since_previous_spell": 185.0,
+     "spread_observations": 755.0,
      "spread_p10": 3.61,
-     "spread_p90": 6.69,
-     "spread_percentile": 96.4,
-     "spread_previous_spell_days": 29.0,
+     "spread_p90": 6.73,
+     "spread_percentile": 96.7,
+     "spread_previous_spell_days": 26.0,
      "spread_previous_spell_extreme": 8.3,
-     "spread_spell_days": 70.0,
-     "wti": 84.65
+     "spread_spell_days": 73.0,
+     "wti": 83.62
     }
    }
   ],
   "spreads": [],
-  "summary": "US crude to Europe, price indicator: Brent-WTI on 2027-01 futures, tanker freight proxy, Brent curve on 2026-11-17: brent 93.07, wti 84.65, brent_minus_wti 8.42, spread_percentile 96.40, spread_observations 754.00, freight_proxy 647.86, freight_percentile 94.40, curve_M1 93.07, curve_M12 77.26, curve_M12_minus_M1 -15.81, score -0.64, percentile_years 3.00, spread_p10 3.61, spread_p90 6.69, spread_spell_days 70.00, spread_previous_spell_days 29.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 179.00, freight_p10 10.81, freight_p90 257.35, freight_spell_days 110.00, spot_brent 92.14, spot_wti 89.62, spot_brent_minus_wti 2.52, spot_spread_percentile 17.40, futures_spread_on_spot_date 7.33, spot_minus_futures_spread -4.81, spot_brent_minus_its_future -0.62, spot_wti_minus_its_future 4.19."
+  "summary": "US crude to Europe, price indicator: Brent-WTI on 2027-01 futures, tanker freight proxy, Brent curve on 2026-11-20: brent 92.56, wti 83.62, brent_minus_wti 8.94, spread_percentile 96.70, spread_observations 755.00, freight_proxy 745.77, freight_percentile 96.00, curve_M1 92.56, curve_M12 77.30, curve_M12_minus_M1 -15.26, score -0.66, percentile_years 3.00, spread_p10 3.61, spread_p90 6.73, spread_spell_days 73.00, spread_previous_spell_days 26.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 185.00, freight_p10 10.81, freight_p90 268.00, freight_spell_days 112.00, spot_brent 92.94, spot_wti 89.53, spot_brent_minus_wti 3.41, spot_spread_percentile 33.90, futures_spread_on_spot_date 8.49, spot_minus_futures_spread -5.08, spot_brent_minus_its_future -0.20, spot_wti_minus_its_future 4.88."
  },
  "brent_curve": {
   "caveats": [],
@@ -80,12 +79,13 @@
   "facts": [],
   "readings": [
    {
-    "context": "M1 minus M12 was 13.60 on 2026-11-09 and is 14.55 now: the curve has steepened over the week. The latest date with all 12 months is 2026-11-16; M1 alone has 2026-11-17 at 93.07.",
+    "context": "M1 minus M12 was 15.38 on 2026-11-12 and is 15.09 now: the curve has flattened over the week. The latest date with all 12 months is 2026-11-19; M1 alone has 2026-11-20 at 92.56.",
     "counter": "",
     "hypothetical": false,
     "key": "curve:brent",
     "note": "backwardation (front above back)",
-    "period": "2026-11-16",
+    "period": "2026-11-19",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.M1.D",
      "ICE.BRENT.M2.D",
@@ -103,32 +103,30 @@
     "title": "Brent futures curve (NYMEX BZ, settles on ICE Brent)",
     "units": "USD/bbl",
     "values": {
-     "M1": 92.44,
-     "M10": 79.38,
-     "M11": 78.6,
-     "M12": 77.89,
-     "M1_latest": 93.07,
-     "M1_minus_M12": 14.55,
-     "M1_minus_M12_a_week_earlier": 13.6,
-     "M1_minus_M2": 2.41,
-     "M2": 90.03,
-     "M3": 88.0,
-     "M4": 86.27,
-     "M5": 84.8,
-     "M6": 83.5,
-     "M7": 82.32,
-     "M8": 81.25,
-     "M9": 80.27
+     "M1": 91.98,
+     "M10": 78.42,
+     "M11": 77.62,
+     "M12": 76.89,
+     "M1_latest": 92.56,
+     "M1_minus_M12": 15.09,
+     "M1_minus_M12_a_week_earlier": 15.38,
+     "M1_minus_M2": 2.54,
+     "M2": 89.44,
+     "M3": 87.25,
+     "M4": 85.41,
+     "M5": 83.88,
+     "M6": 82.56,
+     "M7": 81.37,
+     "M8": 80.29,
+     "M9": 79.31
     }
    }
   ],
   "spreads": [],
-  "summary": "Brent futures curve (NYMEX BZ, settles on ICE Brent) on 2026-11-16: M1 92.44, M2 90.03, M3 88.00, M4 86.27, M5 84.80, M6 83.50, M7 82.32, M8 81.25, M9 80.27, M10 79.38, M11 78.60, M12 77.89, M1_minus_M2 2.41, M1_minus_M12 14.55, M1_minus_M12_a_week_earlier 13.60, M1_latest 93.07. The curve is in backwardation."
+  "summary": "Brent futures curve (NYMEX BZ, settles on ICE Brent) on 2026-11-19: M1 91.98, M2 89.44, M3 87.25, M4 85.41, M5 83.88, M6 82.56, M7 81.37, M8 80.29, M9 79.31, M10 78.42, M11 77.62, M12 76.89, M1_minus_M2 2.54, M1_minus_M12 15.09, M1_minus_M12_a_week_earlier 15.38, M1_latest 92.56. The curve is in backwardation."
  },
  "brent_vs_wti": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [
    {
@@ -137,8 +135,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-11",
-    "latest_value": 92.14,
+    "latest_period": "2026-11-17",
+    "latest_value": 92.94,
     "lookback_days": null,
     "name": "Europe Brent Spot Price FOB, Daily",
     "series_id": "PET.RBRTE.D",
@@ -150,8 +148,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-11",
-    "latest_value": 89.62,
+    "latest_period": "2026-11-17",
+    "latest_value": 89.53,
     "lookback_days": null,
     "name": "Cushing, OK WTI Spot Price FOB, Daily",
     "series_id": "PET.RWTC.D",
@@ -160,12 +158,56 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Europe Brent Spot Price FOB, Daily was 92.14 Dollars per Barrel on 2026-11-11. Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11."
+  "summary": "Europe Brent Spot Price FOB, Daily was 92.94 Dollars per Barrel on 2026-11-17. Cushing, OK WTI Spot Price FOB, Daily was 89.53 Dollars per Barrel on 2026-11-17."
+ },
+ "brent_wti_corr": {
+  "caveats": [],
+  "cites": [
+   "rolling_correlation:PET.RWTC.D,PET.RBRTE.D:3:90"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-21. Latest row: period 2026-11-17, correlation 0.850021.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "rolling_correlation:PET.RWTC.D,PET.RBRTE.D:3:90",
+    "note": "",
+    "period": "2026-11-17",
+    "request": {
+     "action": "rolling_correlation",
+     "body": {
+      "end": "2026-11-21",
+      "series_a": "PET.RWTC.D",
+      "series_b": "PET.RBRTE.D",
+      "start": "2023-11-21",
+      "window": 90
+     },
+     "tool": "rolling_correlation"
+    },
+    "series_ids": [
+     "PET.RWTC.D",
+     "PET.RBRTE.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily and Europe Brent Spot Price FOB, Daily: rolling correlation, last 3 years",
+    "units": "correlation coefficient",
+    "values": {
+     "current_correlation": 0.850021,
+     "max_correlation": 0.987752,
+     "mean_correlation": 0.945662,
+     "min_correlation": 0.830459,
+     "observations": 736.0,
+     "overall_correlation": 0.959925,
+     "window": 90.0,
+     "years": 3.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily and Europe Brent Spot Price FOB, Daily: rolling correlation, last 3 years on 2026-11-17: observations 736.00, window 90.00, overall_correlation 0.96, current_correlation 0.85, min_correlation 0.83, max_correlation 0.99, mean_correlation 0.95, years 3.00."
  },
  "brent_wti_spread": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [],
   "readings": [],
@@ -175,27 +217,25 @@
     "extras": {
      "p10": 2.03,
      "p90": 9.71,
-     "percentile": 17.4,
+     "percentile": 33.9,
      "percentile_years": 3.0
     },
     "name_a": "Europe Brent Spot Price FOB, Daily",
     "name_b": "Cushing, OK WTI Spot Price FOB, Daily",
     "note": "",
-    "period": "2026-11-11",
+    "period": "2026-11-17",
     "series_a": "PET.RBRTE.D",
     "series_b": "PET.RWTC.D",
-    "spread": 2.52,
+    "spread": 3.41,
     "units": "Dollars per Barrel",
-    "value_a": 92.14,
-    "value_b": 89.62
+    "value_a": 92.94,
+    "value_b": 89.53
    }
   ],
-  "summary": "Europe Brent Spot Price FOB, Daily was 92.14 and Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11: a spread of 2.52."
+  "summary": "Europe Brent Spot Price FOB, Daily was 92.94 and Cushing, OK WTI Spot Price FOB, Daily was 89.53 Dollars per Barrel on 2026-11-17: a spread of 3.41."
  },
  "crack_321": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RWTC.D, PET.EER_EPMRU_PF4_RGC_DPG.D, PET.EER_EPD2F_PF4_Y35NY_DPG.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [
    "crack:3-2-1"
   ],
@@ -207,7 +247,8 @@
     "hypothetical": false,
     "key": "crack:3-2-1",
     "note": "products minus crude, spot prices; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude",
-    "period": "2026-11-11",
+    "period": "2026-11-17",
+    "request": null,
     "series_ids": [
      "PET.RWTC.D",
      "PET.EER_EPMRU_PF4_RGC_DPG.D",
@@ -216,27 +257,26 @@
     "title": "3-2-1 crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil",
     "units": "Dollars per Barrel",
     "values": {
-     "crack": 38.368,
+     "crack": 34.846,
      "crack_p10": 14.686,
      "crack_p90": 56.872,
-     "crack_percentile": 78.3,
-     "crude": 89.62,
-     "distillate_per_barrel": 170.772,
-     "distillate_per_gallon": 4.066,
+     "crack_percentile": 76.6,
+     "crude": 89.53,
+     "distillate_per_barrel": 166.32,
+     "distillate_per_gallon": 3.96,
      "gallons_per_barrel": 42.0,
-     "gasoline_per_barrel": 106.596,
-     "gasoline_per_gallon": 2.538,
+     "gasoline_per_barrel": 103.404,
+     "gasoline_per_gallon": 2.462,
      "percentile_years": 3.0
     }
    }
   ],
   "spreads": [],
-  "summary": "3-2-1 crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil on 2026-11-11: crack 38.37, crude 89.62, gasoline_per_gallon 2.54, distillate_per_gallon 4.07, gasoline_per_barrel 106.60, distillate_per_barrel 170.77, gallons_per_barrel 42.00, crack_percentile 78.30, percentile_years 3.00, crack_p10 14.69, crack_p90 56.87."
+  "summary": "3-2-1 crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil on 2026-11-17: crack 34.85, crude 89.53, gasoline_per_gallon 2.46, distillate_per_gallon 3.96, gasoline_per_barrel 103.40, distillate_per_barrel 166.32, gallons_per_barrel 42.00, crack_percentile 76.60, percentile_years 3.00, crack_p10 14.69, crack_p90 56.87."
  },
  "crude_tight": {
   "caveats": [
-   "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 12.2 of three years (2026-11-10; tight above 70, loose below 30; since 2018-11-13 this line has read tight 12% of the time and loose 48%).",
-   "Not current as of 2026-11-18: PET.RWTC.D, PET.RBRTE.D, PET.EER_EPMRU_PF4_RGC_DPG.D, PET.EER_EPD2F_PF4_Y35NY_DPG.D end on 2026-11-11 (7 days ago)."
+   "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 10.3 of three years (2026-11-17; tight above 70, loose below 30; since 2018-11-20 this line has read tight 12% of the time and loose 48%)."
   ],
   "cites": [
    "evidence:crude_tightness"
@@ -244,12 +284,13 @@
   "facts": [],
   "readings": [
    {
-    "context": "Time structure, tight (3 of 4 lines): Brent futures curve: M1 is 14.55 above M12, 15.74% of M1 (2026-11-16; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-12 to 2024-04-05) [tight]; WTI futures curve: M1 is 12.88 above M12, 15.11% of M1 (2026-11-18; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-12 to 2024-04-05) [tight]; WTI spot: 4.19 dollars above its 2027-01 future (2026-11-11; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [tight]; Brent spot: 0.62 dollars below its 2027-01 future (2026-11-11; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [neutral]. US crude stocks, neutral (2 of 3 lines): US crude stocks over four weeks: a draw of 1,160 thousand barrels against a usual build of 7,411 for the time of year, a gap of 2.07% of stocks (2026-11-06; tight below -2%, loose above 2%; since 2018-11-16 this line has read tight 24% of the time and loose 22%) [tight]; US commercial crude stocks: 4.29% below the five-year average for the week (2026-11-06; tight below -5%, loose above 5%; since 2018-11-16 this line has read tight 28% of the time and loose 18%) [neutral]; Cushing crude stocks: percentile 67.9 of their own last three years (2026-11-06; tight below 20, loose above 80; since 2018-11-16 this line has read tight 34% of the time and loose 8%) [neutral]. Refining demand, tight (2 of 2 lines): US refinery utilisation: 95.2% of capacity, 5.66 points above the five-year average for the week (2026-11-06; tight more than 3 points above, loose more than 3 points below; since 2018-11-16 this line has read tight 37% of the time and loose 16%) [tight]; 3-2-1 crack spread: 38.37 dollars per barrel, percentile 78.3 of three years (2026-11-11; tight above 70, loose below 30; since 2018-11-12 this line has read tight 41% of the time and loose 28%) [tight]. Sentiment (shown, not counted), loose (1 of 1 lines): Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 12.2 of three years (2026-11-10; tight above 70, loose below 30; since 2018-11-13 this line has read tight 12% of the time and loose 48%) [loose].",
-    "counter": "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 12.2 of three years (2026-11-10; tight above 70, loose below 30; since 2018-11-13 this line has read tight 12% of the time and loose 48%).",
+    "context": "Time structure, tight (3 of 4 lines): Brent futures curve: M1 is 15.09 above M12, 16.41% of M1 (2026-11-19; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-15 to 2024-04-05) [tight]; WTI futures curve: M1 is 11.01 above M12, 13.09% of M1 (2026-11-20; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-15 to 2024-04-05) [tight]; WTI spot: 4.88 dollars above its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [tight]; Brent spot: 0.20 dollars below its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [neutral]. US crude stocks, neutral (3 of 3 lines): US commercial crude stocks: 3.65% below the five-year average for the week (2026-11-13; tight below -5%, loose above 5%; since 2018-11-16 this line has read tight 28% of the time and loose 18%) [neutral]; US crude stocks over four weeks: a build of 5,280 thousand barrels against a usual build of 5,492 for the time of year, a gap of 0.05% of stocks (2026-11-13; tight below -2%, loose above 2%; since 2018-11-16 this line has read tight 24% of the time and loose 22%) [neutral]; Cushing crude stocks: percentile 63.5 of their own last three years (2026-11-13; tight below 20, loose above 80; since 2018-11-16 this line has read tight 34% of the time and loose 8%) [neutral]. Refining demand, tight (2 of 2 lines): US refinery utilisation: 95.7% of capacity, 5.76 points above the five-year average for the week (2026-11-13; tight more than 3 points above, loose more than 3 points below; since 2018-11-16 this line has read tight 37% of the time and loose 16%) [tight]; 3-2-1 crack spread: 34.85 dollars per barrel, percentile 76.6 of three years (2026-11-17; tight above 70, loose below 30; since 2018-11-15 this line has read tight 42% of the time and loose 27%) [tight]. Sentiment (shown, not counted), loose (1 of 1 lines): Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 10.3 of three years (2026-11-17; tight above 70, loose below 30; since 2018-11-20 this line has read tight 12% of the time and loose 48%) [loose].",
+    "counter": "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at percentile 10.3 of three years (2026-11-17; tight above 70, loose below 30; since 2018-11-20 this line has read tight 12% of the time and loose 48%).",
     "hypothetical": false,
     "key": "evidence:crude_tightness",
-    "note": "The evidence points to a tight market: of 3 groups of physical evidence, 2 read tight, 0 loose and 1 neutral (time structure tight, 3 of 4 lines, US crude stocks neutral, 2 of 3 lines, refining demand tight, 2 of 2 lines). The lines inside a group measure nearly the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its lines do. Fund positioning is sentiment: it reads loose and is shown but not counted. Each line states its threshold and, where eight years of history exist, how often it has read tight and loose, so a line that usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it is not a forecast. Whether a high crack spread is evidence of crude tightness is a judgement, not a threshold. Without that line, refining demand reads tight and the evidence points to a tight market, so today's verdict does not depend on it.",
-    "period": "2026-11-18",
+    "note": "The evidence points to a tight market: of 3 groups of physical evidence, 2 read tight, 0 loose and 1 neutral (time structure tight, 3 of 4 lines, US crude stocks neutral, 3 of 3 lines, refining demand tight, 2 of 2 lines). The lines inside a group measure nearly the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its lines do. Fund positioning is sentiment: it reads loose and is shown but not counted. Each line states its threshold and, where eight years of history exist, how often it has read tight and loose, so a line that usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it is not a forecast. Whether a high crack spread is evidence of crude tightness is a judgement, not a threshold. Without that line, refining demand reads tight and the evidence points to a tight market, so today's verdict does not depend on it.",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.M1.D",
      "ICE.BRENT.M2.D",
@@ -289,21 +330,21 @@
     "title": "Is the crude market tight? Evidence for and against, in groups",
     "units": "percent, dollars per barrel, thousand barrels (stated on each line)",
     "values": {
-     "brent_M1_minus_M12": 14.55,
+     "brent_M1_minus_M12": 15.09,
      "brent_curve_verdict": 1.0,
-     "brent_slope_pct": 15.74,
-     "brent_spot_minus_its_future": -0.62,
+     "brent_slope_pct": 16.41,
+     "brent_spot_minus_its_future": -0.2,
      "brent_spot_premium_verdict": 0.0,
-     "crack_loose_share_pct": 28.0,
-     "crack_spread": 38.368,
-     "crack_spread_percentile": 78.3,
-     "crack_tight_share_pct": 40.8,
+     "crack_loose_share_pct": 27.3,
+     "crack_spread": 34.846,
+     "crack_spread_percentile": 76.6,
+     "crack_tight_share_pct": 42.2,
      "crack_verdict": 1.0,
      "cushing_stocks_loose_share_pct": 7.7,
-     "cushing_stocks_percentile": 67.9,
-     "cushing_stocks_tight_share_pct": 33.6,
+     "cushing_stocks_percentile": 63.5,
+     "cushing_stocks_tight_share_pct": 33.5,
      "cushing_stocks_verdict": 0.0,
-     "fund_net_percentile": 12.2,
+     "fund_net_percentile": 10.3,
      "fund_positioning_loose_share_pct": 48.3,
      "fund_positioning_tight_share_pct": 11.5,
      "fund_positioning_verdict": -1.0,
@@ -313,35 +354,35 @@
      "groups_tight": 2.0,
      "lines": 10.0,
      "refinery_utilisation_loose_share_pct": 15.6,
-     "refinery_utilisation_pct": 95.2,
-     "refinery_utilisation_tight_share_pct": 37.3,
+     "refinery_utilisation_pct": 95.7,
+     "refinery_utilisation_tight_share_pct": 37.4,
      "refinery_utilisation_verdict": 1.0,
-     "refinery_utilisation_vs_5y_points": 5.66,
+     "refinery_utilisation_vs_5y_points": 5.76,
      "refining_group_verdict": 1.0,
      "sentiment_group_verdict": -1.0,
      "stocks_group_verdict": 0.0,
      "structure_group_verdict": 1.0,
-     "us_stocks_4w_change": -1160.0,
-     "us_stocks_4w_gap_pct": -2.07,
-     "us_stocks_4w_loose_share_pct": 21.9,
+     "us_stocks_4w_change": 5280.0,
+     "us_stocks_4w_gap_pct": -0.05,
+     "us_stocks_4w_loose_share_pct": 21.8,
      "us_stocks_4w_tight_share_pct": 24.5,
-     "us_stocks_4w_usual_change": 7411.2,
-     "us_stocks_4w_verdict": 1.0,
-     "us_stocks_vs_5y_loose_share_pct": 18.3,
-     "us_stocks_vs_5y_pct": -4.29,
+     "us_stocks_4w_usual_change": 5492.2,
+     "us_stocks_4w_verdict": 0.0,
+     "us_stocks_vs_5y_loose_share_pct": 18.2,
+     "us_stocks_vs_5y_pct": -3.65,
      "us_stocks_vs_5y_tight_share_pct": 28.1,
      "us_stocks_vs_5y_verdict": 0.0,
-     "wti_M1_minus_M12": 12.88,
+     "wti_M1_minus_M12": 11.01,
      "wti_curve_verdict": 1.0,
-     "wti_front_above_fourth_month_share_pct": 62.3,
-     "wti_slope_pct": 15.11,
-     "wti_spot_minus_its_future": 4.19,
+     "wti_front_above_fourth_month_share_pct": 62.4,
+     "wti_slope_pct": 13.09,
+     "wti_spot_minus_its_future": 4.88,
      "wti_spot_premium_verdict": 1.0
     }
    }
   ],
   "spreads": [],
-  "summary": "Is the crude market tight? Evidence for and against, in groups on 2026-11-18: groups_counted 3.00, groups_tight 2.00, groups_loose 0.00, groups_neutral 1.00, lines 10.00, structure_group_verdict 1.00, stocks_group_verdict 0.00, refining_group_verdict 1.00, sentiment_group_verdict -1.00, brent_M1_minus_M12 14.55, brent_slope_pct 15.74, wti_front_above_fourth_month_share_pct 62.30, brent_curve_verdict 1.00, wti_M1_minus_M12 12.88, wti_slope_pct 15.11, wti_curve_verdict 1.00, wti_spot_minus_its_future 4.19, wti_spot_premium_verdict 1.00, brent_spot_minus_its_future -0.62, brent_spot_premium_verdict 0.00, us_stocks_vs_5y_pct -4.29, us_stocks_vs_5y_tight_share_pct 28.10, us_stocks_vs_5y_loose_share_pct 18.30, us_stocks_vs_5y_verdict 0.00, us_stocks_4w_change down 1160.00, us_stocks_4w_usual_change up 7411.20, us_stocks_4w_gap_pct -2.07, us_stocks_4w_tight_share_pct 24.50, us_stocks_4w_loose_share_pct 21.90, us_stocks_4w_verdict 1.00, cushing_stocks_percentile 67.90, cushing_stocks_tight_share_pct 33.60, cushing_stocks_loose_share_pct 7.70, cushing_stocks_verdict 0.00, refinery_utilisation_pct 95.20, refinery_utilisation_vs_5y_points 5.66, refinery_utilisation_tight_share_pct 37.30, refinery_utilisation_loose_share_pct 15.60, refinery_utilisation_verdict 1.00, crack_spread 38.37, crack_spread_percentile 78.30, crack_tight_share_pct 40.80, crack_loose_share_pct 28.00, crack_verdict 1.00, fund_net_percentile 12.20, fund_positioning_tight_share_pct 11.50, fund_positioning_loose_share_pct 48.30, fund_positioning_verdict -1.00."
+  "summary": "Is the crude market tight? Evidence for and against, in groups on 2026-11-20: groups_counted 3.00, groups_tight 2.00, groups_loose 0.00, groups_neutral 1.00, lines 10.00, structure_group_verdict 1.00, stocks_group_verdict 0.00, refining_group_verdict 1.00, sentiment_group_verdict -1.00, brent_M1_minus_M12 15.09, brent_slope_pct 16.41, wti_front_above_fourth_month_share_pct 62.40, brent_curve_verdict 1.00, wti_M1_minus_M12 11.01, wti_slope_pct 13.09, wti_curve_verdict 1.00, wti_spot_minus_its_future 4.88, wti_spot_premium_verdict 1.00, brent_spot_minus_its_future -0.20, brent_spot_premium_verdict 0.00, us_stocks_vs_5y_pct -3.65, us_stocks_vs_5y_tight_share_pct 28.10, us_stocks_vs_5y_loose_share_pct 18.20, us_stocks_vs_5y_verdict 0.00, us_stocks_4w_change up 5280.00, us_stocks_4w_usual_change up 5492.20, us_stocks_4w_gap_pct -0.05, us_stocks_4w_tight_share_pct 24.50, us_stocks_4w_loose_share_pct 21.80, us_stocks_4w_verdict 0.00, cushing_stocks_percentile 63.50, cushing_stocks_tight_share_pct 33.50, cushing_stocks_loose_share_pct 7.70, cushing_stocks_verdict 0.00, refinery_utilisation_pct 95.70, refinery_utilisation_vs_5y_points 5.76, refinery_utilisation_tight_share_pct 37.40, refinery_utilisation_loose_share_pct 15.60, refinery_utilisation_verdict 1.00, crack_spread 34.85, crack_spread_percentile 76.60, crack_tight_share_pct 42.20, crack_loose_share_pct 27.30, crack_verdict 1.00, fund_net_percentile 10.30, fund_positioning_tight_share_pct 11.50, fund_positioning_loose_share_pct 48.30, fund_positioning_verdict -1.00."
  },
  "crude_vs_5y": {
   "caveats": [],
@@ -351,30 +392,48 @@
   "facts": [],
   "readings": [
    {
-    "context": "",
+    "context": "Same week (week=46) in each of 5 earlier years: 2021 434,020, 2022 431,665, 2023 448,054, 2024 430,292, 2025 424,155. The latest value is below the range of those years. delta_vs_avg = latest minus the average; pct_vs_avg = that difference in percent of the average.",
     "counter": "",
     "hypothetical": false,
     "key": "seasonal:PET.WCESTUS1.W:5",
     "note": "below the range",
-    "period": "2026-11-06",
+    "period": "2026-11-13",
+    "request": {
+     "action": "seasonal",
+     "body": {
+      "lookback_years": 5,
+      "series": "PET.WCESTUS1.W"
+     },
+     "tool": "seasonal"
+    },
     "series_ids": [
      "PET.WCESTUS1.W"
     ],
     "title": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year, previous 5 years",
     "units": "Thousand Barrels",
     "values": {
-     "difference": -18591.0,
-     "difference_pct": -4.293454,
-     "latest": 414417.0,
-     "prior_average": 433008.0,
-     "prior_high": 439354.0,
-     "prior_low": 427581.0,
-     "years": 5.0
+     "current_value": 417797.0,
+     "delta_vs_avg": -15840.2,
+     "lookback_years": 5.0,
+     "pct_vs_avg": -3.652869,
+     "percentile": 0.0,
+     "range_position": -0.266036,
+     "seasonal_avg": 433637.2,
+     "seasonal_max": 448054.0,
+     "seasonal_min": 424155.0,
+     "seasonal_std": 8845.658692,
+     "value_in_2021": 434020.0,
+     "value_in_2022": 431665.0,
+     "value_in_2023": 448054.0,
+     "value_in_2024": 430292.0,
+     "value_in_2025": 424155.0,
+     "years_of_history": 5.0,
+     "zscore": -1.790732
     }
    }
   ],
   "spreads": [],
-  "summary": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year, previous 5 years on 2026-11-06: latest 414417.00, prior_average 433008.00, difference -18591.00, difference_pct -4.29, prior_low 427581.00, prior_high 439354.00, years 5.00."
+  "summary": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year, previous 5 years on 2026-11-13: current_value 417797.00, lookback_years 5.00, years_of_history 5.00, seasonal_avg 433637.20, seasonal_min 424155.00, seasonal_max 448054.00, seasonal_std 8845.66, delta_vs_avg -15840.20, pct_vs_avg -3.65, zscore -1.79, percentile 0.00, range_position -0.27, value_in_2021 434020.00, value_in_2022 431665.00, value_in_2023 448054.00, value_in_2024 430292.00, value_in_2025 424155.00."
  },
  "cushing_4w": {
   "caveats": [],
@@ -382,14 +441,14 @@
   "facts": [
    {
     "also": {
-     "million_barrels": 27.356
+     "million_barrels": 26.147
     },
-    "base_period": "2026-10-09",
-    "base_value": 26607.0,
-    "change_abs": 749.0,
-    "change_pct": 2.815049,
-    "latest_period": "2026-11-06",
-    "latest_value": 27356.0,
+    "base_period": "2026-10-16",
+    "base_value": 27594.0,
+    "change_abs": -1447.0,
+    "change_pct": -5.243894,
+    "latest_period": "2026-11-13",
+    "latest_value": 26147.0,
     "lookback_days": 28,
     "name": "Cushing, OK Ending Stocks excluding SPR of Crude Oil, Weekly",
     "series_id": "PET.W_EPC0_SAX_YCUOK_MBBL.W",
@@ -398,12 +457,59 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Cushing, OK Ending Stocks excluding SPR of Crude Oil, Weekly was 27356.00 Thousand Barrels on 2026-11-06, up 749.00 (2.82%) from 26607.00 on 2026-10-09, 28 days earlier."
+  "summary": "Cushing, OK Ending Stocks excluding SPR of Crude Oil, Weekly was 26147.00 Thousand Barrels on 2026-11-13, down 1447.00 (5.24%) from 27594.00 on 2026-10-16, 28 days earlier."
+ },
+ "describe_wti": {
+  "caveats": [],
+  "cites": [
+   "describe:PET.RWTC.D"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Cushing, OK WTI Spot Price FOB Source: Thomson-Reuters; publisher U.S. Energy Information Administration (EIA). Coverage 1986-01-02 to 2026-11-17. Health: ok. Used by: eia_weekly; contradictions refiner_margin_trap, diesel_clean_long, gasoline_overhang, freight_locked_arb, fundamental_rally, supply_shock_signature, arb_shut_but_eu_drawing, rotterdam_squeeze, opec_revision_vs_price.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "describe:PET.RWTC.D",
+    "note": "",
+    "period": "2026-11-17",
+    "request": {
+     "action": "describe",
+     "body": {
+      "series_id": "PET.RWTC.D"
+     },
+     "tool": "describe"
+    },
+    "series_ids": [
+     "PET.RWTC.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily: the series card",
+    "units": "Dollars per Barrel",
+    "values": {
+     "coverage.gaps": 0.0,
+     "coverage.observations": 10296.0,
+     "coverage.typical_step_days": 1.0,
+     "freshness.days_since_period_end": 4.0,
+     "freshness.threshold_days": 7.0,
+     "latest.change": 0.29000000000000625,
+     "latest.change_pct": 0.32496638278799445,
+     "latest.previous.value": 89.24,
+     "latest.value": 89.53,
+     "stats.max.value": 145.31,
+     "stats.mean": 48.87690073815073,
+     "stats.min.value": -36.98,
+     "stats.observations": 10296.0,
+     "stats.percentile_of_latest": 87.48543123543124,
+     "stats.std": 29.729842478448344,
+     "stats.z_of_latest": 1.367417243845788
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: the series card on 2026-11-17: latest.value 89.53, latest.previous.value 89.24, latest.change up 0.29, latest.change_pct up 0.32, coverage.observations 10296.00, coverage.typical_step_days 1.00, coverage.gaps 0.00, stats.observations 10296.00, stats.min.value -36.98, stats.max.value 145.31, stats.mean 48.88, stats.percentile_of_latest 87.49, stats.std 29.73, stats.z_of_latest 1.37, freshness.days_since_period_end 4.00, freshness.threshold_days 7.00."
  },
  "dictated_caveat": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RWTC.D ends on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [
    {
@@ -412,8 +518,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-11",
-    "latest_value": 89.62,
+    "latest_period": "2026-11-17",
+    "latest_value": 89.53,
     "lookback_days": null,
     "name": "Cushing, OK WTI Spot Price FOB, Daily",
     "series_id": "PET.RWTC.D",
@@ -422,7 +528,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11."
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.53 Dollars per Barrel on 2026-11-17."
  },
  "dubai_price": {
   "caveats": [
@@ -436,8 +542,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-17",
-    "latest_value": 92.186,
+    "latest_period": "2026-11-19",
+    "latest_value": 91.465,
     "lookback_days": null,
     "name": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F)",
     "series_id": "NYMEX.DUBAI.FRONT.D",
@@ -446,7 +552,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 92.19 USD/bbl on 2026-11-17."
+  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 91.47 USD/bbl on 2026-11-19."
  },
  "dubai_vs_brent": {
   "caveats": [
@@ -460,8 +566,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-17",
-    "latest_value": 92.186,
+    "latest_period": "2026-11-19",
+    "latest_value": 91.465,
     "lookback_days": null,
     "name": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F)",
     "series_id": "NYMEX.DUBAI.FRONT.D",
@@ -473,8 +579,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-17",
-    "latest_value": 93.07,
+    "latest_period": "2026-11-20",
+    "latest_value": 92.56,
     "lookback_days": null,
     "name": "Brent futures M1 (constant maturity, 1st nearby; NYMEX BZ, settles on ICE Brent)",
     "series_id": "ICE.BRENT.M1.D",
@@ -483,7 +589,149 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 92.19 USD/bbl on 2026-11-17. Brent futures M1 (constant maturity, 1st nearby; NYMEX BZ, settles on ICE Brent) was 93.07 USD/bbl on 2026-11-17."
+  "summary": "Dubai crude oil (Platts) financial futures, front month (Yahoo DCB=F) was 91.47 USD/bbl on 2026-11-19. Brent futures M1 (constant maturity, 1st nearby; NYMEX BZ, settles on ICE Brent) was 92.56 USD/bbl on 2026-11-20."
+ },
+ "eia_weekly_brief": {
+  "caveats": [],
+  "cites": [
+   "report:eia_weekly"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Headline: Distillate stocks at an extreme seasonal low, crude stocks below their seasonal range with refineries running hot and production at a seasonal high. 5 signals firing: distillate_undersupplied, crude_undersupplied, production_at_seasonal_high, refinery_strong\u2026 (no contradiction evaluated \u2014 12 of the catalog's conjunctions need legs this panel does not measure) Lede: Regular gasoline fell by 0.19, to 3.81 Dollars per Gallon, a 2.2-sigma move for this series, leaving it at the 100th percentile of the same-week window across 5 prior years. Also: Crude imports fell by 1,122, to 5,576 Thousand Barrels per Day, a 1.8-sigma move for this series, leaving it at the 10th percentile of the same-week window across 5 prior years. Also: Heating oil (residential) fell by 0.20, to 5.72 Dollars per Gallon, a 1.6-sigma move for this series, leaving it at the 90th percentile of the same-week window across 5 prior years. Also: Total gasoline rose by 5.19, to 215.9 Million Barrels, a 1.6-sigma move for this series, leaving it at the 84th percentile of the same-week window across 5 prior years. Extreme: Crude oil (excl. SPR) sits at the 0th percentile of the same-week window across 5 prior years (417.8 Million Barrels). Extreme: Distillate fuel oil sits at the 0th percentile of the same-week window across 5 prior years (104.9 Million Barrels). Extreme: SPR sits at the 0th percentile of the same-week window across 5 prior years (276.4 Million Barrels). Extreme: Crude production sits at the 100th percentile of the same-week window across 5 prior years (14,032 Thousand Barrels per Day). Signal firing: distillate_undersupplied (extreme): distillate stocks seasonal percentile of 0 is below the 20 threshold. Signal firing: crude_undersupplied (extreme): crude stocks seasonal percentile of 0 is below the 20 threshold. Signal firing: production_at_seasonal_high (extreme): US crude production seasonal percentile of 100 is at or above the 99 threshold. Signal firing: refinery_strong (extreme): US refinery utilization (%) of 95.7 exceeds the 92 threshold. Signal firing: crude_building (elevated): crude_stock_wow of 3.38 exceeds the 1 threshold. Rows: value is the latest; wow and yoy are the change on the week and on the year in the row's unit; move_z is how unusual this week's move is; seasonal_percentile ranks the level against the same week of earlier years.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "report:eia_weekly",
+    "note": "written by the server's rules, the same text on every run",
+    "period": "2026-11-17",
+    "request": {
+     "action": "report",
+     "body": {
+      "preset": "eia_weekly"
+     },
+     "tool": "report"
+    },
+    "series_ids": [
+     "PET.EER_EPD2F_PF4_Y35NY_DPG.D",
+     "PET.EER_EPLLPA_PF4_Y44MB_DPG.D",
+     "PET.EER_EPMRU_PF4_Y35NY_DPG.D",
+     "PET.EMD_EPD2D_PTE_NUS_DPG.W",
+     "PET.EMM_EPMR_PTE_NUS_DPG.W",
+     "PET.RBRTE.D",
+     "PET.RWTC.D",
+     "PET.WCESTUS1.W",
+     "PET.WCRFPUS2.W",
+     "PET.WCRIMUS2.W",
+     "PET.WCSSTUS1.W",
+     "PET.WDISTUS1.W",
+     "PET.WDIUPUS2.W",
+     "PET.WGFUPUS2.W",
+     "PET.WGTSTUS1.W",
+     "PET.WPRSTUS1.W",
+     "PET.WPULEUS3.W",
+     "PET.W_EPC0_SAX_YCUOK_MBBL.W",
+     "PET.W_EPD2F_PRS_NUS_DPG.W",
+     "PET.W_EPLLPA_PRS_NUS_DPG.W"
+    ],
+    "title": "US weekly petroleum, standing report as of 2026-11-17",
+    "units": "Dollars per Barrel; Dollars per Gallon; Percent; Thousand Barrels; Thousand Barrels per Day",
+    "values": {
+     "Crude imports.level_z": -1.47,
+     "Crude imports.move_z": -1.76,
+     "Crude imports.seasonal_percentile": 10.5,
+     "Crude imports.value": 5576.0,
+     "Crude imports.wow": -1122.0,
+     "Crude imports.yoy": -374.0,
+     "Crude oil (excl. SPR).level_z": -0.86,
+     "Crude oil (excl. SPR).move_z": 0.71,
+     "Crude oil (excl. SPR).seasonal_percentile": 0.0,
+     "Crude oil (excl. SPR).value": 417797.0,
+     "Crude oil (excl. SPR).wow": 3380.0,
+     "Crude oil (excl. SPR).yoy": -6358.0,
+     "Crude production.level_z": 1.46,
+     "Crude production.move_z": 0.09,
+     "Crude production.seasonal_percentile": 100.0,
+     "Crude production.value": 14032.0,
+     "Crude production.wow": 19.0,
+     "Crude production.yoy": 198.0,
+     "Cushing, OK.level_z": -0.2,
+     "Cushing, OK.move_z": -1.17,
+     "Cushing, OK.seasonal_percentile": 73.7,
+     "Cushing, OK.value": 26147.0,
+     "Cushing, OK.wow": -1209.0,
+     "Cushing, OK.yoy": 4326.0,
+     "Distillate fuel oil.level_z": -1.38,
+     "Distillate fuel oil.move_z": 0.6,
+     "Distillate fuel oil.seasonal_percentile": 0.0,
+     "Distillate fuel oil.value": 104901.0,
+     "Distillate fuel oil.wow": 1571.0,
+     "Distillate fuel oil.yoy": -6179.0,
+     "Distillate product supplied.level_z": -0.09,
+     "Distillate product supplied.move_z": 0.85,
+     "Distillate product supplied.seasonal_percentile": 36.8,
+     "Distillate product supplied.value": 3785.0,
+     "Distillate product supplied.wow": 374.0,
+     "Distillate product supplied.yoy": -97.0,
+     "Gasoline product supplied.level_z": 0.02,
+     "Gasoline product supplied.move_z": 0.05,
+     "Gasoline product supplied.seasonal_percentile": 47.4,
+     "Gasoline product supplied.value": 8790.0,
+     "Gasoline product supplied.wow": 23.0,
+     "Gasoline product supplied.yoy": 262.0,
+     "Heating oil (residential).level_z": 2.47,
+     "Heating oil (residential).move_z": -1.6,
+     "Heating oil (residential).seasonal_percentile": 89.5,
+     "Heating oil (residential).value": 5.717,
+     "Heating oil (residential).wow": -0.198,
+     "Heating oil (residential).yoy": 1.953,
+     "No 2 diesel.level_z": 2.04,
+     "No 2 diesel.move_z": -1.43,
+     "No 2 diesel.seasonal_percentile": 100.0,
+     "No 2 diesel.value": 5.937,
+     "No 2 diesel.wow": -0.19,
+     "No 2 diesel.yoy": 2.069,
+     "Propane (residential).level_z": 1.35,
+     "Propane (residential).move_z": -0.2,
+     "Propane (residential).seasonal_percentile": 100.0,
+     "Propane (residential).value": 2.817,
+     "Propane (residential).wow": -0.007,
+     "Propane (residential).yoy": 0.357,
+     "Propane/propylene.level_z": 1.33,
+     "Propane/propylene.move_z": -0.02,
+     "Propane/propylene.seasonal_percentile": 78.9,
+     "Propane/propylene.value": 104211.0,
+     "Propane/propylene.wow": 12.0,
+     "Propane/propylene.yoy": -1150.0,
+     "Refinery utilization.level_z": 1.32,
+     "Refinery utilization.move_z": 0.29,
+     "Refinery utilization.seasonal_percentile": 100.0,
+     "Refinery utilization.value": 95.7,
+     "Refinery utilization.wow": 0.5,
+     "Refinery utilization.yoy": 5.7,
+     "Regular gasoline.level_z": 0.56,
+     "Regular gasoline.move_z": -2.17,
+     "Regular gasoline.seasonal_percentile": 100.0,
+     "Regular gasoline.value": 3.805,
+     "Regular gasoline.wow": -0.19,
+     "Regular gasoline.yoy": 0.743,
+     "SPR.level_z": -1.72,
+     "SPR.move_z": -0.76,
+     "SPR.seasonal_percentile": 0.0,
+     "SPR.value": 276361.0,
+     "SPR.wow": -3174.0,
+     "SPR.yoy": -134565.0,
+     "Total gasoline.level_z": -0.76,
+     "Total gasoline.move_z": 1.55,
+     "Total gasoline.seasonal_percentile": 84.2,
+     "Total gasoline.value": 215949.0,
+     "Total gasoline.wow": 5192.0,
+     "Total gasoline.yoy": 8558.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "US weekly petroleum, standing report as of 2026-11-17 on 2026-11-17: Crude oil (excl. SPR).value 417797.00, Crude oil (excl. SPR).wow 3380.00, Crude oil (excl. SPR).yoy -6358.00, Crude oil (excl. SPR).move_z 0.71, Crude oil (excl. SPR).seasonal_percentile 0.00, Crude oil (excl. SPR).level_z -0.86, Cushing, OK.value 26147.00, Cushing, OK.wow -1209.00, Cushing, OK.yoy 4326.00, Cushing, OK.move_z -1.17, Cushing, OK.seasonal_percentile 73.70, Cushing, OK.level_z -0.20, Total gasoline.value 215949.00, Total gasoline.wow 5192.00, Total gasoline.yoy 8558.00, Total gasoline.move_z 1.55, Total gasoline.seasonal_percentile 84.20, Total gasoline.level_z -0.76, Distillate fuel oil.value 104901.00, Distillate fuel oil.wow 1571.00, Distillate fuel oil.yoy -6179.00, Distillate fuel oil.move_z 0.60, Distillate fuel oil.seasonal_percentile 0.00, Distillate fuel oil.level_z -1.38, Propane/propylene.value 104211.00, Propane/propylene.wow 12.00, Propane/propylene.yoy -1150.00, Propane/propylene.move_z -0.02, Propane/propylene.seasonal_percentile 78.90, Propane/propylene.level_z 1.33, SPR.value 276361.00, SPR.wow -3174.00, SPR.yoy -134565.00, SPR.move_z -0.76, SPR.seasonal_percentile 0.00, SPR.level_z -1.72, Crude production.value 14032.00, Crude production.wow 19.00, Crude production.yoy 198.00, Crude production.move_z 0.09, Crude production.seasonal_percentile 100.00, Crude production.level_z 1.46, Crude imports.value 5576.00, Crude imports.wow -1122.00, Crude imports.yoy -374.00, Crude imports.move_z -1.76, Crude imports.seasonal_percentile 10.50, Crude imports.level_z -1.47, Refinery utilization.value 95.70, Refinery utilization.wow 0.50, Refinery utilization.yoy 5.70, Refinery utilization.move_z 0.29, Refinery utilization.seasonal_percentile 100.00, Refinery utilization.level_z 1.32, Gasoline product supplied.value 8790.00, Gasoline product supplied.wow 23.00, Gasoline product supplied.yoy 262.00, Gasoline product supplied.move_z 0.05, Gasoline product supplied.seasonal_percentile 47.40, Gasoline product supplied.level_z 0.02, Distillate product supplied.value 3785.00, Distillate product supplied.wow 374.00, Distillate product supplied.yoy -97.00, Distillate product supplied.move_z 0.85, Distillate product supplied.seasonal_percentile 36.80, Distillate product supplied.level_z -0.09, Regular gasoline.value 3.81, Regular gasoline.wow -0.19, Regular gasoline.yoy 0.74, Regular gasoline.move_z -2.17, Regular gasoline.seasonal_percentile 100.00, Regular gasoline.level_z 0.56, No 2 diesel.value 5.94, No 2 diesel.wow -0.19, No 2 diesel.yoy 2.07, No 2 diesel.move_z -1.43, No 2 diesel.seasonal_percentile 100.00, No 2 diesel.level_z 2.04, Heating oil (residential).value 5.72, Heating oil (residential).wow -0.20, Heating oil (residential).yoy 1.95, Heating oil (residential).move_z -1.60, Heating oil (residential).seasonal_percentile 89.50, Heating oil (residential).level_z 2.47, Propane (residential).value 2.82, Propane (residential).wow -0.01, Propane (residential).yoy 0.36, Propane (residential).move_z -0.20, Propane (residential).seasonal_percentile 100.00, Propane (residential).level_z 1.35."
  },
  "eu_gas_storage": {
   "caveats": [],
@@ -495,8 +743,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-16",
-    "latest_value": 70.15,
+    "latest_period": "2026-11-19",
+    "latest_value": 69.59,
     "lookback_days": null,
     "name": "European Union gas storage \u2014 storage fullness (gas in storage / working gas volume)",
     "series_id": "AGSI.EU.FULL_PCT.D",
@@ -505,12 +753,10 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "European Union gas storage \u2014 storage fullness (gas in storage / working gas volume) was 70.15 % on 2026-11-16."
+  "summary": "European Union gas storage \u2014 storage fullness (gas in storage / working gas volume) was 69.59 % on 2026-11-19."
  },
  "follow_up": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D ends on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [
    {
@@ -519,8 +765,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-11",
-    "latest_value": 92.14,
+    "latest_period": "2026-11-17",
+    "latest_value": 92.94,
     "lookback_days": null,
     "name": "Europe Brent Spot Price FOB, Daily",
     "series_id": "PET.RBRTE.D",
@@ -529,7 +775,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Europe Brent Spot Price FOB, Daily was 92.14 Dollars per Barrel on 2026-11-11."
+  "summary": "Europe Brent Spot Price FOB, Daily was 92.94 Dollars per Barrel on 2026-11-17."
  },
  "freight_history": {
   "caveats": [],
@@ -539,34 +785,46 @@
   "facts": [],
   "readings": [
    {
-    "context": "It has been above the 90th percentile line (257.35) since 2026-07-30, 110 days, allowing for brief dips back. There is no earlier spell beyond that line in the window.",
+    "context": "Ranked against 753 values from 2023-11-21 to 2026-11-20. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean.",
     "counter": "",
     "hypothetical": false,
     "key": "percentile:SHIP.BWET.D:3",
     "note": "percentile 0 = lowest of the window, 100 = highest",
-    "period": "2026-11-17",
+    "period": "2026-11-20",
+    "request": {
+     "action": "percentile",
+     "body": {
+      "end": "2026-11-21",
+      "series": "SHIP.BWET.D",
+      "start": "2023-11-21"
+     },
+     "tool": "percentile"
+    },
     "series_ids": [
      "SHIP.BWET.D"
     ],
     "title": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years",
     "units": "USD",
     "values": {
-     "average": 101.748149,
-     "high": 1012.75,
-     "latest": 647.86,
-     "low": 9.06,
+     "max": 1012.75,
+     "mean": 104.609313,
+     "median": 17.225,
+     "min": 9.06,
      "observations": 753.0,
-     "p10": 10.815,
-     "p90": 257.35,
-     "percentile": 94.4,
-     "spell_days": 110.0,
+     "p25": 12.465,
+     "p5": 10.421,
+     "p75": 55.38,
+     "p95": 703.4406,
+     "percentile": 96.015936,
+     "std": 211.431908,
+     "target_value": 745.77,
      "years": 3.0,
-     "z_score": 2.63
+     "zscore": 3.032469
     }
    }
   ],
   "spreads": [],
-  "summary": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years on 2026-11-17: latest 647.86, percentile 94.40, low 9.06, high 1012.75, average 101.75, z_score 2.63, observations 753.00, years 3.00, p10 10.81, p90 257.35, spell_days 110.00."
+  "summary": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years on 2026-11-20: target_value 745.77, observations 753.00, mean 104.61, std 211.43, min 9.06, max 1012.75, p5 10.42, p25 12.46, median 17.23, p75 55.38, p95 703.44, zscore 3.03, percentile 96.02, years 3.00."
  },
  "futures_crack": {
   "caveats": [],
@@ -581,7 +839,8 @@
     "hypothetical": false,
     "key": "fcrack:3-2-1",
     "note": "All three legs are the 2026-12 delivery contract. Products minus crude; 3-2-1 = (2 x gasoline + 1 x distillate) / 3 - crude. The percentile ranks today against this contract set's own history (up to three years).",
-    "period": "2026-11-18",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "NYMEX.WTI.2026-12.D",
      "NYMEX.RBOB.2026-12.D",
@@ -590,37 +849,36 @@
     "title": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil",
     "units": "Dollars per Barrel",
     "values": {
-     "crack": 41.158,
+     "crack": 41.1288,
      "crack_p10": 16.6446,
      "crack_p90": 44.976,
-     "crack_percentile": 87.9,
-     "crude": 85.22,
-     "distillate_per_gallon": 4.03,
+     "crack_percentile": 87.7,
+     "crude": 84.09,
+     "distillate_per_gallon": 3.9394,
      "gallons_per_barrel": 42.0,
-     "gasoline_per_gallon": 2.4985,
+     "gasoline_per_gallon": 2.5024,
      "observations": 755.0
     }
    }
   ],
   "spreads": [],
-  "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-18: crack 41.16, crude 85.22, gasoline_per_gallon 2.50, distillate_per_gallon 4.03, gallons_per_barrel 42.00, crack_percentile 87.90, observations 755.00, crack_p10 16.64, crack_p90 44.98."
+  "summary": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil on 2026-11-20: crack 41.13, crude 84.09, gasoline_per_gallon 2.50, distillate_per_gallon 3.94, gallons_per_barrel 42.00, crack_percentile 87.70, observations 755.00, crack_p10 16.64, crack_p90 44.98."
  },
  "futures_spread": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [
    "fspread:brent_wti"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "The futures spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-22 (29 days), reaching 8.30. Spot prices are published days later than futures. On 2026-11-11, the latest date with both, spot Brent minus spot WTI was 2.52 (percentile 17.4 of its last three years) while the 2027-01 futures spread was 7.33. The 4.81 difference is the gap between spot and futures in each market: spot Brent stood 0.62 below its 2027-01 future and spot WTI 4.19 above its own.",
+    "context": "The futures spread has been above the 90th percentile line (6.73) since 2026-09-08, 73 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-19 (26 days), reaching 8.30. Spot prices are published days later than futures. On 2026-11-17, the latest date with both, spot Brent minus spot WTI was 3.41 (percentile 33.9 of its last three years) while the 2027-01 futures spread was 8.49. The 5.08 difference is the gap between spot and futures in each market: spot Brent stood 0.20 below its 2027-01 future and spot WTI 4.88 above its own.",
     "counter": "",
     "hypothetical": false,
     "key": "fspread:brent_wti",
     "note": "Both legs are the 2027-01 delivery contract, the nearest month both still trade, so the spread compares like with like. The percentile ranks today against this contract pair's own history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent.",
-    "period": "2026-11-17",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.2027-01.D",
      "NYMEX.WTI.2027-01.D",
@@ -630,71 +888,84 @@
     "title": "Brent minus WTI on futures, 2027-01 delivery",
     "units": "USD/bbl",
     "values": {
-     "brent": 93.07,
-     "brent_minus_wti": 8.42,
-     "futures_spread_on_spot_date": 7.33,
-     "observations": 754.0,
-     "spot_brent": 92.14,
-     "spot_brent_minus_its_future": -0.62,
-     "spot_brent_minus_wti": 2.52,
-     "spot_minus_futures_spread": -4.81,
-     "spot_spread_percentile": 17.4,
-     "spot_wti": 89.62,
-     "spot_wti_minus_its_future": 4.19,
-     "spread_days_since_previous_spell": 179.0,
+     "brent": 92.56,
+     "brent_minus_wti": 8.94,
+     "futures_spread_on_spot_date": 8.49,
+     "observations": 755.0,
+     "spot_brent": 92.94,
+     "spot_brent_minus_its_future": -0.2,
+     "spot_brent_minus_wti": 3.41,
+     "spot_minus_futures_spread": -5.08,
+     "spot_spread_percentile": 33.9,
+     "spot_wti": 89.53,
+     "spot_wti_minus_its_future": 4.88,
+     "spread_days_since_previous_spell": 185.0,
      "spread_p10": 3.61,
-     "spread_p90": 6.69,
-     "spread_percentile": 96.4,
-     "spread_previous_spell_days": 29.0,
+     "spread_p90": 6.73,
+     "spread_percentile": 96.7,
+     "spread_previous_spell_days": 26.0,
      "spread_previous_spell_extreme": 8.3,
-     "spread_spell_days": 70.0,
-     "wti": 84.65
+     "spread_spell_days": 73.0,
+     "wti": 83.62
     }
    }
   ],
   "spreads": [],
-  "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-17: brent 93.07, wti 84.65, brent_minus_wti 8.42, spread_percentile 96.40, observations 754.00, spread_p10 3.61, spread_p90 6.69, spread_spell_days 70.00, spread_previous_spell_days 29.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 179.00, spot_brent 92.14, spot_wti 89.62, spot_brent_minus_wti 2.52, spot_spread_percentile 17.40, futures_spread_on_spot_date 7.33, spot_minus_futures_spread -4.81, spot_brent_minus_its_future -0.62, spot_wti_minus_its_future 4.19."
+  "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-20: brent 92.56, wti 83.62, brent_minus_wti 8.94, spread_percentile 96.70, observations 755.00, spread_p10 3.61, spread_p90 6.73, spread_spell_days 73.00, spread_previous_spell_days 26.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 185.00, spot_brent 92.94, spot_wti 89.53, spot_brent_minus_wti 3.41, spot_spread_percentile 33.90, futures_spread_on_spot_date 8.49, spot_minus_futures_spread -5.08, spot_brent_minus_its_future -0.20, spot_wti_minus_its_future 4.88."
  },
  "henry_hub_percentile": {
-  "caveats": [
-   "Not current as of 2026-11-18: NG.RNGWHHD.D ends on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [
    "percentile:NG.RNGWHHD.D:3"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
+    "context": "Ranked against 747 values from 2023-11-21 to 2026-11-17. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean.",
     "counter": "",
     "hypothetical": false,
     "key": "percentile:NG.RNGWHHD.D:3",
     "note": "percentile 0 = lowest of the window, 100 = highest",
-    "period": "2026-11-11",
+    "period": "2026-11-17",
+    "request": {
+     "action": "percentile",
+     "body": {
+      "end": "2026-11-21",
+      "series": "NG.RNGWHHD.D",
+      "start": "2023-11-21"
+     },
+     "tool": "percentile"
+    },
     "series_ids": [
      "NG.RNGWHHD.D"
     ],
     "title": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years",
     "units": "Dollars per Million Btu",
     "values": {
-     "average": 3.002185,
-     "high": 30.72,
-     "latest": 3.0,
-     "low": 1.21,
-     "observations": 746.0,
-     "p10": 1.83,
-     "p90": 3.9,
-     "percentile": 60.2,
+     "max": 30.72,
+     "mean": 3.004244,
+     "median": 2.9,
+     "min": 1.21,
+     "observations": 747.0,
+     "p25": 2.44,
+     "p5": 1.58,
+     "p75": 3.22,
+     "p95": 4.364,
+     "percentile": 65.930388,
+     "std": 1.715942,
+     "target_value": 3.1,
      "years": 3.0,
-     "z_score": -0.0
+     "zscore": 0.055804
     }
    }
   ],
   "spreads": [],
-  "summary": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years on 2026-11-11: latest 3.00, percentile 60.20, low 1.21, high 30.72, average 3.00, z_score -0.00, observations 746.00, years 3.00, p10 1.83, p90 3.90."
+  "summary": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years on 2026-11-17: target_value 3.10, observations 747.00, mean 3.00, std 1.72, min 1.21, max 30.72, p5 1.58, p25 2.44, median 2.90, p75 3.22, p95 4.36, zscore 0.06, percentile 65.93, years 3.00."
  },
  "hormuz_tankers": {
-  "caveats": [],
+  "caveats": [
+   "Not current as of 2026-11-21: PORTWATCH.HORMUZ.TANKERS.D ends on 2026-11-15 (6 days ago)."
+  ],
   "cites": [],
   "facts": [
    {
@@ -716,9 +987,7 @@
   "summary": "Strait of Hormuz \u2014 daily tanker transits was 0.00 vessels/day on 2026-11-15."
  },
  "no_cross_unit_spread": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RWTC.D ends on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [
    {
@@ -727,8 +996,8 @@
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-11",
-    "latest_value": 89.62,
+    "latest_period": "2026-11-17",
+    "latest_value": 89.53,
     "lookback_days": null,
     "name": "Cushing, OK WTI Spot Price FOB, Daily",
     "series_id": "PET.RWTC.D",
@@ -736,14 +1005,14 @@
    },
    {
     "also": {
-     "million_barrels": 414.417
+     "million_barrels": 417.797
     },
     "base_period": null,
     "base_value": null,
     "change_abs": null,
     "change_pct": null,
-    "latest_period": "2026-11-06",
-    "latest_value": 414417.0,
+    "latest_period": "2026-11-13",
+    "latest_value": 417797.0,
     "lookback_days": null,
     "name": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly",
     "series_id": "PET.WCESTUS1.W",
@@ -752,7 +1021,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11. U.S. Ending Stocks excluding SPR of Crude Oil, Weekly was 414417.00 Thousand Barrels on 2026-11-06."
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.53 Dollars per Barrel on 2026-11-17. U.S. Ending Stocks excluding SPR of Crude Oil, Weekly was 417797.00 Thousand Barrels on 2026-11-13."
  },
  "oman_curve": {
   "caveats": [],
@@ -762,12 +1031,13 @@
   "facts": [],
   "readings": [
    {
-    "context": "M1 minus M12 was 13.85 on 2026-11-10 and is 12.90 now: the curve has flattened over the week.",
+    "context": "M1 minus M12 was 15.86 on 2026-11-13 and is 12.01 now: the curve has flattened over the week.",
     "counter": "",
     "hypothetical": false,
     "key": "curve:oman",
     "note": "mixed: contango at the front (M1 below M2) and backwardation across the curve (M1 above M12)",
-    "period": "2026-11-17",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "GME.OMAN.M1.D",
      "GME.OMAN.M2.D",
@@ -785,26 +1055,26 @@
     "title": "Oman crude futures curve (GME OQD)",
     "units": "USD/bbl",
     "values": {
-     "M1": 89.77,
-     "M10": 78.45,
-     "M11": 77.62,
-     "M12": 76.87,
-     "M1_minus_M12": 12.9,
-     "M1_minus_M12_a_week_earlier": 13.85,
-     "M1_minus_M2": -0.29,
-     "M2": 90.06,
-     "M3": 87.77,
-     "M4": 85.86,
-     "M5": 84.26,
-     "M6": 82.85,
-     "M7": 81.58,
-     "M8": 80.42,
-     "M9": 79.38
+     "M1": 87.08,
+     "M10": 76.6,
+     "M11": 75.8,
+     "M12": 75.07,
+     "M1_minus_M12": 12.01,
+     "M1_minus_M12_a_week_earlier": 15.86,
+     "M1_minus_M2": -0.59,
+     "M2": 87.67,
+     "M3": 85.45,
+     "M4": 83.61,
+     "M5": 82.09,
+     "M6": 80.77,
+     "M7": 79.58,
+     "M8": 78.49,
+     "M9": 77.5
     }
    }
   ],
   "spreads": [],
-  "summary": "Oman crude futures curve (GME OQD) on 2026-11-17: M1 89.77, M2 90.06, M3 87.77, M4 85.86, M5 84.26, M6 82.85, M7 81.58, M8 80.42, M9 79.38, M10 78.45, M11 77.62, M12 76.87, M1_minus_M2 -0.29, M1_minus_M12 12.90, M1_minus_M12_a_week_earlier 13.85. The curve is in mixed."
+  "summary": "Oman crude futures curve (GME OQD) on 2026-11-20: M1 87.08, M2 87.67, M3 85.45, M4 83.61, M5 82.09, M6 80.77, M7 79.58, M8 78.49, M9 77.50, M10 76.60, M11 75.80, M12 75.07, M1_minus_M2 -0.59, M1_minus_M12 12.01, M1_minus_M12_a_week_earlier 15.86. The curve is in mixed."
  },
  "out_of_scope": {
   "caveats": [
@@ -826,22 +1096,139 @@
   "spreads": [],
   "summary": "No EnergyScope series matched the question."
  },
- "spot_vs_futures": {
+ "regime_signals": {
   "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D end on 2026-11-11 (7 days ago)."
+   "Not current as of 2026-11-21: ICE_COT.BRENT.MM_Net ends on 2026-11-03 (18 days ago)."
   ],
+  "cites": [
+   "signals:live"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Signal firing: distillate_undersupplied (extreme, theme refined_products): distillate stocks seasonal percentile of 0 is below the 20 threshold. Signal firing: crude_undersupplied (extreme, theme crude_supply): crude stocks seasonal percentile of 0 is below the 20 threshold. Signal firing: production_at_seasonal_high (extreme, theme crude_supply): US crude production seasonal percentile of 100 is at or above the 99 threshold. Signal firing: eu_gas_stocks_tight (extreme, theme european): EU gas storage fullness seasonal percentile (AGSI+) of 0 is below the 20 threshold. Signal firing: opec_compliance_gap_extreme (extreme, theme opec_compliance): max OPEC direct-vs-secondary production gap (tb/d) of 479 exceeds the 200 threshold. Signal firing: opec_production_gap (extreme, theme opec_compliance): OPEC call-vs-production gap (mb/d) of 4.41 exceeds the 2 threshold. Signal firing: refinery_strong (extreme, theme refined_products): US refinery utilization (%) of 95.7 exceeds the 92 threshold. Signal firing: brent_positioning_median (elevated, theme positioning): Brent managed money net positioning percentile of 41.03 is inside the 30\u201370 range. Signal firing: opec_call_rising (elevated, theme opec_compliance): OPEC call on DoC crude QoQ change (mb/d) of 0.55 exceeds the 0 threshold. Signal firing: steep_backwardation (elevated, theme market_structure): 12-month curve, M12\u2212M1 ($/bbl; negative = backwardation \u2014 key name is legacy) of -15.26 is below the -10 threshold. Signal firing: wti_specs_short (mild, theme positioning): WTI managed money net positioning percentile of 6.78 is below the 10 threshold. Signal firing: freight_extreme (mild, theme market_structure): BWET freight z-score of 3.33 exceeds the 3 threshold. Signal firing: punishing_carry (mild, theme market_structure): 12-month roll yield (%, M12 vs M1) of -16.49 is below the -15 threshold. Contradiction firing: regime_curve_destruction (mild): Backwardation steep, roll yield punishing \u2014 storage economics destroyed. regime_curve_destruction fires because steep_backwardation (elevated, score=0.351) + punishing_carry (mild, score=0.099) Dominant contradiction: regime_curve_destruction. Not evaluated: 7 contradictions lack an input metric. A signal is a fixed rule over one metric (a z-score, a seasonal percentile, a spread); a contradiction is two or more signals firing together. They describe the data and ...",
+    "counter": "",
+    "hypothetical": false,
+    "key": "signals:live",
+    "note": "metric snapshot of 2026-11-21",
+    "period": "2026-11-21",
+    "request": {
+     "action": "derived_signals",
+     "body": {
+      "metrics": {
+       "brent_mm_pctl": 41.025641,
+       "brent_wti_spread": 3.41,
+       "brent_wti_zscore": -0.450656,
+       "bwet_z": 3.3289,
+       "cdd_anomaly_z": 0.0,
+       "crack_321_z": 0.069665,
+       "crack_diesel_z": 1.700311,
+       "crack_gasoline_z": -1.647493,
+       "crude_seasonal_pctl": 0.0,
+       "cushing_7d_pct": -4.047706,
+       "cushing_z": 0.487797,
+       "distillate_seasonal_pctl": 0.0,
+       "eu_gas_seasonal_pctl": 0.0,
+       "gasoline_seasonal_pctl": 80.0,
+       "hdd_anomaly_z": -0.979236,
+       "hdd_oil_anomaly_z": -0.965812,
+       "m1_m12": -15.26,
+       "opec_call_production_gap": 4.4051881199088,
+       "opec_call_qoq_change": 0.5458094425433302,
+       "opec_compliance_gap_max_kbd": 479.0,
+       "opec_world_demand_revision": 0.1,
+       "production_seasonal_pctl": 100.0,
+       "refinery_util": 95.7,
+       "roll_yield_pct": -16.486603284356093,
+       "vix_corr": 0.09749,
+       "wti_mm_pctl": 6.779661,
+       "wti_price_pctl": 88.646465
+      }
+     },
+     "tool": "signals"
+    },
+    "series_ids": [
+     "AGSI.EU.FULL_PCT.D",
+     "CFTC.WTI.MM_Net",
+     "ICE.BRENT.M1.D",
+     "ICE.BRENT.M12.D",
+     "ICE_COT.BRENT.MM_Net",
+     "MACRO.VIX.D",
+     "OPEC.MOMR11_1.MEMO.CALL_ON_DOC_CRUDE.Q",
+     "OPEC.MOMR11_1.NON_DOC.DOC_CRUDE_OIL_PRODUCTION.Q",
+     "OPEC.MOMR11_1_REV.DEMAND.TOTAL_WORLD_DEMAND.A",
+     "OPEC.MOMR5_7.*.M",
+     "OPEC.MOMR5_8.*.M",
+     "PET.EER_EPD2DXL0_PF4_Y35NY_DPG.D",
+     "PET.EER_EPMRU_PF4_Y35NY_DPG.D",
+     "PET.RBRTE.D",
+     "PET.RWTC.D",
+     "PET.WCESTUS1.W",
+     "PET.WCRFPUS2.W",
+     "PET.WDISTUS1.W",
+     "PET.WGTSTUS1.W",
+     "PET.WPULEUS3.W",
+     "PET.W_EPC0_SAX_YCUOK_MBBL.W",
+     "SHIP.BWET.D",
+     "WEATHER.CDD.POP.US.TOTAL.W",
+     "WEATHER.HDD.OIL.US.TOTAL.W",
+     "WEATHER.HDD.POP.US.TOTAL.W"
+    ],
+    "title": "The server's signals and contradictions, live",
+    "units": "as each metric",
+    "values": {
+     "active_count": 13.0,
+     "contradiction_count": 1.0,
+     "contradiction_total": 16.0,
+     "metric.brent_mm_pctl": 41.025641,
+     "metric.brent_wti_spread": 3.41,
+     "metric.brent_wti_zscore": -0.450656,
+     "metric.bwet_z": 3.3289,
+     "metric.cdd_anomaly_z": 0.0,
+     "metric.crack_321_z": 0.069665,
+     "metric.crack_diesel_z": 1.700311,
+     "metric.crack_gasoline_z": -1.647493,
+     "metric.crude_seasonal_pctl": 0.0,
+     "metric.cushing_7d_pct": -4.047706,
+     "metric.cushing_z": 0.487797,
+     "metric.distillate_seasonal_pctl": 0.0,
+     "metric.eu_gas_seasonal_pctl": 0.0,
+     "metric.gasoline_seasonal_pctl": 80.0,
+     "metric.hdd_anomaly_z": -0.979236,
+     "metric.hdd_oil_anomaly_z": -0.965812,
+     "metric.m1_m12": -15.26,
+     "metric.opec_call_production_gap": 4.4051881199088,
+     "metric.opec_call_qoq_change": 0.5458094425433302,
+     "metric.opec_compliance_gap_max_kbd": 479.0,
+     "metric.opec_world_demand_revision": 0.1,
+     "metric.production_seasonal_pctl": 100.0,
+     "metric.refinery_util": 95.7,
+     "metric.roll_yield_pct": -16.486603284356093,
+     "metric.vix_corr": 0.09749,
+     "metric.wti_mm_pctl": 6.779661,
+     "metric.wti_price_pctl": 88.646465,
+     "signals_evaluated": 42.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "The server's signals and contradictions, live on 2026-11-21: metric.roll_yield_pct -16.49, metric.m1_m12 -15.26, metric.bwet_z 3.33, metric.brent_wti_zscore -0.45, metric.crack_321_z 0.07, metric.crack_diesel_z 1.70, metric.gasoline_seasonal_pctl 80.00, metric.cushing_7d_pct -4.05, metric.refinery_util 95.70, metric.distillate_seasonal_pctl 0.00, metric.wti_price_pctl 88.65, metric.crack_gasoline_z -1.65, metric.production_seasonal_pctl 100.00, metric.crude_seasonal_pctl 0.00, metric.opec_world_demand_revision 0.10, metric.opec_call_qoq_change up 0.55, metric.opec_call_production_gap 4.41, metric.cushing_z 0.49, metric.vix_corr 0.10, metric.wti_mm_pctl 6.78, metric.hdd_anomaly_z -0.98, metric.brent_wti_spread 3.41, metric.eu_gas_seasonal_pctl 0.00, metric.hdd_oil_anomaly_z -0.97, metric.brent_mm_pctl 41.03, metric.cdd_anomaly_z 0.00, metric.opec_compliance_gap_max_kbd 479.00, signals_evaluated 42.00, active_count 13.00, contradiction_count 1.00, contradiction_total 16.00."
+ },
+ "spot_vs_futures": {
+  "caveats": [],
   "cites": [
    "fspread:brent_wti"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "The futures spread has been above the 90th percentile line (6.69) since 2026-09-08, 70 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-22 (29 days), reaching 8.30. Spot prices are published days later than futures. On 2026-11-11, the latest date with both, spot Brent minus spot WTI was 2.52 (percentile 17.4 of its last three years) while the 2027-01 futures spread was 7.33. The 4.81 difference is the gap between spot and futures in each market: spot Brent stood 0.62 below its 2027-01 future and spot WTI 4.19 above its own.",
+    "context": "The futures spread has been above the 90th percentile line (6.73) since 2026-09-08, 73 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-19 (26 days), reaching 8.30. Spot prices are published days later than futures. On 2026-11-17, the latest date with both, spot Brent minus spot WTI was 3.41 (percentile 33.9 of its last three years) while the 2027-01 futures spread was 8.49. The 5.08 difference is the gap between spot and futures in each market: spot Brent stood 0.20 below its 2027-01 future and spot WTI 4.88 above its own.",
     "counter": "",
     "hypothetical": false,
     "key": "fspread:brent_wti",
     "note": "Both legs are the 2027-01 delivery contract, the nearest month both still trade, so the spread compares like with like. The percentile ranks today against this contract pair's own history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent.",
-    "period": "2026-11-17",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.2027-01.D",
      "NYMEX.WTI.2027-01.D",
@@ -851,30 +1238,77 @@
     "title": "Brent minus WTI on futures, 2027-01 delivery",
     "units": "USD/bbl",
     "values": {
-     "brent": 93.07,
-     "brent_minus_wti": 8.42,
-     "futures_spread_on_spot_date": 7.33,
-     "observations": 754.0,
-     "spot_brent": 92.14,
-     "spot_brent_minus_its_future": -0.62,
-     "spot_brent_minus_wti": 2.52,
-     "spot_minus_futures_spread": -4.81,
-     "spot_spread_percentile": 17.4,
-     "spot_wti": 89.62,
-     "spot_wti_minus_its_future": 4.19,
-     "spread_days_since_previous_spell": 179.0,
+     "brent": 92.56,
+     "brent_minus_wti": 8.94,
+     "futures_spread_on_spot_date": 8.49,
+     "observations": 755.0,
+     "spot_brent": 92.94,
+     "spot_brent_minus_its_future": -0.2,
+     "spot_brent_minus_wti": 3.41,
+     "spot_minus_futures_spread": -5.08,
+     "spot_spread_percentile": 33.9,
+     "spot_wti": 89.53,
+     "spot_wti_minus_its_future": 4.88,
+     "spread_days_since_previous_spell": 185.0,
      "spread_p10": 3.61,
-     "spread_p90": 6.69,
-     "spread_percentile": 96.4,
-     "spread_previous_spell_days": 29.0,
+     "spread_p90": 6.73,
+     "spread_percentile": 96.7,
+     "spread_previous_spell_days": 26.0,
      "spread_previous_spell_extreme": 8.3,
-     "spread_spell_days": 70.0,
-     "wti": 84.65
+     "spread_spell_days": 73.0,
+     "wti": 83.62
     }
    }
   ],
   "spreads": [],
-  "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-17: brent 93.07, wti 84.65, brent_minus_wti 8.42, spread_percentile 96.40, observations 754.00, spread_p10 3.61, spread_p90 6.69, spread_spell_days 70.00, spread_previous_spell_days 29.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 179.00, spot_brent 92.14, spot_wti 89.62, spot_brent_minus_wti 2.52, spot_spread_percentile 17.40, futures_spread_on_spot_date 7.33, spot_minus_futures_spread -4.81, spot_brent_minus_its_future -0.62, spot_wti_minus_its_future 4.19."
+  "summary": "Brent minus WTI on futures, 2027-01 delivery on 2026-11-20: brent 92.56, wti 83.62, brent_minus_wti 8.94, spread_percentile 96.70, observations 755.00, spread_p10 3.61, spread_p90 6.73, spread_spell_days 73.00, spread_previous_spell_days 26.00, spread_previous_spell_extreme 8.30, spread_days_since_previous_spell 185.00, spot_brent 92.94, spot_wti 89.53, spot_brent_minus_wti 3.41, spot_spread_percentile 33.90, futures_spread_on_spot_date 8.49, spot_minus_futures_spread -5.08, spot_brent_minus_its_future -0.20, spot_wti_minus_its_future 4.88."
+ },
+ "spread_reversion": {
+  "caveats": [],
+  "cites": [
+   "spread_stats:PET.RBRTE.D,PET.RWTC.D:3"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-21. current_spread = first minus second on the latest common date; half_life is in observations: how fast the spread has returned toward its mean.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "spread_stats:PET.RBRTE.D,PET.RWTC.D:3",
+    "note": "",
+    "period": "2026-11-17",
+    "request": {
+     "action": "spread",
+     "body": {
+      "end": "2026-11-21",
+      "series_a": "PET.RBRTE.D",
+      "series_b": "PET.RWTC.D",
+      "start": "2023-11-21"
+     },
+     "tool": "spread_stats"
+    },
+    "series_ids": [
+     "PET.RBRTE.D",
+     "PET.RWTC.D"
+    ],
+    "title": "Europe Brent Spot Price FOB, Daily and Cushing, OK WTI Spot Price FOB, Daily: the spread (first minus second) against its own history, last 3 years",
+    "units": "Dollars per Barrel",
+    "values": {
+     "current_spread": 3.41,
+     "half_life": 10.039929,
+     "max": 37.62,
+     "mean": 5.562649,
+     "min": -2.45,
+     "observations": 736.0,
+     "percentile": 33.831522,
+     "std": 5.297599,
+     "years": 3.0,
+     "zscore": -0.406344
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Europe Brent Spot Price FOB, Daily and Cushing, OK WTI Spot Price FOB, Daily: the spread (first minus second) against its own history, last 3 years on 2026-11-17: observations 736.00, current_spread 3.41, mean 5.56, std 5.30, min -2.45, max 37.62, zscore -0.41, percentile 33.83, half_life 10.04, years 3.00."
  },
  "us_crude_yoy": {
   "caveats": [],
@@ -882,14 +1316,14 @@
   "facts": [
    {
     "also": {
-     "million_barrels": 414.417
+     "million_barrels": 417.797
     },
-    "base_period": "2025-10-31",
-    "base_value": 421168.0,
-    "change_abs": -6751.0,
-    "change_pct": -1.602923,
-    "latest_period": "2026-11-06",
-    "latest_value": 414417.0,
+    "base_period": "2025-11-07",
+    "base_value": 427581.0,
+    "change_abs": -9784.0,
+    "change_pct": -2.288221,
+    "latest_period": "2026-11-13",
+    "latest_value": 417797.0,
     "lookback_days": 365,
     "name": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly",
     "series_id": "PET.WCESTUS1.W",
@@ -898,7 +1332,7 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly was 414417.00 Thousand Barrels on 2026-11-06, down 6751.00 (1.60%) from 421168.00 on 2025-10-31, 365 days earlier."
+  "summary": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly was 417797.00 Thousand Barrels on 2026-11-13, down 9784.00 (2.29%) from 427581.00 on 2025-11-07, 365 days earlier."
  },
  "us_rigs_yoy": {
   "caveats": [],
@@ -906,12 +1340,12 @@
   "facts": [
    {
     "also": {},
-    "base_period": "2025-11-06",
-    "base_value": 548.0,
-    "change_abs": 53.0,
-    "change_pct": 9.671533,
-    "latest_period": "2026-11-13",
-    "latest_value": 601.0,
+    "base_period": "2025-11-14",
+    "base_value": 549.0,
+    "change_abs": 58.0,
+    "change_pct": 10.564663,
+    "latest_period": "2026-11-20",
+    "latest_value": 607.0,
     "lookback_days": 365,
     "name": "Baker Hughes Weekly \u2014 United States, all rigs",
     "series_id": "BH.United_States.Total.W",
@@ -920,11 +1354,11 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Baker Hughes Weekly \u2014 United States, all rigs was 601.00 Rigs on 2026-11-13, up 53.00 (9.67%) from 548.00 on 2025-11-06, 365 days earlier."
+  "summary": "Baker Hughes Weekly \u2014 United States, all rigs was 607.00 Rigs on 2026-11-20, up 58.00 (10.56%) from 549.00 on 2025-11-14, 365 days earlier."
  },
  "week_surprises": {
   "caveats": [
-   "Not current as of 2026-11-18: ICE_COT.BRENT.MM_Net ends on 2026-11-03 (15 days ago)."
+   "Not current as of 2026-11-21: ICE_COT.BRENT.MM_Net ends on 2026-11-03 (18 days ago)."
   ],
   "cites": [
    "surprises:week"
@@ -936,14 +1370,15 @@
     "counter": "",
     "hypothetical": false,
     "key": "surprises:week",
-    "note": "Change over 7 days, ranked by z-score against two years of 7-day changes in the same series; beyond plus or minus two is unusual. Not a miss against forecasts: the data holds no consensus. Units and dates: ICE gasoil (USD/MT, 2026-11-18); Tanker freight proxy (USD, 2026-11-17); US distillate stocks (Thousand Barrels, 2026-11-06); Brent fund net position (contracts, 2026-11-03); US commercial crude stocks (Thousand Barrels, 2026-11-06).",
-    "period": "2026-11-18",
+    "note": "Change over 7 days, ranked by z-score against two years of 7-day changes in the same series; beyond plus or minus two is unusual. Not a miss against forecasts: the data holds no consensus. Units and dates: Tanker freight proxy (USD, 2026-11-20); ICE gasoil (USD/MT, 2026-11-20); US gasoline stocks (Thousand Barrels, 2026-11-13); US rig count (Rigs, 2026-11-20); Brent fund net position (contracts, 2026-11-03).",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
-     "ICE.GASOIL.M1.D",
      "SHIP.BWET.D",
-     "PET.WDISTUS1.W",
-     "ICE_COT.BRENT.MM_Net",
-     "PET.WCESTUS1.W"
+     "ICE.GASOIL.M1.D",
+     "PET.WGTSTUS1.W",
+     "BH.United_States.Total.W",
+     "ICE_COT.BRENT.MM_Net"
     ],
     "title": "Most unusual moves over a week, from a watchlist of 18 series",
     "units": "each series in its own units",
@@ -951,77 +1386,72 @@
      "Brent fund net position: change": -48466.0,
      "Brent fund net position: latest": 171603.0,
      "Brent fund net position: z-score": -1.28,
-     "ICE gasoil: change": -165.869995,
-     "ICE gasoil: latest": 1175.3800048828125,
-     "ICE gasoil: z-score": -2.3,
-     "Tanker freight proxy: change": 111.94,
-     "Tanker freight proxy: latest": 647.86,
-     "Tanker freight proxy: z-score": 2.03,
-     "US commercial crude stocks: change": 4657.0,
-     "US commercial crude stocks: latest": 414417.0,
-     "US commercial crude stocks: z-score": 0.97,
-     "US distillate stocks: change": 4071.0,
-     "US distillate stocks: latest": 103330.0,
-     "US distillate stocks: z-score": 1.51
+     "ICE gasoil: change": -121.75,
+     "ICE gasoil: latest": 1165.75,
+     "ICE gasoil: z-score": -1.69,
+     "Tanker freight proxy: change": 127.09,
+     "Tanker freight proxy: latest": 745.77,
+     "Tanker freight proxy: z-score": 2.25,
+     "US gasoline stocks: change": 5192.0,
+     "US gasoline stocks: latest": 215949.0,
+     "US gasoline stocks: z-score": 1.56,
+     "US rig count: change": 6.0,
+     "US rig count: latest": 607.0,
+     "US rig count: z-score": 1.41
     }
    }
   ],
   "spreads": [],
-  "summary": "Most unusual moves over a week, from a watchlist of 18 series on 2026-11-18: ICE gasoil: latest 1175.38, ICE gasoil: change down 165.87, ICE gasoil: z-score -2.30, Tanker freight proxy: latest 647.86, Tanker freight proxy: change up 111.94, Tanker freight proxy: z-score 2.03, US distillate stocks: latest 103330.00, US distillate stocks: change up 4071.00, US distillate stocks: z-score 1.51, Brent fund net position: latest 171603.00, Brent fund net position: change down 48466.00, Brent fund net position: z-score -1.28, US commercial crude stocks: latest 414417.00, US commercial crude stocks: change up 4657.00, US commercial crude stocks: z-score 0.97."
+  "summary": "Most unusual moves over a week, from a watchlist of 18 series on 2026-11-20: Tanker freight proxy: latest 745.77, Tanker freight proxy: change up 127.09, Tanker freight proxy: z-score 2.25, ICE gasoil: latest 1165.75, ICE gasoil: change down 121.75, ICE gasoil: z-score -1.69, US gasoline stocks: latest 215949.00, US gasoline stocks: change up 5192.00, US gasoline stocks: z-score 1.56, US rig count: latest 607.00, US rig count: change up 6.00, US rig count: z-score 1.41, Brent fund net position: latest 171603.00, Brent fund net position: change down 48466.00, Brent fund net position: z-score -1.28."
  },
  "week_watch": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RBRTE.D, PET.RWTC.D, PET.EER_EPMRU_PF4_RGC_DPG.D end on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [
    "watch:week"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "Flags, in no order of importance: ICE gasoil moved -165.87 USD/MT (z-score -2.30, to 2026-11-18); Tanker freight proxy moved +111.94 USD (z-score +2.03, to 2026-11-17); US distillate stocks moved +4071.00 Thousand Barrels (z-score +1.51, to 2026-11-06); funds are stretched short in Natural gas (NYMEX) (net position at the 1.3 percentile of three years, report of 2026-11-10); funds are stretched long in RBOB gasoline (NYMEX) (net position at the 91.7 percentile of three years, report of 2026-11-10); US commercial crude stocks are below their five-year range for the time of year (-4.29% against the average, week of 2026-11-06); US distillate stocks are below their five-year range for the time of year (-8.23% against the average, week of 2026-11-06); Brent spot and WTI spot parted ways over the week: +0.33% against -2.30%; Gulf Coast gasoline and WTI spot parted ways over the week: -5.44% against -2.30%.",
+    "context": "Flags, in no order of importance: Tanker freight proxy moved +127.09 USD (z-score +2.25, to 2026-11-20); ICE gasoil moved -121.75 USD/MT (z-score -1.69, to 2026-11-20); US gasoline stocks moved +5192.00 Thousand Barrels (z-score +1.56, to 2026-11-13); funds are stretched short in Natural gas (NYMEX) (net position at the 1.9 percentile of three years, report of 2026-11-17); US commercial crude stocks are below their five-year range for the time of year (-3.65% against the average, week of 2026-11-13); US distillate stocks are below their five-year range for the time of year (-6.63% against the average, week of 2026-11-13); Brent spot and WTI spot parted ways over the week: +3.08% against -0.10%.",
     "counter": "",
     "hypothetical": false,
     "key": "watch:week",
     "note": "A flag is a fact from the data that is outside its usual range: an unusual move, a stretched position, a curve that changed shape, stocks outside their five-year range, or two related prices diverging. No forecasts, no news, no ranking by importance.",
-    "period": "2026-11-18",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
-     "ICE.GASOIL.M1.D",
      "SHIP.BWET.D",
-     "PET.WDISTUS1.W",
+     "ICE.GASOIL.M1.D",
+     "PET.WGTSTUS1.W",
      "CFTC.NG.MM_Net",
-     "CFTC.RBOB.MM_Net",
      "ICE.BRENT.M1.D",
      "PET.WCESTUS1.W",
+     "PET.WDISTUS1.W",
      "PET.RBRTE.D",
-     "PET.RWTC.D",
-     "PET.EER_EPMRU_PF4_RGC_DPG.D"
+     "PET.RWTC.D"
     ],
     "title": "What to watch: flags from prices, stocks, the curve and positioning over a week",
     "units": "each item in its own units",
     "values": {
-     "Brent curve: front minus back": 14.55,
-     "Brent curve: front minus back a week earlier": 13.6,
-     "Brent spot: change pct": 0.33,
-     "Gulf Coast gasoline: change pct": -5.44,
-     "ICE gasoil: change": -165.869995,
-     "ICE gasoil: z-score": -2.3,
-     "Natural gas (NYMEX): fund net percentile": 1.3,
-     "RBOB gasoline (NYMEX): fund net percentile": 91.7,
-     "Tanker freight proxy: change": 111.94,
-     "Tanker freight proxy: z-score": 2.03,
-     "US commercial crude stocks: against five-year average, pct": -4.29,
-     "US distillate stocks: against five-year average, pct": -8.23,
-     "US distillate stocks: change": 4071.0,
-     "US distillate stocks: z-score": 1.51,
-     "WTI spot: change pct against Brent spot": -2.3,
-     "WTI spot: change pct against Gulf Coast gasoline": -2.3,
-     "flags": 9.0
+     "Brent curve: front minus back": 15.09,
+     "Brent curve: front minus back a week earlier": 15.38,
+     "Brent spot: change pct": 3.08,
+     "ICE gasoil: change": -121.75,
+     "ICE gasoil: z-score": -1.69,
+     "Natural gas (NYMEX): fund net percentile": 1.9,
+     "Tanker freight proxy: change": 127.09,
+     "Tanker freight proxy: z-score": 2.25,
+     "US commercial crude stocks: against five-year average, pct": -3.65,
+     "US distillate stocks: against five-year average, pct": -6.63,
+     "US gasoline stocks: change": 5192.0,
+     "US gasoline stocks: z-score": 1.56,
+     "WTI spot: change pct against Brent spot": -0.1,
+     "flags": 7.0
     }
    }
   ],
   "spreads": [],
-  "summary": "What to watch: flags from prices, stocks, the curve and positioning over a week on 2026-11-18: ICE gasoil: change down 165.87, ICE gasoil: z-score -2.30, Tanker freight proxy: change up 111.94, Tanker freight proxy: z-score 2.03, US distillate stocks: change up 4071.00, US distillate stocks: z-score 1.51, Natural gas (NYMEX): fund net percentile 1.30, RBOB gasoline (NYMEX): fund net percentile 91.70, Brent curve: front minus back 14.55, Brent curve: front minus back a week earlier 13.60, US commercial crude stocks: against five-year average, pct -4.29, US distillate stocks: against five-year average, pct -8.23, Brent spot: change pct up 0.33, WTI spot: change pct against Brent spot down 2.30, Gulf Coast gasoline: change pct down 5.44, WTI spot: change pct against Gulf Coast gasoline down 2.30, flags 9.00."
+  "summary": "What to watch: flags from prices, stocks, the curve and positioning over a week on 2026-11-20: Tanker freight proxy: change up 127.09, Tanker freight proxy: z-score 2.25, ICE gasoil: change down 121.75, ICE gasoil: z-score -1.69, US gasoline stocks: change up 5192.00, US gasoline stocks: z-score 1.56, Natural gas (NYMEX): fund net percentile 1.90, Brent curve: front minus back 15.09, Brent curve: front minus back a week earlier 15.38, US commercial crude stocks: against five-year average, pct -3.65, US distillate stocks: against five-year average, pct -6.63, Brent spot: change pct up 3.08, WTI spot: change pct against Brent spot down 0.10, flags 7.00."
  },
  "what_if_arb": {
   "caveats": [],
@@ -1035,8 +1465,9 @@
     "counter": "",
     "hypothetical": true,
     "key": "scenario:arb:us_crude_to_europe:+5:+0:-20",
-    "note": "Hypothetical. The stated changes are applied to the 2027-01 futures prices of 2026-11-17 and the score is recomputed against the same history; the curve is left as it is. In the scenario the score tilts against US crude exports. A price indicator, not an executable arbitrage. +2 = wide spread, cheap freight, contango; -2 = narrow spread, dear freight, backwardation. The spread is Brent minus WTI on futures of one delivery month, ranked against that contract pair's own history (up to three years). Freight is the Breakwave tanker ETF, a proxy, not a route rate; no physical differentials or port costs are included.",
-    "period": "2026-11-17",
+    "note": "Hypothetical. The stated changes are applied to the 2027-01 futures prices of 2026-11-20 and the score is recomputed against the same history; the curve is left as it is. In the scenario the score tilts against US crude exports. A price indicator, not an executable arbitrage. +2 = wide spread, cheap freight, contango; -2 = narrow spread, dear freight, backwardation. The spread is Brent minus WTI on futures of one delivery month, ranked against that contract pair's own history (up to three years). Freight is the Breakwave tanker ETF, a proxy, not a route rate; no physical differentials or port costs are included.",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "ICE.BRENT.2027-01.D",
      "NYMEX.WTI.2027-01.D",
@@ -1049,40 +1480,38 @@
     "values": {
      "brent_change": 5.0,
      "freight_change_pct": -20.0,
-     "observed_brent_minus_wti": 8.42,
-     "observed_freight_percentile": 94.4,
-     "observed_freight_proxy": 647.86,
-     "observed_score": -0.64,
-     "observed_spread_percentile": 96.4,
-     "scenario_brent": 98.07,
-     "scenario_brent_minus_wti": 13.42,
-     "scenario_freight_percentile": 93.2,
-     "scenario_freight_proxy": 518.288,
+     "observed_brent_minus_wti": 8.94,
+     "observed_freight_percentile": 96.0,
+     "observed_freight_proxy": 745.77,
+     "observed_score": -0.66,
+     "observed_spread_percentile": 96.7,
+     "scenario_brent": 97.56,
+     "scenario_brent_minus_wti": 13.94,
+     "scenario_freight_percentile": 93.6,
+     "scenario_freight_proxy": 596.616,
      "scenario_score": -0.58,
      "scenario_spread_percentile": 100.0,
-     "scenario_wti": 84.65,
-     "score_change": 0.06,
+     "scenario_wti": 83.62,
+     "score_change": 0.08,
      "wti_change": 0.0
     }
    }
   ],
   "spreads": [],
-  "summary": "If the stated changes happened, hypothetically: What if: US crude to Europe with changed prices on 2026-11-17: brent_change up 5.00, wti_change 0.00, freight_change_pct down 20.00, observed_brent_minus_wti 8.42, observed_spread_percentile 96.40, observed_freight_proxy 647.86, observed_freight_percentile 94.40, observed_score -0.64, scenario_brent 98.07, scenario_wti 84.65, scenario_brent_minus_wti 13.42, scenario_spread_percentile 100.00, scenario_freight_proxy 518.29, scenario_freight_percentile 93.20, scenario_score -0.58, score_change up 0.06."
+  "summary": "If the stated changes happened, hypothetically: What if: US crude to Europe with changed prices on 2026-11-20: brent_change up 5.00, wti_change 0.00, freight_change_pct down 20.00, observed_brent_minus_wti 8.94, observed_spread_percentile 96.70, observed_freight_proxy 745.77, observed_freight_percentile 96.00, observed_score -0.66, scenario_brent 97.56, scenario_wti 83.62, scenario_brent_minus_wti 13.94, scenario_spread_percentile 100.00, scenario_freight_proxy 596.62, scenario_freight_percentile 93.60, scenario_score -0.58, score_change up 0.08."
  },
  "wti_30d": {
-  "caveats": [
-   "Not current as of 2026-11-18: PET.RWTC.D ends on 2026-11-11 (7 days ago)."
-  ],
+  "caveats": [],
   "cites": [],
   "facts": [
    {
     "also": {},
-    "base_period": "2026-10-12",
-    "base_value": 94.99,
-    "change_abs": -5.37,
-    "change_pct": -5.653227,
-    "latest_period": "2026-11-11",
-    "latest_value": 89.62,
+    "base_period": "2026-10-16",
+    "base_value": 108.21,
+    "change_abs": -18.68,
+    "change_pct": -17.26273,
+    "latest_period": "2026-11-17",
+    "latest_value": 89.53,
     "lookback_days": 30,
     "name": "Cushing, OK WTI Spot Price FOB, Daily",
     "series_id": "PET.RWTC.D",
@@ -1091,7 +1520,45 @@
   ],
   "readings": [],
   "spreads": [],
-  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.62 Dollars per Barrel on 2026-11-11, down 5.37 (5.65%) from 94.99 on 2026-10-12, 30 days earlier."
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily was 89.53 Dollars per Barrel on 2026-11-17, down 18.68 (17.26%) from 108.21 on 2026-10-16, 30 days earlier."
+ },
+ "wti_breaks": {
+  "caveats": [],
+  "cites": [
+   "breakpoints:PET.RWTC.D:3:3"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-21. Breaks at: period 2024-08-28, mean_before 76.447, mean_after 71.16, shift -5.287; period 2025-02-28, mean_before 71.08, mean_after 67.486, shift -3.594; period 2026-03-03, mean_before 66.168, mean_after 87.335, shift 21.167. Segments: start 2023-11-21, end 2024-08-27, mean 78.7, std 4.391978, count 190; start 2024-08-28, end 2025-02-27, mean 71.74112, std 2.813448, count 125; start 2025-02-28, end 2026-03-02, mean 63.63908, std 3.968847, count 250; start 2026-03-03, end 2026-11-17, mean 92.707377, std 10.541531, count 183.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "breakpoints:PET.RWTC.D:3:3",
+    "note": "",
+    "period": "2026-11-21",
+    "request": {
+     "action": "breakpoints",
+     "body": {
+      "end": "2026-11-21",
+      "n_bkps": 3,
+      "series": "PET.RWTC.D",
+      "start": "2023-11-21"
+     },
+     "tool": "breakpoints"
+    },
+    "series_ids": [
+     "PET.RWTC.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years",
+    "units": "Dollars per Barrel",
+    "values": {
+     "n_breakpoints": 3.0,
+     "years": 3.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years on 2026-11-21: n_breakpoints 3.00, years 3.00."
  },
  "wti_curve": {
   "caveats": [],
@@ -1101,12 +1568,13 @@
   "facts": [],
   "readings": [
    {
-    "context": "M1 minus M12 was 11.54 on 2026-11-11 and is 12.88 now: the curve has steepened over the week.",
+    "context": "M1 minus M12 was 12.77 on 2026-11-13 and is 11.01 now: the curve has flattened over the week.",
     "counter": "",
     "hypothetical": false,
     "key": "curve:wti",
     "note": "backwardation (front above back)",
-    "period": "2026-11-18",
+    "period": "2026-11-20",
+    "request": null,
     "series_ids": [
      "NYMEX.WTI.M1.D",
      "NYMEX.WTI.M2.D",
@@ -1124,26 +1592,69 @@
     "title": "WTI futures curve (NYMEX CL)",
     "units": "USD/bbl",
     "values": {
-     "M1": 85.22,
-     "M10": 74.08,
-     "M11": 73.33,
-     "M12": 72.34,
-     "M1_minus_M12": 12.88,
-     "M1_minus_M12_a_week_earlier": 11.54,
-     "M1_minus_M2": 1.26,
-     "M2": 83.96,
-     "M3": 82.61,
-     "M4": 81.14,
-     "M5": 79.8,
-     "M6": 78.3,
-     "M7": 77.05,
-     "M8": 75.98,
-     "M9": 74.94
+     "M1": 84.09,
+     "M10": 74.67,
+     "M11": 73.94,
+     "M12": 73.08,
+     "M1_minus_M12": 11.01,
+     "M1_minus_M12_a_week_earlier": 12.77,
+     "M1_minus_M2": 0.47,
+     "M2": 83.62,
+     "M3": 82.4,
+     "M4": 81.1,
+     "M5": 79.84,
+     "M6": 78.68,
+     "M7": 77.56,
+     "M8": 76.54,
+     "M9": 75.61
     }
    }
   ],
   "spreads": [],
-  "summary": "WTI futures curve (NYMEX CL) on 2026-11-18: M1 85.22, M2 83.96, M3 82.61, M4 81.14, M5 79.80, M6 78.30, M7 77.05, M8 75.98, M9 74.94, M10 74.08, M11 73.33, M12 72.34, M1_minus_M2 1.26, M1_minus_M12 12.88, M1_minus_M12_a_week_earlier 11.54. The curve is in backwardation."
+  "summary": "WTI futures curve (NYMEX CL) on 2026-11-20: M1 84.09, M2 83.62, M3 82.40, M4 81.10, M5 79.84, M6 78.68, M7 77.56, M8 76.54, M9 75.61, M10 74.67, M11 73.94, M12 73.08, M1_minus_M2 0.47, M1_minus_M12 11.01, M1_minus_M12_a_week_earlier 12.77. The curve is in backwardation."
+ },
+ "wti_five_years": {
+  "caveats": [],
+  "cites": [
+   "history:PET.RWTC.D:5"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "From 2021-11-22 to 2026-11-17: 1244 values. The low was on 2025-12-16, the high on 2022-03-08. Every value is in the chart on the page and in the Excel workbook's table.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "history:PET.RWTC.D:5",
+    "note": "first value 2021-11-22",
+    "period": "2026-11-17",
+    "request": {
+     "action": "",
+     "body": {
+      "end": "2026-11-21",
+      "series": "PET.RWTC.D",
+      "start": "2021-11-21"
+     },
+     "tool": "history"
+    },
+    "series_ids": [
+     "PET.RWTC.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily, last 5 years",
+    "units": "Dollars per Barrel",
+    "values": {
+     "average": 80.057034,
+     "change": 12.79,
+     "change_pct": 16.666667,
+     "first": 76.74,
+     "high": 123.64,
+     "latest": 89.53,
+     "low": 55.44,
+     "observations": 1244.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily, last 5 years on 2026-11-17: first 76.74, latest 89.53, low 55.44, high 123.64, average 80.06, observations 1244.00, change up 12.79, change_pct up 16.67."
  },
  "wti_positioning": {
   "caveats": [],
@@ -1153,12 +1664,13 @@
   "facts": [],
   "readings": [
    {
-    "context": "The net position is inside its usual range, between the 10th and 90th percentile lines (21728.00 and 191531.00) of the window.",
+    "context": "The net position is inside its usual range, between the 10th and 90th percentile lines (15814.00 and 191531.00) of the window.",
     "counter": "",
     "hypothetical": false,
     "key": "positioning:wti",
     "note": "net_percentile ranks the latest net position against the last percentile_weeks weekly reports",
-    "period": "2026-11-10",
+    "period": "2026-11-17",
+    "request": null,
     "series_ids": [
      "CFTC.WTI.MM_Net",
      "CFTC.WTI.MM_Long",
@@ -1168,19 +1680,114 @@
     "title": "WTI crude (NYMEX): managed-money positioning",
     "units": "contracts",
     "values": {
-     "managed_money_long": 148092.0,
-     "managed_money_net": 25714.0,
-     "managed_money_short": 122378.0,
-     "net_change_on_week": 3986.0,
-     "net_p10": 21728.0,
+     "managed_money_long": 153611.0,
+     "managed_money_net": 15814.0,
+     "managed_money_short": 137797.0,
+     "net_change_on_week": -9900.0,
+     "net_p10": 15814.0,
      "net_p90": 191531.0,
-     "net_percentile": 12.2,
-     "open_interest": 1917473.0,
+     "net_percentile": 10.3,
+     "open_interest": 1869789.0,
      "percentile_weeks": 156.0
     }
    }
   ],
   "spreads": [],
-  "summary": "WTI crude (NYMEX): managed-money positioning on 2026-11-10: managed_money_net 25714.00, managed_money_long 148092.00, managed_money_short 122378.00, open_interest 1917473.00, net_change_on_week up 3986.00, net_percentile 12.20, percentile_weeks 156.00, net_p10 21728.00, net_p90 191531.00."
+  "summary": "WTI crude (NYMEX): managed-money positioning on 2026-11-17: managed_money_net 15814.00, managed_money_long 153611.00, managed_money_short 137797.00, open_interest 1869789.00, net_change_on_week down 9900.00, net_percentile 10.30, percentile_weeks 156.00, net_p10 15814.00, net_p90 191531.00."
+ },
+ "wti_stats": {
+  "caveats": [],
+  "cites": [
+   "stats:PET.RWTC.D:3"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-21.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "stats:PET.RWTC.D:3",
+    "note": "",
+    "period": "2026-11-17",
+    "request": {
+     "action": "stats",
+     "body": {
+      "end": "2026-11-21",
+      "series": "PET.RWTC.D",
+      "start": "2023-11-21"
+     },
+     "tool": "stats"
+    },
+    "series_ids": [
+     "PET.RWTC.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily: descriptive statistics, last 3 years",
+    "units": "Dollars per Barrel",
+    "values": {
+     "count": 748.0,
+     "first_value": 78.35,
+     "kurtosis": 0.008987,
+     "last_value": 89.53,
+     "max": 114.58,
+     "mean": 75.930294,
+     "median": 72.955,
+     "min": 55.44,
+     "p25": 66.3475,
+     "p5": 59.261,
+     "p75": 83.085,
+     "p95": 101.3805,
+     "pct_change": 14.269304,
+     "skewness": 0.790622,
+     "std": 12.764091,
+     "years": 3.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: descriptive statistics, last 3 years on 2026-11-17: count 748.00, mean 75.93, median 72.95, std 12.76, min 55.44, max 114.58, skewness 0.79, kurtosis 0.01, first_value 78.35, last_value 89.53, pct_change up 14.27, p5 59.26, p25 66.35, p75 83.08, p95 101.38, years 3.00."
+ },
+ "wti_volatility": {
+  "caveats": [],
+  "cites": [
+   "volatility:PET.RWTC.D:3:20"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-21. Latest row: period 2026-11-17, return 0.003244, rolling_vol 0.539113, garch_vol 0.523382.",
+    "counter": "",
+    "hypothetical": false,
+    "key": "volatility:PET.RWTC.D:3:20",
+    "note": "",
+    "period": "2026-11-17",
+    "request": {
+     "action": "volatility",
+     "body": {
+      "end": "2026-11-21",
+      "series": "PET.RWTC.D",
+      "start": "2023-11-21",
+      "window": 20
+     },
+     "tool": "volatility"
+    },
+    "series_ids": [
+     "PET.RWTC.D"
+    ],
+    "title": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH), last 3 years",
+    "units": "annualised, as a fraction",
+    "values": {
+     "current.annualised_factor": 252.0,
+     "current.garch_vol": 0.523382,
+     "current.rolling_vol": 0.539113,
+     "current.window": 20.0,
+     "latest.garch_vol": 0.523382,
+     "latest.return": 0.003244,
+     "latest.rolling_vol": 0.539113,
+     "years": 3.0
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH), last 3 years on 2026-11-17: current.rolling_vol 0.54, current.annualised_factor 252.00, current.window 20.00, current.garch_vol 0.52, latest.return 0.00, latest.rolling_vol 0.54, latest.garch_vol 0.52, years 3.00."
  }
 }

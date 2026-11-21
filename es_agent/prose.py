@@ -298,7 +298,7 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
             elif "_minus_" in k:
                 a, b = (_words(part.replace("_", " ")) for part in k.split("_minus_", 1))
                 levels.append((v, a - b, b - a))
-            elif k in ("difference", "difference_pct") or k.endswith("_vs_5y_pct"):
+            elif k in ("difference", "difference_pct", "delta_vs_avg", "pct_vs_avg") or k.endswith("_vs_5y_pct"):
                 levels.append((v, set(), _AVERAGE))
     return moves, levels
 
