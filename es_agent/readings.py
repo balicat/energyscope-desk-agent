@@ -876,7 +876,7 @@ def stale_inputs(source: DataSource, series_ids: list[str]) -> str:
     return f"Not current as of {today}: " + "; ".join(parts) + more + "."
 
 
-US_STOCKS, CUSHING_STOCKS, REFINERY_UTIL = "PET.WCESTUS1.W", "PET.W_EPC0_SAX_YCUOK_MBBL.W", "PET.WPULEUS3.W"
+US_STOCKS = "PET.WCESTUS1.W"
 THESES = ("crude_tightness",)
 BASE_RATE_YEARS = 8
 GROUPS = {"structure": "Time structure", "stocks": "US crude stocks", "refining": "Refining demand",
@@ -885,18 +885,6 @@ GROUPS = {"structure": "Time structure", "stocks": "US crude stocks", "refining"
 
 def _week_index(hist: History) -> dict[tuple[int, int], int]:
     return {(d.isocalendar()[0], d.isocalendar()[1]): i for i, (d, _) in enumerate(hist)}
-
-
-def _vs_5y(hist: History, idx: dict, i: int, years: int = 5) -> tuple[float, float] | None:
-    """Observation i against the average of the same report week in each of the previous years:
-    (difference in percent, difference in the series' own units)."""
-    d, v = hist[i]
-    y, w = d.isocalendar()[0], d.isocalendar()[1]
-    prior = [idx.get((y - k, w)) for k in range(1, years + 1)]
-    if any(q is None for q in prior):
-        return None
-    avg = sum(hist[q][1] for q in prior) / years
-    return (v - avg) / avg * 100, v - avg
 
 
 def _gap_4w(hist: History, idx: dict, i: int, years: int = 5) -> tuple[float, float, float] | None:
@@ -910,11 +898,6 @@ def _gap_4w(hist: History, idx: dict, i: int, years: int = 5) -> tuple[float, fl
     chg = v - hist[i - 4][1]
     usual = sum(hist[q][1] - hist[q - 4][1] for q in prior) / years
     return chg, usual, (chg - usual) / v * 100
-
-
-def _rolling_rank(hist: History, i: int, window: int) -> float:
-    """Percentile of observation i among the `window` observations ending at it."""
-    return _rank([v for _, v in hist[max(0, i - window + 1):i + 1]], hist[i][1])
 
 
 def _verdict(x: float, lo: float, hi: float, tight_when: str) -> int:
@@ -952,20 +935,83 @@ def _side(x: float, up: str = "above", down: str = "below") -> str:
     return up if x >= 0 else down
 
 
+# Lines the server's signal catalogue already scores (David, 21 Nov 2026: "one definition, the server's"). The
+# metric is the server's, from its live snapshot, and the verdict is the server's own evaluation of the named
+# signals, so the scorecard and get_signals cannot disagree. Before, these lines had definitions of their own: a
+# public answer said "US crude stocks neutral" (3.4% below the five-year average, inside a 5% band) beside the
+# server's "crude stocks at a seasonal percentile of 0" (the lowest of the same five weeks: crude_undersupplied).
+SERVER_LINES = (
+    # name, group, server metric, signal that reads tight, signal that reads loose (None: no such signal), what it is
+    ("brent_curve", "structure", "m1_m12", "steep_backwardation", "steep_contango",
+     "Brent 12-month curve, M12 minus M1 in dollars per barrel (negative is backwardation)"),
+    ("us_stocks", "stocks", "crude_seasonal_pctl", "crude_undersupplied", "crude_oversupplied",
+     "US commercial crude stocks, seasonal percentile (the level against the same week of the last five years)"),
+    ("cushing_stocks", "stocks", "cushing_z", "cushing_tight", "cushing_full",
+     "Cushing crude stocks, z-score against about five years of weekly values"),
+    ("refinery_utilisation", "refining", "refinery_util", "refinery_strong", "refinery_weak",
+     "US refinery utilisation, percent of capacity"),
+    ("crack", "refining", "crack_321_z", "crack_extreme", None,
+     "3-2-1 crack spread, z-score against about five years of trading days"),
+    ("fund_positioning", "sentiment", "wti_mm_pctl", "wti_specs_extended", "wti_specs_short",
+     "Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net, percentile of about "
+     "five years of weekly values"),
+)
+_OP_WORD = {">": "above", "<": "below", ">=": "at or above", "<=": "at or below"}
+
+
+def _server_lines(source: DataSource) -> list[dict]:
+    """The scorecard lines the server scores, or [] when its snapshot or catalogue cannot be read: no fallback to a
+    definition of our own."""
+    from .engine import _last_date, _num, _schema, _thresholds, live_evaluation
+    from .sources import ServerError
+    try:
+        body, doc, _ = live_evaluation(source)
+    except ServerError:
+        return []
+    schema, metrics_ = _schema(source), body["metrics"]
+    active, allsig = set(doc.get("active") or []), doc.get("signals") or {}
+    out = []
+    for name, group, key, tight, loose, what in SERVER_LINES:
+        x = _num(metrics_.get(key))
+        specs = [(sig, schema.get(sig)) for sig in (tight, loose) if sig]
+        if x is None or not all(spec and _num(spec.get("threshold")) is not None for _, spec in specs):
+            continue
+        ids = sorted({sid for _, spec in specs for sid in ((spec.get("source_hint") or {}).get("series_ids") or [])})
+        try:
+            date = _last_date(source, ids) if ids else clock.today()
+        except Exception:  # noqa: BLE001 - a metric whose series cannot be read is still the server's value
+            date = clock.today()
+        rules = "; ".join(f"{word} when {_OP_WORD.get(spec.get('op'), spec.get('op'))} {float(spec['threshold']):g} ({sig})"
+                          for (sig, spec), word in zip(specs, ("tight", "loose")))
+        if not loose:
+            rules += "; the server has no signal for the other side, so this line reads tight or neutral"
+        verdict = 1 if tight in active else -1 if loose and loose in active else 0
+        fired = tight if verdict == 1 else loose if verdict == -1 else None
+        beyond = (_num((allsig.get(fired) or {}).get("score")) or 0.0) if fired else 0.0
+        values = {f"metric.{key}": x, **_thresholds(schema, [s for s, _ in specs])}
+        out.append({"name": name, "group": group, "verdict": verdict, "beyond": beyond, "date": date, "ids": ids,
+                    "values": values,
+                    "text": f"{what}: {round(x, 2):g} ({date}; scored by the server's signals: {rules})"})
+    return out
+
+
 def evidence(source: DataSource, thesis: str) -> Reading | None:
     """Evidence for and against a thesis, in groups.
 
-    crude_tightness: ten lines in four groups. Time structure (two curves, spot against futures for
-    WTI and Brent), US crude stocks (level against the five-year average, Cushing against its own
-    three years, the four-week change against its usual), refining demand (refinery runs against
-    the same week of earlier years, the crack spread), and fund positioning, which is sentiment and
-    is shown but not counted. The lines inside a group measure nearly the same thing, so the balance
-    counts groups: a group reads tight or loose only when more than half of its lines do.
+    crude_tightness: ten lines in four groups. Time structure (the Brent and WTI curves, spot against
+    futures for WTI and Brent), US crude stocks (the seasonal percentile of the level, Cushing's
+    z-score, the four-week change against its usual), refining demand (refinery utilisation, the 3-2-1
+    crack's z-score), and fund positioning, which is sentiment and is shown but not counted. The lines
+    inside a group measure nearly the same thing, so the balance counts groups: a group reads tight or
+    loose only when more than half of its lines do.
 
-    Thresholds are fixed here and were set from eight years of weekly data so that a line is neutral
-    in roughly half of all weeks; each line with a history prints how often it has read tight and
-    loose, so a reader can discount one that usually fires. The model writes the conclusion; it
-    cannot choose the lines or leave out the ones that disagree: `counter` goes into the caveats.
+    Six lines are the server's (SERVER_LINES, 21 Nov 2026): the metric comes from its live snapshot and
+    the verdict from its own evaluation of the named signals, so the scorecard reads exactly what
+    get_signals reads; they mark extremes and have no record of their own here. The other four have no
+    server signal; their thresholds are fixed here, set from eight years of weekly data so that a line
+    is neutral in roughly half of all weeks, and each with a history prints how often it has read tight
+    and loose. The model writes the conclusion; it cannot choose the lines or leave out the ones that
+    disagree: `counter` goes into the caveats.
     """
     if thesis != "crude_tightness":
         return None
@@ -981,7 +1027,7 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         record_values = {"wti_front_above_fourth_month_share_pct": share}
     else:
         record, record_values = "no record, the history starts in 2026", {}
-    for market, label in (("brent", "Brent"), ("wti", "WTI")):
+    for market, label in (("wti", "WTI"),):  # Brent's curve is a server line (m1_m12): SERVER_LINES
         c = curve(source, market)
         if c:
             n = max(int(k[1:]) for k in c.values if k[1:].isdigit())
@@ -1008,16 +1054,7 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
     long_ago = _since(366 * (BASE_RATE_YEARS + 7))
     stocks = source.history(US_STOCKS, start=long_ago)
     if len(stocks) > 60 and stocks[-1][0] >= _since(30):
-        idx, last = _week_index(stocks), len(stocks) - 1
-        got = _vs_5y(stocks, idx, last)
-        if got:
-            x = round(got[0], 2)
-            lines.append(_scored(
-                "us_stocks_vs_5y", "stocks",
-                f"US commercial crude stocks: {abs(x):.2f}% {_side(x)} the five-year average for the week "
-                f"({stocks[-1][0]}; tight below -5%, loose above 5%",
-                x, -5, 5, "low", stocks[-1][0], [US_STOCKS], {"us_stocks_vs_5y_pct": x},
-                _base_rate(stocks, lambda i: (g := _vs_5y(stocks, idx, i)) and g[0], -5, 5, "low")))
+        idx, last = _week_index(stocks), len(stocks) - 1  # the level is a server line (crude_seasonal_pctl)
         gap = _gap_4w(stocks, idx, last)
         if gap:
             chg, usual, g = round(gap[0], 3), round(gap[1], 3), round(gap[2], 2)
@@ -1029,49 +1066,9 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
                 g, -2, 2, "low", stocks[-1][0], [US_STOCKS],
                 {"us_stocks_4w_change": chg, "us_stocks_4w_usual_change": usual, "us_stocks_4w_gap_pct": g},
                 _base_rate(stocks, lambda i: (q := _gap_4w(stocks, idx, i)) and q[2], -2, 2, "low")))
-    cushing = source.history(CUSHING_STOCKS, start=long_ago)
-    if len(cushing) > 200 and cushing[-1][0] >= _since(30):
-        x = _rolling_rank(cushing, len(cushing) - 1, PERCENTILE_WEEKS)
-        lines.append(_scored(
-            "cushing_stocks", "stocks",
-            f"Cushing crude stocks: percentile {x:.1f} of their own last three years "
-            f"({cushing[-1][0]}; tight below 20, loose above 80",
-            x, 20, 80, "low", cushing[-1][0], [CUSHING_STOCKS], {"cushing_stocks_percentile": x},
-            _base_rate(cushing, lambda i: _rolling_rank(cushing, i, PERCENTILE_WEEKS) if i >= PERCENTILE_WEEKS else None, 20, 80, "low")))
-
-    runs = source.history(REFINERY_UTIL, start=long_ago)
-    if len(runs) > 60 and runs[-1][0] >= _since(30):
-        idx = _week_index(runs)
-        got = _vs_5y(runs, idx, len(runs) - 1)
-        if got:
-            x = round(got[1], 2)
-            lines.append(_scored(
-                "refinery_utilisation", "refining",
-                f"US refinery utilisation: {runs[-1][1]:.1f}% of capacity, {abs(x):.2f} points {_side(x)} the five-year average for the week "
-                f"({runs[-1][0]}; tight more than 3 points above, loose more than 3 points below",
-                x, -3, 3, "high", runs[-1][0], [REFINERY_UTIL],
-                {"refinery_utilisation_pct": runs[-1][1], "refinery_utilisation_vs_5y_points": x},
-                _base_rate(runs, lambda i: (g := _vs_5y(runs, idx, i)) and g[1], -3, 3, "high")))
-    k = crack(source, "3-2-1")
-    if k:
-        x = k.values["crack_percentile"]
-        hist = crack_history(source, "3-2-1", 366 * (BASE_RATE_YEARS + 3))
-        lines.append(_scored(
-            "crack", "refining",
-            f"3-2-1 crack spread: {k.values['crack']:.2f} dollars per barrel, percentile {x:.1f} of three years "
-            f"({k.period}; tight above 70, loose below 30",
-            x, 30, 70, "high", k.period, k.series_ids, {"crack_spread": k.values["crack"], "crack_spread_percentile": x},
-            _base_rate(hist, lambda i: _rolling_rank(hist, i, 750) if i >= 750 else None, 30, 70, "high", step=5)))
-    p = positioning(source, "wti")
-    if p:
-        x = p.values["net_percentile"]
-        net = source.history(p.series_ids[0], start=long_ago)
-        lines.append(_scored(
-            "fund_positioning", "sentiment",
-            f"Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net at "
-            f"percentile {x:.1f} of three years ({p.period}; tight above 70, loose below 30",
-            x, 30, 70, "high", p.period, p.series_ids[:1], {"fund_net_percentile": x},
-            _base_rate(net, lambda i: _rolling_rank(net, i, PERCENTILE_WEEKS) if i >= PERCENTILE_WEEKS else None, 30, 70, "high")))
+    # Cushing, refinery runs, the crack and fund positioning are server lines: the server's metric and its signals'
+    # verdict (SERVER_LINES), so this scorecard reads what get_signals reads.
+    lines += _server_lines(source)
     if len(lines) < 5:
         return None
 
@@ -1120,16 +1117,18 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
                      f"{sum(ln['group'] == g for ln in lines)} lines" for g, v in groups.items() if g != "sentiment")
     return Reading(
         key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against, in groups",
-        period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels (stated on each line)",
+        period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels, z-scores (stated on each line)",
         series_ids=list(dict.fromkeys(i for ln in lines for i in ln["ids"])), values=values,
         note=(f"The evidence {balance}: of {len(counted)} groups of physical evidence, {counted.count(1)} read tight, "
               f"{counted.count(-1)} loose and {counted.count(0)} neutral ({said}). The lines inside a group measure nearly "
               "the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its "
               "lines do. Fund positioning "
               f"is sentiment: it reads {word[groups.get('sentiment', 0)]} and is shown but not counted. Each line states its "
-              "threshold and, where eight years of history exist, how often it has read tight and loose, so a line that "
-              "usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it "
-              "is not a forecast." + depends),
+              "threshold. The lines scored by the server's signals use the server's metric and its signals' verdict, the "
+              "same as the server's signal reading, and mark extremes; the others have no server signal and, where eight "
+              "years of history exist, say how often they have read tight and loose, so a line that usually fires can be "
+              "discounted. It covers the futures curves and US data, not the world balance, and it is not a forecast."
+              + depends),
         context=context,
         counter=("Against the balance of the evidence: " + "; ".join(ln["text"] for ln in minority) + ".") if minority else "")
 

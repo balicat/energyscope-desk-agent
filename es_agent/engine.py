@@ -609,6 +609,15 @@ def _report(source, body):
                     values, " ".join(parts), "written by the server's rules, the same text on every run", value_units=vu)
 
 
+def live_evaluation(source: DataSource) -> tuple[dict, dict, str]:
+    """The live snapshot's metrics, the server's evaluation of its whole catalogue over them, and when the snapshot
+    was taken: one request, the same body get_signals sends, so the evidence scorecard reads the very evaluation
+    get_signals shows (21 Nov 2026: the scorecard's own seasonal said "neutral" beside the server's "percentile 0")."""
+    snap = source.snapshot()
+    body = {"metrics": {k: v for k, v in snap["metrics"].items() if _num(v) is not None}}
+    return body, source.action("derived_signals", body), snap.get("fetched_at", "")
+
+
 def signals(source: DataSource) -> Reading:
     """The server's whole signal catalogue over its live metric snapshot: what fires and which contradictions."""
     snap = source.snapshot()

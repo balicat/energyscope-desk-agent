@@ -554,12 +554,12 @@ def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline",
 @agent.tool
 def get_evidence(ctx: RunContext[Deps], thesis: Literal["crude_tightness"]) -> Reading:
     """The evidence for and against a thesis, as a fixed scorecard. crude_tightness: ten lines in four groups
-    (time structure: Brent and WTI curves, spot against futures; US crude stocks: level against the five-year
-    average, Cushing against its own three years, the four-week change against its usual; refining demand:
-    refinery runs against the same week of earlier years, the 3-2-1 crack; and fund positioning, shown but
-    not counted). Each line is scored tight, loose or neutral against a stated threshold and says how often
-    it has read each way in eight years; the balance counts groups. Use for 'is the market tight / tightening
-    / loosening', 'what is the evidence', 'what argues against'."""
+    (time structure: Brent and WTI curves, spot against futures; US crude stocks: the seasonal percentile of the
+    level, Cushing's z-score, the four-week change against its usual; refining demand: refinery utilisation, the
+    3-2-1 crack's z-score; and fund positioning, shown but not counted). Each line is scored tight, loose or
+    neutral against a stated threshold; six of them are scored by the server's own signals, on the same metrics
+    get_signals reads, and the others say how often they have read each way in eight years. The balance counts
+    groups. Use for 'is the market tight / tightening / loosening', 'what is the evidence', 'what argues against'."""
     ctx.deps.emit("get_evidence", {"thesis": thesis})
     return _keep(ctx, readings.evidence(ctx.deps.source, thesis), f"Not enough recent data for {thesis}.")
 
