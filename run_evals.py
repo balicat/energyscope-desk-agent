@@ -266,10 +266,17 @@ def spent(messages) -> float:
     return total
 
 
-REPEATS_MOST = 60   # a live run had 38 and 39 on 20 Nov 2026; the gate blocks above this
+# A live run had 38 and 39 on 20 Nov 2026 over 32 questions; the gate blocked above 60, about two a question. On
+# 21 Nov 2026 the suite grew to 41 questions (the server's analytics), and the first live run had 56 in 21 of them,
+# seven of them new questions whose readings carry a series the model then lists as a fact. The limit keeps the
+# same two a question: 80.
+REPEATS_MOST = 80
 REPEATS_SEEN = {"arb_us_europe", "brent_curve", "brent_wti_spread", "crack_321", "crude_vs_5y", "freight_history", "futures_spread",
                 "henry_hub_percentile", "oman_curve", "spot_vs_futures", "week_surprises", "week_watch", "wti_curve",
-                "wti_positioning"}
+                "wti_positioning",
+                # seen on 21 Nov 2026, the first live run with the server's analytics
+                "crude_tight", "describe_wti", "eia_weekly_brief", "futures_crack", "wti_five_years", "wti_stats",
+                "wti_volatility"}
 
 
 def make_task(model_name: str, enforce: bool = True):

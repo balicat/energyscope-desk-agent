@@ -20,7 +20,7 @@ import datetime as dt
 import math
 import re
 
-from . import clock
+from . import clock, readings
 from .models import Reading
 from .sources import DataSource, ServerError, parse_period
 
@@ -52,6 +52,20 @@ def flatten(doc: dict, skip: tuple[str, ...] = (), depth: int = 2, prefix: str =
             out[name] = n
         elif isinstance(v, dict) and depth > 0:
             out.update(flatten(v, skip, depth - 1, name + "."))
+    return out
+
+
+def list_values(doc: dict, *names: str, most: int = MAX_LINES) -> dict[str, float]:
+    """The numbers of list items (breaks, segments, outliers, episodes) as values named list.n.field, counted from
+    1. In the context alone a number can be quoted only exactly as written; as a value it may be rounded."""
+    out: dict[str, float] = {}
+    for name in names:
+        for i, item in enumerate((doc.get(name) or [])[:most], 1):
+            if isinstance(item, dict):
+                for k, v in item.items():
+                    n = _num(v)
+                    if n is not None and k != "index":
+                        out[f"{name}.{i}.{k}"] = n
     return out
 
 
@@ -140,6 +154,15 @@ def _percentile(source, body, years):
     first = _iso(doc.get("first_period", ""))
     ctx = (f"Ranked against {int(values.get('observations', 0))} values from {first} to {_iso(doc.get('last_period', ''))}. "
            "percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean.")
+    # How long the level has been unusual and when it was last so: not a statistic the server has. Written here
+    # over the same window, as the Librarian's own percentile wrote it before 21 Nov 2026 ("is tanker freight
+    # unusually high, and when was it last this high?" lost its second half when the server's reading replaced it).
+    end = min(dt.date.fromisoformat(body["end"]), _period(doc, "target_period", "last_period"))
+    hist = [(d, v) for d, v in source.history(body["series"], start=dt.date.fromisoformat(body["start"])) if d <= end]
+    if len(hist) >= 20:
+        extra, sentence = readings.spell(hist)
+        values.update(extra)
+        ctx += " " + sentence
     short = ""
     try:
         if parse_period(first) > dt.date.fromisoformat(body["start"]) + dt.timedelta(days=45):
@@ -182,7 +205,8 @@ def _seasonal(source, body):
 
 
 def _series_window(tool: str, action: str, title: str, extra: dict | None = None, skip=("series_id",), units=None,
-                   context=None, period=("last_date", "last_period", "current_period"), last_row: bool = False):
+                   context=None, period=("last_date", "last_period", "current_period"), last_row: bool = False,
+                   lists: tuple[str, ...] = (), percent_of: tuple[str, ...] = ()):
     """A builder for an action that takes one series and a window: stats, volatility, returns, ..."""
 
     def build(source: DataSource, series_id: str, years: int = 3, **params) -> Reading:
@@ -198,6 +222,9 @@ def _series_window(tool: str, action: str, title: str, extra: dict | None = None
         values = flatten(doc, skip=skip)
         if last_row:   # the numbers of these actions are in the last row of a table
             values.update(_flatten_last_row(doc))
+        values.update(list_values(doc, *lists))
+        for k in [k for k in values if k.endswith(percent_of)] if percent_of else []:
+            values[k + "_pct"] = round(values[k] * 100, 6)   # the model may not convert: code gives the percent
         values["years"] = float(years)
         ctx = context(doc) if context else ""
         ctx = (f"Window {body['start']} to {body['end']}. " + ctx).strip()
@@ -257,16 +284,18 @@ def _ctx_latest_row(doc):
 
 
 stats = _series_window("stats", "stats", "descriptive statistics", period=("last_date",))
-volatility = _series_window("volatility", "volatility", "volatility (annualised, rolling and GARCH)",
-                            units=lambda u: "annualised, as a fraction", context=_ctx_latest_row, last_row=True)
+volatility = _series_window("volatility", "volatility", "volatility (annualised, rolling and GARCH(1,1))",
+                            units=lambda u: "annualised, as a fraction (the _pct values: the same in percent)",
+                            context=_ctx_latest_row, last_row=True, percent_of=("rolling_vol", "garch_vol"))
 returns = _series_window("returns", "returns", "returns and drawdown", units=lambda u: "percent", context=_ctx_returns)
-breakpoints = _series_window("breakpoints", "breakpoints", "structural breaks", context=_ctx_breakpoints)
-outliers = _series_window("outliers", "outliers", "outliers", context=_ctx_outliers)
+breakpoints = _series_window("breakpoints", "breakpoints", "structural breaks", context=_ctx_breakpoints,
+                             lists=("breakpoints", "segments"))
+outliers = _series_window("outliers", "outliers", "outliers", context=_ctx_outliers, lists=("outliers",))
 unit_root = _series_window("unit_root", "unit_root", "unit-root tests", extra={"test": "all"},
                            units=lambda u: "test statistics", context=_ctx_unit_root)
 acf = _series_window("acf", "acf", "autocorrelation", units=lambda u: "correlation coefficient", context=_ctx_acf)
 bubble_test = _series_window("bubble_test", "bubble_test", "test for explosive (bubble) behaviour",
-                             units=lambda u: "test statistics", context=_ctx_bubble)
+                             units=lambda u: "test statistics", context=_ctx_bubble, lists=("episodes",))
 seasonality = _series_window("seasonality", "seasonality", "seasonal decomposition (trend, seasonal, residual)",
                              context=_ctx_latest_row, last_row=True)
 hp_filter = _series_window("hp_filter", "hp_filter", "trend and cycle (Hodrick-Prescott filter)", context=_ctx_latest_row,
@@ -520,6 +549,7 @@ def _maintenance(source, body):
     name, units = _name(source, body["series"])
     doc = source.action("maintenance_signal", body)
     values = flatten(doc, skip=("series_id", "mode", "frequency"))
+    values.update(list_values(doc, "events"))
     ctx = _lines("Maintenance events", doc.get("events") or []) + " " + _lines("Flagged weeks", doc.get("flagged_weeks") or [])
     return _reading("maintenance", "maintenance_signal", body, f"maintenance:{body['series']}",
                     f"{name}: weeks of unusually low runs (maintenance)", clock.today(), units, [body["series"]], values, ctx)

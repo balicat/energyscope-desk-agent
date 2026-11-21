@@ -637,6 +637,17 @@ def newer_than_its_reading(src: Observation | Change, series_id: str, readings: 
     return min(dated) if dated and latest > min(dated) else None
 
 
+def copy_observation(f: SeriesFact, src: Observation) -> SeriesFact:
+    """A fact a latest-value tool returned, shown with the tool's figures. An observation has no earlier value, so
+    a base, a change or a percent on it can only have been typed by the model: they are removed. Until 21 Nov 2026
+    they stayed: after a five-year history reading the live model put that reading's change (12.79, 16.67 percent,
+    rounded) onto the latest-value fact, nothing checked it, and the fact's Excel sheet gave 16.6667. The summary's
+    numbers are still traced, to the reading that holds them."""
+    f.latest_value, f.name, f.units = src.value, src.name, src.units
+    f.base_period = f.base_value = f.change_abs = f.change_pct = None
+    return f
+
+
 def fact_from_data(src: Observation | Change) -> SeriesFact:
     """A fact with the tool's own figures, name and units: nothing in it was typed by the model."""
     if isinstance(src, Observation):
@@ -677,7 +688,7 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
                 f.change_abs, f.change_pct = src.change_abs, src.change_pct
                 f.name, f.units = src.name, src.units   # a mistyped unit would go straight into a sheet's label
         elif isinstance(src, Observation) and f.latest_period == src.period and metrics.close(f.latest_value, src.value):
-            f.latest_value, f.name, f.units = src.value, src.name, src.units
+            copy_observation(f, src)
     # The model's caveats are held to the same tracing as the summary: one that states a number or a
     # date no tool returned is removed, because a caveat is where a number goes when the summary may not hold it.
     # What the visitor wrote: the prompt without the lines that quote The Librarian's own earlier answers.

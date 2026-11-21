@@ -23,6 +23,8 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
             problems.append(f"{f.series_id} does not exist")
             continue
         lb = f.lookback_days or 0
+        if not lb and any(x is not None for x in (f.base_period, f.base_value, f.change_abs, f.change_pct)):
+            problems.append(f"{f.series_id}: a change on a latest value, which no tool returns")
         hist = source.history(f.series_id, start=clock.today() - dt.timedelta(days=lb + 400))
         truth = metrics.change_over(hit, hist, lb) if lb else metrics.latest_obs(hit, hist)
         if truth is None:

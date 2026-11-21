@@ -70,8 +70,10 @@ def unit_key(units: str) -> str:
 
 
 def _kind(key: str) -> str:
-    parts = key.lower().split("_")
-    if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years") for p in parts):
+    # a server reading's names are nested with dots ("coverage.observations", "segments.2.mean"): split on both
+    parts = re.split(r"[._]", key.lower())
+    # a half-life is counted in observations ("a half-life of 10.04 days")
+    if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years", "life") for p in parts):
         return "count"
     if "percentile" in parts or key.endswith("_pct") or "percentile" in key:
         return "percent"
@@ -153,6 +155,10 @@ def pool_of(answer: DeskAnswer) -> Pool:
     for r in answer.readings:
         for k, v in r.values.items():
             p.add(k, v)
+            # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
+            q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
+            if q:
+                p.names.add(q[1])
         p.dates.add(r.period)
         p.text(r.title, r.note, r.context, r.counter, r.key, " ".join(r.series_ids), " ".join(r.values))
         p.label(r.units, r.title, r.note, r.context, " ".join(r.values))

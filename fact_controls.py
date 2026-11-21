@@ -14,7 +14,7 @@ import datetime as dt
 import sys
 
 from es_agent import clock
-from es_agent.agent import fact_from_data, newer_than_its_reading, read_fact, repeats_of_readings
+from es_agent.agent import copy_observation, fact_from_data, newer_than_its_reading, read_fact, repeats_of_readings
 from es_agent.models import Change, Observation, Reading, SeriesFact, SeriesHit
 
 D = clock.today()   # the stand-in data moves with the clock, so the change's window always holds it
@@ -96,6 +96,13 @@ def main() -> int:
     extra.append(("with two readings carrying the series, the earlier date decides",
                   newer_than_its_reading(obs, "X.D", [reading(D), reading(yesterday)]) == yesterday))
     extra.append(("a change is judged by its latest date", newer_than_its_reading(ch, "X.D", [reading(yesterday)]) == yesterday))
+    # a change typed onto a latest-value fact (21 Nov 2026, live): the observation keeps nothing the model added
+    typed = SeriesFact(series_id="X.D", name="typed", units="typed", latest_period=D, latest_value=12.0,
+                       base_period=D - dt.timedelta(days=2), base_value=10.0, change_abs=2.0, change_pct=20.0)
+    shown = copy_observation(typed, obs)
+    extra.append(("a change typed onto a latest value is removed; the value, name and units are the data's",
+                  (shown.base_period, shown.base_value, shown.change_abs, shown.change_pct) == (None, None, None, None)
+                  and (shown.latest_value, shown.name, shown.units) == (12.0, "Series X", "dollars")))
     for what, ok in extra:
         wrong += not ok
         print(("ok    " if ok else "WRONG ") + what)

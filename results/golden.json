@@ -785,7 +785,7 @@
   "facts": [],
   "readings": [
    {
-    "context": "Ranked against 753 values from 2023-11-21 to 2026-11-20. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean.",
+    "context": "Ranked against 753 values from 2023-11-21 to 2026-11-20. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean. It has been above the 90th percentile line (268.00) since 2026-07-31, 112 days, allowing for brief dips back. There is no earlier spell beyond that line in the window.",
     "counter": "",
     "hypothetical": false,
     "key": "percentile:SHIP.BWET.D:3",
@@ -811,11 +811,14 @@
      "median": 17.225,
      "min": 9.06,
      "observations": 753.0,
+     "p10": 10.815,
      "p25": 12.465,
      "p5": 10.421,
      "p75": 55.38,
+     "p90": 268.0,
      "p95": 703.4406,
      "percentile": 96.015936,
+     "spell_days": 112.0,
      "std": 211.431908,
      "target_value": 745.77,
      "years": 3.0,
@@ -824,7 +827,7 @@
    }
   ],
   "spreads": [],
-  "summary": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years on 2026-11-20: target_value 745.77, observations 753.00, mean 104.61, std 211.43, min 9.06, max 1012.75, p5 10.42, p25 12.46, median 17.23, p75 55.38, p95 703.44, zscore 3.03, percentile 96.02, years 3.00."
+  "summary": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years on 2026-11-20: target_value 745.77, observations 753.00, mean 104.61, std 211.43, min 9.06, max 1012.75, p5 10.42, p25 12.46, median 17.23, p75 55.38, p95 703.44, zscore 3.03, percentile 96.02, years 3.00, p10 10.81, p90 268.00, spell_days 112.00."
  },
  "futures_crack": {
   "caveats": [],
@@ -921,7 +924,7 @@
   "facts": [],
   "readings": [
    {
-    "context": "Ranked against 747 values from 2023-11-21 to 2026-11-17. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean.",
+    "context": "Ranked against 747 values from 2023-11-21 to 2026-11-17. percentile 0 = lowest of the window, 100 = highest; zscore = standard deviations from the window's mean. It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
     "counter": "",
     "hypothetical": false,
     "key": "percentile:NG.RNGWHHD.D:3",
@@ -947,9 +950,11 @@
      "median": 2.9,
      "min": 1.21,
      "observations": 747.0,
+     "p10": 1.83,
      "p25": 2.44,
      "p5": 1.58,
      "p75": 3.22,
+     "p90": 3.9,
      "p95": 4.364,
      "percentile": 65.930388,
      "std": 1.715942,
@@ -960,7 +965,7 @@
    }
   ],
   "spreads": [],
-  "summary": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years on 2026-11-17: target_value 3.10, observations 747.00, mean 3.00, std 1.72, min 1.21, max 30.72, p5 1.58, p25 2.44, median 2.90, p75 3.22, p95 4.36, zscore 0.06, percentile 65.93, years 3.00."
+  "summary": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years on 2026-11-17: target_value 3.10, observations 747.00, mean 3.00, std 1.72, min 1.21, max 30.72, p5 1.58, p25 2.44, median 2.90, p75 3.22, p95 4.36, zscore 0.06, percentile 65.93, years 3.00, p10 1.83, p90 3.90."
  },
  "hormuz_tankers": {
   "caveats": [
@@ -1552,13 +1557,34 @@
     "title": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years",
     "units": "Dollars per Barrel",
     "values": {
+     "breakpoints.1.mean_after": 71.16,
+     "breakpoints.1.mean_before": 76.447,
+     "breakpoints.1.shift": -5.287,
+     "breakpoints.2.mean_after": 67.486,
+     "breakpoints.2.mean_before": 71.08,
+     "breakpoints.2.shift": -3.594,
+     "breakpoints.3.mean_after": 87.335,
+     "breakpoints.3.mean_before": 66.168,
+     "breakpoints.3.shift": 21.167,
      "n_breakpoints": 3.0,
+     "segments.1.count": 190.0,
+     "segments.1.mean": 78.7,
+     "segments.1.std": 4.391978,
+     "segments.2.count": 125.0,
+     "segments.2.mean": 71.74112,
+     "segments.2.std": 2.813448,
+     "segments.3.count": 250.0,
+     "segments.3.mean": 63.63908,
+     "segments.3.std": 3.968847,
+     "segments.4.count": 183.0,
+     "segments.4.mean": 92.707377,
+     "segments.4.std": 10.541531,
      "years": 3.0
     }
    }
   ],
   "spreads": [],
-  "summary": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years on 2026-11-21: n_breakpoints 3.00, years 3.00."
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years on 2026-11-21: n_breakpoints 3.00, breakpoints.1.mean_before 76.45, breakpoints.1.mean_after 71.16, breakpoints.1.shift -5.29, breakpoints.2.mean_before 71.08, breakpoints.2.mean_after 67.49, breakpoints.2.shift -3.59, breakpoints.3.mean_before 66.17, breakpoints.3.mean_after 87.33, breakpoints.3.shift 21.17, segments.1.mean 78.70, segments.1.std 4.39, segments.1.count 190.00, segments.2.mean 71.74, segments.2.std 2.81, segments.2.count 125.00, segments.3.mean 63.64, segments.3.std 3.97, segments.3.count 250.00, segments.4.mean 92.71, segments.4.std 10.54, segments.4.count 183.00, years 3.00."
  },
  "wti_curve": {
   "caveats": [],
@@ -1773,21 +1799,25 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
-    "title": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH), last 3 years",
-    "units": "annualised, as a fraction",
+    "title": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH(1,1)), last 3 years",
+    "units": "annualised, as a fraction (the _pct values: the same in percent)",
     "values": {
      "current.annualised_factor": 252.0,
      "current.garch_vol": 0.523382,
+     "current.garch_vol_pct": 52.3382,
      "current.rolling_vol": 0.539113,
+     "current.rolling_vol_pct": 53.9113,
      "current.window": 20.0,
      "latest.garch_vol": 0.523382,
+     "latest.garch_vol_pct": 52.3382,
      "latest.return": 0.003244,
      "latest.rolling_vol": 0.539113,
+     "latest.rolling_vol_pct": 53.9113,
      "years": 3.0
     }
    }
   ],
   "spreads": [],
-  "summary": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH), last 3 years on 2026-11-17: current.rolling_vol 0.54, current.annualised_factor 252.00, current.window 20.00, current.garch_vol 0.52, latest.return 0.00, latest.rolling_vol 0.54, latest.garch_vol 0.52, years 3.00."
+  "summary": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH(1,1)), last 3 years on 2026-11-17: current.rolling_vol 0.54, current.annualised_factor 252.00, current.window 20.00, current.garch_vol 0.52, latest.return 0.00, latest.rolling_vol 0.54, latest.garch_vol 0.52, current.rolling_vol_pct 53.91, current.garch_vol_pct 52.34, latest.rolling_vol_pct 53.91, latest.garch_vol_pct 52.34, years 3.00."
  }
 }
