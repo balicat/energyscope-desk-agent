@@ -35,7 +35,9 @@ freight = Reading(key="percentile:SHIP.BWET.D:3", title="Tanker freight proxy ag
                   context="It has been above the 90th percentile line (25.10) since 2026-07-30, 110 days, allowing for brief dips back.")
 funds = Reading(key="positioning:wti", title="WTI crude (NYMEX): managed-money positioning", period=dt.date(2026, 11, 10),
                 units="contracts", series_ids=["CFTC.WTI.MM_Net"],
-                values={"managed_money_net": 151200.0, "net_change_on_week": 12000.0, "net_percentile": 6.8, "percentile_weeks": 156})
+                values={"managed_money_net": 151200.0, "net_change_on_week": 12000.0, "net_percentile": 6.8, "percentile_weeks": 156},
+                # as readings.default_units gives them when a tool keeps the reading
+                value_units={"managed_money_net": "contracts", "net_change_on_week": "contracts"})
 gap = Spread(series_a="PET.RBRTE.D", name_a="Brent spot", series_b="PET.RWTC.D", name_b="WTI spot", units="USD/bbl",
              period=dt.date(2026, 11, 11), value_a=87.48, value_b=88.10, spread=-0.62)
 brent_curve = Reading(key="curve:brent", title="Brent futures curve", period=D, units="USD/bbl",
@@ -56,7 +58,16 @@ report = Reading(key="report:eia_weekly", title="US weekly petroleum, standing r
                  values={"Total gasoline.value": 215949.0, "Total gasoline.value_in_million_barrels": 215.949,
                          "Regular gasoline.wow": -0.19, "Regular gasoline.value": 3.81},
                  context="Lede: Regular gasoline fell by 0.19, to 3.81 Dollars per Gallon, a 2.2-sigma move.",
-                 request={"tool": "report", "action": "report", "body": {"preset": "eia_weekly"}})
+                 request={"tool": "report", "action": "report", "body": {"preset": "eia_weekly"}},
+                 # as engine._report writes them: each row in its own unit, the shown figures in theirs
+                 value_units={"Total gasoline.value": "Thousand Barrels", "Total gasoline.value_in_million_barrels": "Million Barrels",
+                              "Regular gasoline.wow": "Dollars per Gallon", "Regular gasoline.value": "Dollars per Gallon"})
+# Round 3 of the adversary: hyphenated terms of a server text, and a snapshot metric that is itself a change
+signals_r = Reading(key="signals:live", title="The server's signals and contradictions, live", period=D, units="as each metric",
+                    series_ids=[], values={"metric.opec_call_qoq_change": 0.546, "metric.m1_m12": -15.26, "steep_backwardation.threshold": -10.0},
+                    context=("Signal firing: steep_backwardation (elevated): 12-month curve, M12-M1 of -15.26 is below the -10 "
+                             "threshold. Lede: crude imports moved 1.8-sigma."),
+                    request={"tool": "signals", "action": "derived_signals", "body": {}})
 seasonal3 = Reading(key="seasonal:PET.WCESTUS1.W:3", title="US crude stocks: latest against the same time of year, previous 3 years",
                     period=dt.date(2026, 11, 13), units="Thousand Barrels", series_ids=["PET.WCESTUS1.W"],
                     values={"current_value": 417797.0, "seasonal_avg": 434167.0, "lookback_years": 3.0},
@@ -148,6 +159,23 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      summary="Stocks of 417,797 thousand barrels are below the ten-year average of 434,167.")),
     ("a number that stands only in a server reading's text", dict(readings=[report],
      summary="Regular gasoline moved 2.2 sigma to 3.81 dollars per gallon.")),
+    # A true number written with another true number's unit (David, 21 Nov 2026: "we should try to fix this").
+    # Until then each was true somewhere in the answer and the sentence passed; a number now matches a value in the
+    # unit it is written with.
+    ("a report's price change written as a stock in million barrels",
+     dict(readings=[report], summary="Gasoline stocks were 0.19 million barrels on the week.")),
+    ("a stock written in dollars a gallon", dict(readings=[report], summary="Gasoline cost 215.9 dollars a gallon.")),
+    ("a stock in thousand barrels written as million barrels", dict(facts=[stocks], summary="US crude stocks are 414,417 million barrels.")),
+    ("a price written in thousand barrels", dict(facts=[wti_up], summary="WTI spot is 88.10 thousand barrels.")),
+    ("a fund position in contracts written in dollars", dict(readings=[funds], summary="Managed money is net long $151,200.")),
+    ("a percent written for a price", dict(facts=[wti], summary="WTI futures are at 88.10%.")),
+    # round 3 of the adversary
+    ("the 8 of a 1.8-sigma move written as a stock change (a digit of a decimal is not a name)",
+     dict(readings=[signals_r], summary="US crude stocks fell by 8 million barrels on the week.")),
+    ("the 12 of a 12-month curve written as a price (a hyphen term's number, written without its hyphen)",
+     dict(readings=[signals_r], summary="Brent rose $12 a barrel.")),
+    ("a snapshot metric that rose, said to have fell",
+     dict(readings=[signals_r], summary="The opec call qoq change fell by 0.55.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
@@ -169,6 +197,11 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[report], summary="Regular gasoline fell 0.19 to 3.81 dollars per gallon; total gasoline stocks are 215.9 million barrels."),
     dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a three-year average of 434,167."),
     dict(readings=[seasonal3], summary="Over 36 months of the same week, the average was 434,167 thousand barrels."),
+    # the unit rule must let each number keep its own unit
+    dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels."),
+    dict(facts=[wti_up], summary="WTI spot rose 1.20 dollars a barrel, or 1.38%, to $88.10 per barrel."),
+    dict(readings=[funds], summary="Managed money is net long 151,200 contracts, at the 6.8th percentile."),
+    dict(readings=[signals_r], summary="The 12-month curve, M12 minus M1, is -15.26, below the -10 threshold; the OPEC call QoQ change is 0.55."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
@@ -185,11 +218,6 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
                             values={"latest": 31.4, "percentile": 96.0},
                             context="Above the line since 2026-07-30; the previous spell ended 2024-02-12.")],
           summary="Freight is at percentile 96, above the line since 2024-02-12; the previous spell ended 2026-07-30.")),
-    # A true number put with a unit of another true number: 0.19 is gasoline's weekly fall in dollars a gallon, and
-    # million barrels is the unit the report gives stocks in. The text's numbers now take the unit tests (they did
-    # not before 21 Nov 2026), and this still passes: the rules do not tie a number to its own unit.
-    ("a report's price change written as a stock in million barrels (the adversary, 21 Nov 2026)",
-     dict(readings=[report], summary="Gasoline stocks were 0.19 million barrels on the week.")),
     # windows in words the rule does not read (the adversary, round 2): no number in them, or one the answer has
     ("a three-year average called the average of the past decade",
      dict(readings=[seasonal3], summary="Stocks of 417,797 thousand barrels are below the average of the past decade, 434,167.")),

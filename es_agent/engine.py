@@ -145,12 +145,36 @@ def _name(source: DataSource, sid: str) -> tuple[str, str]:
     return hit.name, hit.units
 
 
+# Values with no unit: scores, tests, correlations, z-scores, factors. Matched on the last part of a value's name.
+_UNITLESS = re.compile(r"(?:^|[._])(?:z|zscore|z_score|z_of_latest|level_z|move_z|move_zscore|trough_zscore|threshold_z|"
+                       r"skewness|kurtosis|lambda|iterations|seasonal|resid|score|statistic|p_value|aic|acf|pacf|q_stat|"
+                       r"gsadf|cv_\d+|bsadf|peak_bsadf|\w*correlation|rolling_vol|garch_vol|return|avg_daily_return|"
+                       r"volatility|annualised_factor|confidence_band|range_position|significance|confidence|"
+                       r"critical_values\.\S+)$")
+
+
+def units_of(values: dict[str, float], unit: str | None, unitless_all: bool = False) -> dict[str, str]:
+    """The unit of each value: '1' for a value that has none, the series' unit for the rest. Percents and counts
+    are recognised by their names (prose._kind) and need no entry."""
+    from .prose import _kind
+    out = {}
+    for k in values:
+        if _kind(k) != "amount":
+            continue
+        if unitless_all or _UNITLESS.search(k):
+            out[k] = "1"
+        elif unit:
+            out[k] = unit
+    return out
+
+
 def _reading(tool: str, action: str, body: dict, key: str, title: str, period: dt.date, units: str,
              series_ids: list[str], values: dict[str, float], context: str = "", note: str = "",
-             counter: str = "", hypothetical: bool = False) -> Reading:
+             counter: str = "", hypothetical: bool = False, value_units: dict[str, str] | None = None) -> Reading:
     return Reading(key=key, title=title, period=period, units=units, series_ids=series_ids, values=values,
                    context=_clip(context), note=note, counter=counter, hypothetical=hypothetical,
-                   request={"tool": tool, "action": action, "body": body})
+                   request={"tool": tool, "action": action, "body": body},
+                   value_units=value_units if value_units is not None else {})
 
 
 def _flatten_last_row(doc):
@@ -197,7 +221,8 @@ def _percentile(source, body, years):
         pass
     return _reading("percentile", "percentile", body, f"percentile:{body['series']}:{years}",
                     f"{name}: latest against its last {years} years", _period(doc, "target_period", "last_period"),
-                    units, [body["series"]], values, ctx, "percentile 0 = lowest of the window, 100 = highest", short)
+                    units, [body["series"]], values, ctx, "percentile 0 = lowest of the window, 100 = highest", short,
+                    value_units=units_of(values, units))
 
 
 def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading:
@@ -230,12 +255,13 @@ def _seasonal(source, body):
     years = int(body["lookback_years"])
     return _reading("seasonal", "seasonal", body, f"seasonal:{body['series']}:{years}",
                     f"{name}: latest against the same time of year, previous {years} years",
-                    _period(doc, "current_period"), units, [body["series"]], values, ctx, note)
+                    _period(doc, "current_period"), units, [body["series"]], values, ctx, note,
+                    value_units=units_of(values, units))
 
 
 def _series_window(tool: str, action: str, title: str, extra: dict | None = None, skip=("series_id",), units=None,
                    context=None, period=("last_date", "last_period", "current_period"), last_row: bool = False,
-                   lists: tuple[str, ...] = (), percent_of: tuple[str, ...] = ()):
+                   lists: tuple[str, ...] = (), percent_of: tuple[str, ...] = (), unitless: bool = False):
     """A builder for an action that takes one series and a window: stats, volatility, returns, ..."""
 
     def build(source: DataSource, series_id: str, years: int = 3, **params) -> Reading:
@@ -262,7 +288,8 @@ def _series_window(tool: str, action: str, title: str, extra: dict | None = None
         key = f"{tool}:{body['series']}:{years}" + (f":{params}" if params else "")
         p = _period(doc, *period) if any(doc.get(f) for f in period) else _last_row_period(doc, body)
         return _reading(tool, action, body, key, f"{name}: {title}, last {years} years", p,
-                        units(u) if callable(units) else (units or u), [body["series"]], values, ctx)
+                        units(u) if callable(units) else (units or u), [body["series"]], values, ctx,
+                        value_units=units_of(values, u, unitless_all=unitless))
 
     build.rebuild = rebuild_series
     return build
@@ -316,16 +343,18 @@ def _ctx_latest_row(doc):
 stats = _series_window("stats", "stats", "descriptive statistics", period=("last_date",))
 volatility = _series_window("volatility", "volatility", "volatility (annualised, rolling and GARCH(1,1))",
                             units=lambda u: "annualised, as a fraction (the _pct values: the same in percent)",
-                            context=_ctx_latest_row, last_row=True, percent_of=("rolling_vol", "garch_vol"))
-returns = _series_window("returns", "returns", "returns and drawdown", units=lambda u: "percent", context=_ctx_returns)
+                            context=_ctx_latest_row, last_row=True, percent_of=("rolling_vol", "garch_vol"), unitless=True)
+returns = _series_window("returns", "returns", "returns and drawdown", units=lambda u: "percent", context=_ctx_returns,
+                         unitless=True)
 breakpoints = _series_window("breakpoints", "breakpoints", "structural breaks", context=_ctx_breakpoints,
                              lists=("breakpoints", "segments"))
 outliers = _series_window("outliers", "outliers", "outliers", context=_ctx_outliers, lists=("outliers",))
 unit_root = _series_window("unit_root", "unit_root", "unit-root tests", extra={"test": "all"},
-                           units=lambda u: "test statistics", context=_ctx_unit_root)
-acf = _series_window("acf", "acf", "autocorrelation", units=lambda u: "correlation coefficient", context=_ctx_acf)
+                           units=lambda u: "test statistics", context=_ctx_unit_root, unitless=True)
+acf = _series_window("acf", "acf", "autocorrelation", units=lambda u: "correlation coefficient", context=_ctx_acf,
+                     unitless=True)
 bubble_test = _series_window("bubble_test", "bubble_test", "test for explosive (bubble) behaviour",
-                             units=lambda u: "test statistics", context=_ctx_bubble, lists=("episodes",))
+                             units=lambda u: "test statistics", context=_ctx_bubble, lists=("episodes",), unitless=True)
 seasonality = _series_window("seasonality", "seasonality", "seasonal decomposition (trend, seasonal, residual)",
                              context=_ctx_latest_row, last_row=True)
 hp_filter = _series_window("hp_filter", "hp_filter", "trend and cycle (Hodrick-Prescott filter)", context=_ctx_latest_row,
@@ -373,7 +402,8 @@ def _pair(tool: str, action: str, title: str, units: str | None = None, context=
         ctx = f"Window {body['start']} to {body['end']}. " + (context(doc) if context else "")
         return _reading(tool, action, body, key, f"{na} and {nb}: {title}, last {years} years",
                         _last_row_period(doc, body), units or ua,
-                        [body["series_a"], body["series_b"]], values, ctx, counter=note)
+                        [body["series_a"], body["series_b"]], values, ctx, counter=note,
+                        value_units=units_of(values, ua, unitless_all=units is not None))
 
     build.rebuild = rebuild_pair
     return build
@@ -406,7 +436,8 @@ def _many(tool: str, action: str, title: str, units: str, flatten_doc=None, cont
         key = f"{tool}:{','.join(body['series'])}:{years}" + (f":{params}" if params else "")
         ctx = f"Window {body['start']} to {body['end']}. " + (context(doc) if context else "")
         return _reading(tool, action, body, key, f"{', '.join(names)}: {title}, last {years} years",
-                        min(clock.today(), dt.date.fromisoformat(body["end"])), units, list(body["series"]), values, ctx)
+                        min(clock.today(), dt.date.fromisoformat(body["end"])), units, list(body["series"]), values, ctx,
+                        value_units=units_of(values, None, unitless_all=True))
 
     build.rebuild = rebuild_many
     return build
@@ -456,10 +487,18 @@ def _changes(source, body):
         for k in ("latest", "previous", "change", "pct_change", "move_zscore"):
             if _num(r.get(k)) is not None:
                 values[f"{sid}.{k}"] = float(r[k])
+    vu = {}
+    for k in values:
+        sid, _, field = k.rpartition(".")
+        hit = source.meta(sid)
+        if field in ("latest", "previous", "change") and hit:
+            vu[k] = hit.units
+        elif field == "move_zscore":
+            vu[k] = "1"
     return _reading("changes", "changes", body, f"changes:{','.join(body['series'])}:{body['lookback_days']}",
                     f"The largest moves over {body['lookback_days']} days, ranked by how unusual each is",
                     clock.today(), "as each series", list(body["series"]), values,
-                    _lines("Ranked", rows, 20) + " move_zscore = the move against that series' own moves.")
+                    _lines("Ranked", rows, 20) + " move_zscore = the move against that series' own moves.", value_units=vu)
 
 
 # ---- the server's narrative layer --------------------------------------------------------------------------
@@ -505,18 +544,23 @@ def _thresholds(schema: dict, ids) -> dict[str, float]:
 def _report(source, body):
     doc = source.action("report", body)
     rows = doc.get("rows") or []
-    values = {}
+    values, vu = {}, {}
     for r in rows:
         label = r.get("label") or r.get("series_id", "")
         for k in ("value", "wow", "yoy", "move_z", "seasonal_pctl", "level_z"):
             if _num(r.get(k)) is not None:
                 values[f"{label}.{'seasonal_percentile' if k == 'seasonal_pctl' else k}"] = float(r[k])
+                if k in ("value", "wow", "yoy") and r.get("units"):
+                    vu[f"{label}.{k}"] = r["units"]
+                elif k in ("move_z", "level_z"):
+                    vu[f"{label}.{k}"] = "1"
         # the brief writes stocks in the unit it shows them in (215.9 Million Barrels): those figures are values
         # too, so its sentences can be quoted and traced with their unit
         if r.get("display_units") and r.get("display_units") != r.get("units"):
             for k in ("display_value", "display_wow", "display_yoy"):
                 if _num(r.get(k)) is not None:
-                    values[f"{label}.{k.replace('display_', '')}_in_{r['display_units'].lower().replace(' ', '_')}"] = float(r[k])
+                    name = f"{label}.{k.replace('display_', '')}_in_{r['display_units'].lower().replace(' ', '_')}"
+                    values[name], vu[name] = float(r[k]), r["display_units"]
     n = doc.get("narrative") or {}
     sig = n.get("signals") or {}
     for k, v in (sig.get("metrics") or {}).items():
@@ -537,7 +581,7 @@ def _report(source, body):
     return _reading("report", "report", body, f"report:{body['preset']}" + (f":{body['as_of']}" if body.get("as_of") else ""),
                     f"{PRESETS[body['preset']].split(':')[0]}, standing report as of {period}", period,
                     "; ".join(units) or "as each row", sorted({r.get('series_id') for r in rows if r.get('series_id')}),
-                    values, " ".join(parts), "written by the server's rules, the same text on every run")
+                    values, " ".join(parts), "written by the server's rules, the same text on every run", value_units=vu)
 
 
 def signals(source: DataSource) -> Reading:
@@ -610,7 +654,8 @@ def _describe(source, body):
            f"Used by: {', '.join(r.get('preset', '') for r in usage.get('reports') or []) or 'no standing report'}; "
            f"contradictions {', '.join(usage.get('contradictions') or []) or 'none'}.")
     return _reading("describe", "describe", body, f"describe:{body['series_id']}", f"{name}: the series card",
-                    _period(doc.get("latest") or {}, "period"), units, [body["series_id"]], values, ctx)
+                    _period(doc.get("latest") or {}, "period"), units, [body["series_id"]], values, ctx,
+                    value_units=units_of(values, units))
 
 
 def events(source: DataSource, days: int = 14) -> Reading:
@@ -637,7 +682,8 @@ def _maintenance(source, body):
     values.update(list_values(doc, "events"))
     ctx = _lines("Maintenance events", doc.get("events") or []) + " " + _lines("Flagged weeks", doc.get("flagged_weeks") or [])
     return _reading("maintenance", "maintenance_signal", body, f"maintenance:{body['series']}",
-                    f"{name}: weeks of unusually low runs (maintenance)", clock.today(), units, [body["series"]], values, ctx)
+                    f"{name}: weeks of unusually low runs (maintenance)", clock.today(), units, [body["series"]], values, ctx,
+                    value_units=units_of(values, units))
 
 
 # ---- the series itself ---------------------------------------------------------------------------------------
@@ -668,7 +714,8 @@ def _history(source, body):
     ctx = (f"From {hist[0][0]} to {hist[-1][0]}: {len(vals)} values. The low was on {lo[0]}, the high on {hi[0]}. "
            "Every value is in the chart on the page and in the Excel workbook's table.")
     return _reading("history", "", body, f"history:{body['series']}:{years}", f"{name}, last {years} years",
-                    hist[-1][0], units, [body["series"]], values, ctx, note=f"first value {hist[0][0]}")
+                    hist[-1][0], units, [body["series"]], values, ctx, note=f"first value {hist[0][0]}",
+                    value_units=units_of(values, units))
 
 
 # ---- rebuilding from the request -------------------------------------------------------------------------

@@ -241,6 +241,8 @@ def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
 def _keep(ctx: RunContext[Deps], reading: Reading | None, why: str) -> Reading:
     if reading is None:
         raise ModelRetry(why)
+    if not reading.value_units:   # the Librarian's own readings: the unit of each value, where they have one
+        reading.value_units = readings.default_units(reading)
     ctx.deps.readings[reading.key] = reading
     return reading
 

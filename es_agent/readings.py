@@ -1134,6 +1134,25 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         counter=("Against the balance of the evidence: " + "; ".join(ln["text"] for ln in minority) + ".") if minority else "")
 
 
+def default_units(r: Reading) -> dict[str, str]:
+    """The unit of each value of the readings whose values are of one unit (or of two, named): a curve, a crack, a
+    futures spread or crack, a positioning. The rest (evidence, watch, surprises, arbitrage, scenarios) mix units
+    without naming them, and their values stay of unknown unit: matched on the number alone."""
+    from .engine import units_of
+    kind = r.key.split(":", 1)[0]
+    if kind in ("curve", "fspread", "positioning"):
+        return units_of(r.values, r.units)
+    if kind in ("crack", "fcrack"):
+        out = units_of(r.values, "Dollars per Barrel")
+        for k in r.values:
+            if k.endswith("_per_gallon"):
+                out[k] = "Dollars per Gallon"
+            elif k == "gallons_per_barrel":
+                out[k] = "gallons per barrel"
+        return out
+    return {}
+
+
 def compute(source: DataSource, key: str) -> Reading | None:
     """Rebuild a reading from its key."""
     kind, _, rest = key.partition(":")

@@ -64,8 +64,14 @@ cites it, and does not speculate.
   summary and to every caveat the model writes:
   - every run of digits must be a valid rounding of a returned value of the right kind. A percentage cannot be
     quoted as dollars, a count of days cannot be quoted as a price move, `2,000` is not a year, and `USD97.72` is
-    still a number. A scale word or `per tonne` after a number must be in the units of something cited. A number
-    spelled out beside a unit is rejected.
+    still a number. A number written with a unit (`thousand barrels`, `dollars a gallon`, `contracts`, `%`) must
+    match a value of that number in that unit (since 21 Nov 2026: a price change of 0.19 dollars a gallon written
+    as "0.19 million barrels" passed until then, the number and the unit each true somewhere in the answer). Each
+    value's unit is code's (a fact's units, a reading's `value_units`); values of a reading that mixes units
+    without naming them (evidence, watch, surprises, arbitrage, scenarios, the signals' metrics) are still matched
+    on the number alone. Replayed over the 73 answers the public service had given, the rule refused none that the
+    rules before it accepted. A window named in words ("five-year") must be one a reading used. A number spelled
+    out beside a unit is rejected.
   - every date must be one a tool returned, written as YYYY-MM-DD. Month names, weekdays and quarters are rejected,
     because a date in words cannot be traced. A bare year passes only inside a returned name. Only code writes
     today's date.
@@ -87,8 +93,9 @@ cites it, and does not speculate.
 
   Each release closed the cases it had been shown; the next unseen set got through at about the same rate, and
   the false refusals rose. So the rules catch the errors they were written for and should not be read as proof
-  of the wording. Still open by design: two true values or dates attached to the wrong nouns, and claims made in
-  words alone ("a record high"); four such answers are kept in `prose_controls.py` as known limits. The page
+  of the wording. Still open by design: two true values or dates of one unit attached to the wrong nouns (Brent's
+  price given to WTI), and claims made in words alone ("a record high"); such answers are kept in
+  `prose_controls.py` as known limits. The page
   says what was checked: the sources were recomputed, every number and date in the text matches one of them,
   and the wording around the numbers is checked by rules, not proved.
   The reviewer's proposed fix is this project's own rule taken one step further, and it is the planned next

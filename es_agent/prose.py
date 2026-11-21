@@ -9,6 +9,14 @@ Checked, in the summary and in every caveat the model wrote:
   "days" or "years" must be a count; a scale word or "per tonne" after a number must appear in the
   units of something the answer cites. A number glued to letters ("USD97.72") is still a number;
   only a whole token that a tool returned as a name ("M12") is excused;
+- a number written WITH a unit (a scale word, a currency, barrels, gallons, tonnes, contracts, rigs, "per
+  day", "%") must match a value of that number in that unit (21 Nov 2026): a price change of 0.19 dollars a
+  gallon written as "0.19 million barrels" is rejected. Each value's unit is code's: a fact's units, a
+  spread's, a reading's `value_units`. Values whose unit code does not know (the evidence, watch, surprises,
+  arbitrage and scenario readings, the signals' metrics, numbers in a reading's own text) are matched on the
+  number alone, as before;
+- a window named in words ("five-year", "over ten years") must be one a reading or fact used, unless the
+  sentence says it is missing ("could not pull the five-year history");
 - a number spelled out beside a unit ("ninety-eight dollars") is rejected;
 - every date is one a tool returned, written as YYYY-MM-DD. Month names, weekday names and quarters
   are rejected, because a date written in words cannot be traced; a bare year passes only as part
@@ -20,7 +28,7 @@ Checked, in the summary and in every caveat the model wrote:
   own word; a high percentile may not be called low.
 
 Not checked, and stated as limits in the README: two true values or dates attached to the wrong
-nouns, and claims made in words alone ("a record high", "has narrowed" where no earlier value was
+nouns when they share a unit (Brent's price given to WTI), and claims made in words alone ("a record high", "has narrowed" where no earlier value was
 returned). A short number such as "2" matches any returned value between 1.5 and 2.5, so the chance
 of an accidental match grows with the number of values cited.
 """
@@ -60,7 +68,10 @@ _SPELLED = re.compile(rf"\b{_COUNTING}(?:[\s-]+(?:and\s+)?{_NUMWORD})*\s+(?:us\s
                       r"(?:usd|dollars?|cents?|percent|per\s+cent|barrels?|bbl|contracts?|tonnes?|gallons?)\b", re.I)
 
 _UNIT_WORDS = {"usd": "dollars", "$": "dollars", "us$": "dollars", "/": " per ", "bbl": "barrel", "barrels": "barrel",
-               "gal": "gallon", "gallons": "gallon", "mt": "tonne", "tonnes": "tonne", "ton": "tonne", "mmbtu": "million btu"}
+               "gal": "gallon", "gallons": "gallon", "mt": "tonne", "tonnes": "tonne", "ton": "tonne", "mmbtu": "million btu",
+               # for the unit rule (21 Nov 2026): OPEC's mb/d, plurals of the nouns a value's unit names
+               "mb": "million barrel", "kb": "thousand barrel", "d": "day", "bbls": "barrel", "contracts": "contract",
+               "rigs": "rig", "dollar": "dollars", "tons": "tonne"}
 
 
 def unit_key(units: str) -> str:
@@ -111,11 +122,22 @@ class Pool:
     dates: set[dt.date] = field(default_factory=set)
     names: set[str] = field(default_factory=set)    # plain numbers that are part of a name or of code-written text
     tokens: set[str] = field(default_factory=set)   # names that mix letters and digits: M12, PF4
+    hyphens: set[str] = field(default_factory=set)  # whole numbers of a hyphenated term of a text: the 12 of 12-month
     units: str = ""                                 # units and labels of everything cited, normalised
+    # every quotable number with its kind and its unit: the unit a tool gave it, "percent" for a percent, "1" for a
+    # number with none (a z-score, a correlation), None where code does not know it (a reading of mixed units)
+    tagged: list[tuple[float, str, str | None]] = field(default_factory=list)
 
-    def add(self, key: str, value: float) -> None:
+    def put(self, value: float, kind: str, unit: str | None) -> None:
+        """kind "any": a number of a code-written text, whose kind is not known either ("the 253.00 line", "all 12
+        months"): it may be quoted as an amount, a percent or a count."""
+        if kind != "any":
+            {"count": self.counts, "percent": self.percents, "amount": self.amounts}[kind].append(value)
+        self.tagged.append((value, kind, "percent" if kind == "percent" else unit))
+
+    def add(self, key: str, value: float, unit: str | None = None) -> None:
         kind = _kind(key)
-        {"count": self.counts, "percent": self.percents, "amount": self.amounts}[kind].append(value)
+        self.put(value, kind, unit)
         if kind == "percent" and "percentile" in key:
             self.percentiles.append(value)
 
@@ -140,15 +162,17 @@ class Pool:
                 self.dates.add(dt.date.fromisoformat(d))
             except ValueError:
                 pass
-        # a number that is part of a hyphenated term of the text ("12-month roll yield", "3-2-1") is a name
-        for m in re.finditer(r"\b(\d+)(?=-[A-Za-z0-9])", _blank_dates(text)):
-            self.names.add(m[1])
+        # A whole number that is part of a hyphenated term of the text ("12-month roll yield", "3-2-1") may be
+        # written the same way, hyphenated. Not a digit of a decimal (the 8 of "1.8-sigma"), and not the number on
+        # its own: "fell by 8 million barrels" passed on that 8 until the adversary's round 3 (21 Nov 2026).
+        for m in re.finditer(r"(?<![\d.,])\b(\d+)(?=-[A-Za-z0-9])", _blank_dates(text)):
+            self.hyphens.add(m[1])
         for tok, _, _, whole, glued in _numbers(_blank_dates(text)):
             if glued:
                 self.tokens.add(whole)
             elif quotable:
                 try:
-                    self.amounts.append(_parse(tok)[0])
+                    self.put(_parse(tok)[0], "any", None)   # neither its kind nor its unit is known: the text mixes them
                 except ValueError:
                     pass
 
@@ -159,29 +183,33 @@ class Pool:
 def pool_of(answer: DeskAnswer) -> Pool:
     p = Pool()
     for f in answer.facts:
-        p.amounts += [x for x in (f.latest_value, f.base_value, f.change_abs) if x is not None]
+        for x in (f.latest_value, f.base_value, f.change_abs):
+            if x is not None:
+                p.put(x, "amount", f.units)
         if f.change_pct is not None:
-            p.percents.append(f.change_pct)
+            p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
-            p.counts.append(f.lookback_days)
+            p.put(f.lookback_days, "count", None)
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
-        p.amounts += list(f.also.values())
+        for k, v in f.also.items():          # million_barrels, million_barrels_per_day
+            p.put(v, "amount", k.replace("_", " "))
         p.text(f.name, f.series_id)
         p.label(f.units, f.name, " ".join(f.also))
     for s in answer.spreads:
-        p.amounts += [s.value_a, s.value_b, s.spread]
+        for x in (s.value_a, s.value_b, s.spread):
+            p.put(x, "amount", s.units)
         for k, v in s.extras.items():
-            p.add(k, v)
+            p.add(k, v, s.units)
         p.dates.add(s.period)
         p.text(s.name_a, s.series_a, s.name_b, s.series_b, s.note)
         p.context(s.context)
         p.label(s.units, s.name_a, s.name_b)
     for r in answer.readings:
         for k, v in r.values.items():
-            p.add(k, v)
+            p.add(k, v, r.value_units.get(k))   # no entry: a reading of mixed units, its unit is not known
             # a window of N years may be written in months ("over 36 months", the adversary)
             if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
-                p.counts.append(12 * v)
+                p.put(12 * v, "count", None)
             # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
             q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
             if q:
@@ -189,8 +217,9 @@ def pool_of(answer: DeskAnswer) -> Pool:
         p.dates.add(r.period)
         p.text(r.title, r.note, r.counter, r.key, " ".join(r.series_ids), " ".join(r.values))
         p.context(r.context, quotable=r.request is None)
-        # the units a quoted number may carry: the reading's own, never words that happen to stand in its text
-        p.label(r.units, r.title, r.note, " ".join(r.values))
+        # the units a quoted number may carry: the reading's own. A server reading's text never adds to them; the
+        # Librarian's own readings of mixed units (watch, evidence) state their units in their text, which stays.
+        p.label(r.units, r.title, r.note, " ".join(r.values), "" if r.request else r.context)
     return p
 
 
@@ -213,8 +242,90 @@ def _parse(tok: str) -> tuple[float, int]:
     return float(raw), (len(raw.split(".")[1]) if "." in raw else 0)
 
 
+@dataclass
+class Written:
+    """The unit the prose puts on a number: "417,797 thousand barrels", "$3.81 a gallon", "1.38%"."""
+    currency: bool = False
+    scale: str = ""        # thousand, million, billion
+    noun: str = ""         # barrel, gallon, tonne, contract, rig, btu, cubic
+    per: str = ""          # per barrel, per gallon, per day, per tonne, per btu
+    pct: bool = False
+
+    def any(self) -> bool:
+        return self.currency or bool(self.scale or self.noun or self.per) or self.pct
+
+    def words(self) -> str:
+        parts = (["dollars"] if self.currency else []) + ([self.scale] if self.scale else []) + ([self.noun] if self.noun else [])
+        return " ".join(parts + ([f"per {self.per}"] if self.per else []) + (["percent"] if self.pct else []))
+
+
+_SCALES = {"thousand", "million", "billion", "trillion"}
+_CURRENCY = {"dollars", "dollar", "cents", "cent", "euros", "euro", "eur"}
+_NOUNS = {"barrel", "gallon", "tonne", "contract", "rig", "btu", "cubic"}
+_PER_NOUNS = {"barrel", "gallon", "tonne", "day", "btu", "mwh", "therm"}
+
+
+def _unit_words(text: str) -> list[str]:
+    """The words of a unit, normalised as unit_key normalises a unit: barrels -> barrel, USD -> dollars, mb -> million
+    barrel, "/" -> per."""
+    out = []
+    for w in re.findall(r"[a-z]+|/|%", text.lower()):
+        out += (_UNIT_WORDS.get(w, w)).split() if w != "/" else ["per"]
+    return out
+
+
+def written_unit(clean: str, start: int, end: int, whole: str) -> Written:
+    """What unit, if any, the prose writes on the number at clean[start:end]: the words right after it up to the
+    next comma, bracket or full stop, and a currency sign or USD right before it."""
+    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd")
+    tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", clean[end:end + 48])[0]
+    words, i = _unit_words(tail), 0
+    if words[:1] == ["%"] or words[:1] == ["percent"] or words[:2] == ["per", "cent"] or words[:2] == ["percentage", "points"]:
+        w.pct = True
+        return w
+    while i < len(words) and words[i] in _SCALES:
+        w.scale, i = words[i], i + 1
+    if i < len(words) and words[i] in _CURRENCY:
+        w.currency, i = True, i + 1
+    if i < len(words) and words[i] in _NOUNS:
+        w.noun, i = words[i], i + 1
+        if i < len(words) and words[i] == "feet":
+            i += 1
+    if i + 1 < len(words) and words[i] in ("per", "a", "an"):
+        rest = [x for x in words[i + 1:i + 3] if x not in _SCALES]
+        if rest and rest[0] in _PER_NOUNS:
+            w.per = rest[0]
+    return w
+
+
+def fits(w: Written, unit: str | None) -> bool:
+    """Can a value in `unit` be written with the unit `w`? A value of unknown unit (None) can: that is the rule as
+    it stood before 21 Nov 2026, and stays so for readings whose values mix units."""
+    if unit is None:
+        return True
+    if unit == "percent":
+        return w.pct and not (w.currency or w.scale or w.noun or w.per)
+    u = " ".join(_unit_words(unit))
+    head, _, per = u.partition(" per ")
+    if w.pct:
+        return "percent" in u or "%" in u
+    if w.currency and not set(head.split()) & (_CURRENCY | {"dollars"}):
+        return False
+    if w.scale and w.scale not in head.split():
+        return False
+    if w.noun and w.noun not in head.split():
+        return False
+    if w.per and w.per not in per.split():
+        return False
+    return True
+
+
 def text_problems(text: str, pool: Pool) -> list[str]:
-    """Numbers and dates in one piece of prose that trace to nothing a tool returned."""
+    """Numbers and dates in one piece of prose that trace to nothing a tool returned.
+
+    A number written WITH a unit must also match a value in that unit (since 21 Nov 2026, David: a price change of
+    0.19 dollars a gallon written as "0.19 million barrels" passed, because the number and the unit were each true
+    somewhere in the answer). A value whose unit code does not know is matched on its number alone."""
     bad = []
     for d in _ISO.findall(text):
         try:
@@ -231,22 +342,23 @@ def text_problems(text: str, pool: Pool) -> list[str]:
     for tok, start, end, whole, glued in _numbers(clean):
         if glued and whole in pool.tokens:
             continue  # M12, PF4: a name a tool returned
-        if not glued and tok in pool.names:
-            continue
+        unit = written_unit(clean, start, end, whole)
+        if not glued and tok in pool.names and not unit.any():
+            continue  # a number of a name, written without a unit of its own
+        if not glued and tok in pool.hyphens and re.match(r"-[A-Za-z0-9]", clean[end:end + 2]):
+            continue  # the 12 of "12-month", written hyphenated as the text writes it
         n, dp = _parse(tok)
         after = clean[end:end + 40]
         money = bool(_MONEY.match(after)) or clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd"
         pct, count = bool(_PCT.match(after)), bool(_COUNT.match(after))
-
-        def hit(values: list[float]) -> bool:
-            return any(_rounds_to(v, n, dp) for v in values)
-
-        ok = (hit(pool.amounts) if money else
-              hit(pool.amounts) or hit(pool.percents) if pct else
-              hit(pool.counts) if count else
-              hit(pool.amounts) or hit(pool.percents) or hit(pool.counts))
-        if not ok:
+        kinds = ({"amount"} if money else {"amount", "percent"} if pct else {"count"} if count else {"amount", "percent", "count"})
+        matches = [u for v, kind, u in pool.tagged if (kind in kinds or kind == "any") and _rounds_to(v, n, dp)]
+        if not matches:
             bad.append(whole if glued else tok)
+            continue
+        if unit.any() and not count and not any(fits(unit, u) for u in matches):
+            shown = sorted({u for u in matches if u})
+            bad.append(f"{tok} {unit.words()} (the values {tok} matches are in {', '.join(shown) or 'no unit'})")
             continue
         scale, per = _SCALE.match(after), _PER.match(after)
         if scale and scale.group(1).lower() not in pool.units:
@@ -287,7 +399,11 @@ def window_problems(answer: DeskAnswer) -> list[str]:
         allowed |= {int(v) for k, v in s.extras.items() if k.endswith("years")}
         allowed |= _years_in(s.context + " " + s.note)
     out = []
-    for text in [answer.summary, *model_caveats(answer)]:
+    sentences = [x for text in [answer.summary, *model_caveats(answer)] for x in re.split(r"(?<=[.;!?])\s+", text)]
+    for text in sentences:
+        # "I could not pull the five-year history", "no five-year comparison was requested": what is missing
+        if re.search(r"\b(?:not|no|cannot|unable|without|none|lacks?|missing)\b|n't\b", text, re.I):
+            continue
         for m in _WINDOW.finditer(text):
             n = int(m[1]) if m[1].isdigit() else _YEARWORD[m[1].lower()]
             if n not in allowed:
@@ -350,10 +466,12 @@ def _words(text: str) -> set[str]:
     return {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z0-9]*", text)} - _SMALL
 
 
-def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str], set[str]]]]:
-    """(changes, levels). A level is (value, words for the first thing, words for the second):
-    positive means the first is above the second."""
+def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str], set[str]]], list[float]]:
+    """(changes, levels, quiet changes). A level is (value, words for the first thing, words for the second):
+    positive means the first is above the second. A quiet change is a snapshot metric that is itself a change
+    ("QoQ change of 0.55", the server's own words): it needs no direction word, but a wrong one is still wrong."""
     moves: list[float] = []
+    quiet: list[float] = []
     levels: list[tuple[float, set[str], set[str]]] = []
     for f in answer.facts:
         moves += [x for x in (f.change_abs, f.change_pct) if x]
@@ -365,14 +483,14 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
         for k, v in r.values.items():
             if not v:
                 continue
-            if "change" in k and not k.startswith("metric."):   # a snapshot metric is a level the rules compare
-                moves.append(v)
+            if "change" in k:
+                (quiet if k.startswith("metric.") else moves).append(v)
             elif "_minus_" in k:
                 a, b = (_words(part.replace("_", " ")) for part in k.split("_minus_", 1))
                 levels.append((v, a - b, b - a))
             elif k in ("difference", "difference_pct", "delta_vs_avg", "pct_vs_avg") or k.endswith("_vs_5y_pct"):
                 levels.append((v, set(), _AVERAGE))
-    return moves, levels
+    return moves, levels, quiet
 
 
 def _shape_problems(answer: DeskAnswer, words: list[str]) -> list[str]:
@@ -426,7 +544,7 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                             f"{'a rise' if rose else 'a fall'}; say so in plain words")
     if changes and "unchanged" in all_words:
         problems.append("the summary says unchanged; the facts show a change")
-    moves, levels = _signed(answer)
+    moves, levels, quiet = _signed(answer)
     pool = pool_of(answer)
     clean = _blank_dates(text)
     for sentence in re.split(r"(?<=[.!?;:])\s+", clean):
@@ -438,7 +556,8 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
             if kind != "num":
                 continue
             n, dp = _parse(tok)
-            move_signs = {v > 0 for v in moves if _quotes(v, n, dp)}
+            loud = {v > 0 for v in moves if _quotes(v, n, dp)}
+            move_signs = loud | {v > 0 for v in quiet if _quotes(v, n, dp)}
             if len(move_signs) == 1:
                 rose = move_signs.pop()
                 lead = sentence[:found[i].start()].rstrip()
@@ -448,9 +567,9 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                 if said is None:
                     after = [w for k, w in toks[i + 1:i + 4] if k == "word"]
                     said = next((w in _CHANGE_UP for w in after if w in ("higher", "lower", "up", "down")), None)
-                if said is None:
+                if said is None and loud:
                     problems.append(f"'{tok}' is a change: write rose or fell (or up, down, a sign) right beside it")
-                elif said != rose:
+                elif said is not None and said != rose:
                     problems.append(f"'{tok}' is described as a {'rise' if said else 'fall'}; the data shows a "
                                     f"{'rise' if rose else 'fall'}")
             hits = [(v, a, b) for v, a, b in levels if _quotes(v, n, dp)]

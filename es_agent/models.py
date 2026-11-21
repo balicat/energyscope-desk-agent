@@ -69,6 +69,8 @@ class Reading(BaseModel):
     counter: str = Field("", description="Written by code: the lines of evidence that point against the balance. Code adds it to the caveats.")
     request: dict | None = Field(None, description="Written by code: for a reading the EnergyScope server computed, the "
                                  "tool, the server action and the request sent. The check sends it again.")
+    value_units: dict[str, str] = Field(default_factory=dict, description="Written by code: the unit of each value "
+                                        "('1' for none, such as a z-score). A number written with a unit must match a value in it.")
 
 
 class SeriesFact(BaseModel):
