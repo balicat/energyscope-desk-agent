@@ -175,6 +175,56 @@ try:
 finally:
     _flight.connect = _orig_connect
 
+# 11. the evidence scorecard and get_signals read one evaluation (David, 21 Nov 2026: "one definition, the server's").
+# A public answer had said "US crude stocks neutral" beside the server's "crude stocks at a seasonal percentile of 0".
+from es_agent import readings as _readings
+
+ev = _readings.evidence(source, "crude_tightness")
+sig = engine.signals(source)
+_, doc, _ = engine.live_evaluation(source)
+active = set(doc.get("active") or [])
+mismatch = []
+for name, _g, key, tight, loose, _w in _readings.SERVER_LINES:
+    if f"{name}_verdict" not in ev.values:
+        mismatch.append(f"{name} missing")
+        continue
+    want = 1 if tight in active else -1 if loose and loose in active else 0
+    if ev.values[f"{name}_verdict"] != want or ev.values.get(f"metric.{key}") != sig.values.get(f"metric.{key}"):
+        mismatch.append(f"{name}: verdict {ev.values[f'{name}_verdict']} against the server's {want}, "
+                        f"metric {ev.values.get(f'metric.{key}')} against {sig.values.get(f'metric.{key}')}")
+checks.append((f"every server-scored evidence line ({len(_readings.SERVER_LINES)}) has get_signals' metric and verdict",
+               not mismatch, "; ".join(mismatch)))
+
+
+class _Planted:
+    """The fixture, with the server's evaluation saying crude stocks are oversupplied (the metric at 95)."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def snapshot(self):
+        s = self.inner.snapshot()
+        return dict(s, metrics=dict(s["metrics"], crude_seasonal_pctl=95.0))
+
+    def action(self, name, request):
+        if name == "derived_signals" and not request.get("schema"):
+            body = dict(request, metrics=dict(request["metrics"], crude_seasonal_pctl=self.inner.snapshot()["metrics"]["crude_seasonal_pctl"]))
+            d = dict(self.inner.action(name, body))
+            d["active"] = [a for a in d.get("active") or [] if a != "crude_undersupplied"] + ["crude_oversupplied"]
+            return d
+        return self.inner.action(name, request)
+
+
+planted = _readings.evidence(_Planted(source), "crude_tightness")
+checks.append(("an evidence line follows the server's evaluation: crude stocks oversupplied there reads loose here",
+               planted.values.get("us_stocks_verdict") == -1 and planted.values.get("metric.crude_seasonal_pctl") == 95.0,
+               f"verdict {planted.values.get('us_stocks_verdict')}, metric {planted.values.get('metric.crude_seasonal_pctl')}"))
+checks.append(("the evidence reading rebuilds unchanged from the same source",
+               _readings.compute(source, ev.key).values == ev.values, ""))
+
 wrong = 0
 for what, ok, detail in checks:
     wrong += not ok
