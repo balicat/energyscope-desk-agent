@@ -86,7 +86,9 @@ def _kind(key: str) -> str:
     # a half-life is counted in observations ("a half-life of 10.04 days")
     if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years", "life") for p in parts):
         return "count"
-    if "percentile" in parts or key.endswith("_pct") or "percentile" in key:
+    # pct anywhere in the name is a percent: the server's pct_vs_avg and pct_change (the live gate, 21 Nov 2026,
+    # refused "3.65 percent below the average" while pct_vs_avg was read as an amount in thousand barrels)
+    if "percentile" in parts or "pct" in parts or key.endswith("_pct") or "percentile" in key:
         return "percent"
     return "amount"
 

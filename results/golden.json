@@ -454,7 +454,6 @@
     "value_units": {
      "current_value": "Thousand Barrels",
      "delta_vs_avg": "Thousand Barrels",
-     "pct_vs_avg": "Thousand Barrels",
      "range_position": "1",
      "seasonal_avg": "Thousand Barrels",
      "seasonal_max": "Thousand Barrels",
@@ -2244,7 +2243,6 @@
      "p5": "Dollars per Barrel",
      "p75": "Dollars per Barrel",
      "p95": "Dollars per Barrel",
-     "pct_change": "Dollars per Barrel",
      "skewness": "1",
      "std": "Dollars per Barrel"
     },
