@@ -1523,7 +1523,7 @@
      "metric.m1_m12": "dollars per barrel",
      "metric.opec_call_production_gap": "million barrel per day",
      "metric.opec_call_qoq_change": "million barrel per day",
-     "metric.opec_compliance_gap_max_kbd": "tb per day",
+     "metric.opec_compliance_gap_max_kbd": "thousand barrel per day",
      "metric.opec_world_demand_revision": "million barrel per day",
      "metric.production_seasonal_pctl": "percent",
      "metric.refinery_util": "percent",
