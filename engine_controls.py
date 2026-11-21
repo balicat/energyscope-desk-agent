@@ -58,6 +58,34 @@ except Exception as e:
 full = engine.stats(source, "PET.RWTC.D", 3)
 checks.append(("WTI spot over 3 years carries no 'Shorter history'", "Shorter history" not in full.counter, full.counter[:90]))
 
+# Fair units (the adversary's p8, 21 Nov 2026): every value of the server readings that has a unit, quoted with
+# that unit, must pass the prose rules. It is the offline control that would have caught the two true sentences
+# the live gate refused ("3.65 percent", "14.27 percent").
+from es_agent import metrics as _m, prose as _p
+from es_agent.models import DeskAnswer as _A
+
+fair_from = [("eia_weekly report", engine.report(source, "eia_weekly")), ("seasonal", s),
+             ("percentile", engine.percentile(source, "NG.RNGWHHD.D", 3)), ("stats", full),
+             ("spread", engine.spread_stats(source, "PET.RBRTE.D", "PET.RWTC.D", 3)),
+             ("volatility", engine.volatility(source, "PET.RWTC.D", 3, window=20)),
+             ("history", engine.history(source, "PET.RWTC.D", 5)),
+             ("rolling correlation", engine.rolling_correlation(source, "PET.RWTC.D", "PET.RBRTE.D", 3, window=90))]
+quoted, unfair = 0, []
+for name, reading in fair_from:
+    for key, value in reading.values.items():
+        kind = _p._kind(key)
+        unit = "percent" if kind == "percent" else reading.value_units.get(key)
+        if unit is None or kind == "count":
+            continue
+        phrase = f"{abs(value):,.2f}" + ("" if unit == "1" else "%" if unit == "percent" else f" {unit}")
+        a = _A(facts=[], readings=[reading], cites=[reading.key], summary=f"The figure for {key} is {phrase}.")
+        quoted += 1
+        found = _m.untraceable_numbers(a)
+        if found:
+            unfair.append(f"{name} {key} '{phrase}': {found[:1]}")
+checks.append((f"every server value quoted with its own unit passes: {quoted - len(unfair)} of {quoted}", not unfair,
+               "; ".join(unfair[:4])))
+
 # 9. fair quotes: the server's own sentences, quoted back word for word with their reading cited, must pass the
 # prose rules (the instructions tell the model to quote them "with its numbers and dates unchanged")
 import re as _re
