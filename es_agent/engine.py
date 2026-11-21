@@ -24,7 +24,8 @@ from . import clock, readings
 from .models import Reading
 from .sources import DataSource, ServerError, parse_period
 
-MAX_VALUES = 90          # a correlation matrix or a report panel can carry hundreds; the model needs the top
+# No cap on values: a cap cut in insertion order dropped 8 of a report's 20 rows, and the brief's own sentences
+# about them were then refused (the adversary, 21 Nov 2026). Long lists are bounded where they are read (MAX_LINES).
 MAX_CONTEXT = 2400       # characters of code-written text per reading
 MAX_LINES = 12           # list items (breakpoints, outliers, events, signals) written into the context
 
@@ -111,6 +112,25 @@ def _clip(text: str) -> str:
     return text if len(text) <= MAX_CONTEXT else text[:MAX_CONTEXT].rsplit(" ", 1)[0] + " ..."
 
 
+def _last_date(source: DataSource, ids: list[str]) -> dt.date:
+    """The last date every one of these series has a value by (the earliest of their last dates). A request ends
+    there, not today: ended today, it would take in values published later with dates before today (EIA spot is
+    about a week behind), and the reading, its stored request and its Excel tab would move (the adversary)."""
+    today, last = clock.today(), []
+    for sid in ids:
+        hist = source.history(sid, start=today - dt.timedelta(days=800))
+        if hist:
+            last.append(hist[-1][0])
+    return min(last) if last and len(last) == len(ids) else today
+
+
+def _ended(source: DataSource, ids: list[str], years: int) -> tuple[str, str]:
+    """A window of `years` ending on the series' last common date (see `_last_date`); the start counts back from
+    today, as it always has, so the window holds at least `years` years of the series."""
+    start, _ = _window(years)
+    return start, _last_date(source, ids).isoformat()
+
+
 def _window(years: int) -> tuple[str, str]:
     """A window of `years` ending today, both ends fixed in the request so it can be sent again (and so the
     Excel sheet fixes the same dates)."""
@@ -128,8 +148,6 @@ def _name(source: DataSource, sid: str) -> tuple[str, str]:
 def _reading(tool: str, action: str, body: dict, key: str, title: str, period: dt.date, units: str,
              series_ids: list[str], values: dict[str, float], context: str = "", note: str = "",
              counter: str = "", hypothetical: bool = False) -> Reading:
-    if len(values) > MAX_VALUES:
-        values = dict(list(values.items())[:MAX_VALUES])
     return Reading(key=key, title=title, period=period, units=units, series_ids=series_ids, values=values,
                    context=_clip(context), note=note, counter=counter, hypothetical=hypothetical,
                    request={"tool": tool, "action": action, "body": body})
@@ -147,7 +165,8 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading:
     """ES.Percentile: where the latest value ranks in its own window."""
     if not 1 <= years <= 10:
         raise ServerError("years must be 1 to 10")
-    start, end = _window(years)
+    _name(source, series_id)
+    start, end = _ended(source, [series_id], years)
     body = {"series": series_id, "start": start, "end": end}
     return _percentile(source, body, years)
 
@@ -187,7 +206,9 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading:
         raise ServerError("years must be 2 to 10")
     # `end` pins the comparison to a day, so it can be asked again (the server reads `end`; it ignores `as_of`).
     # ES.Seasonal has no end argument: its Excel tab follows the latest value (the tab says so).
-    return _seasonal(source, {"series": series_id, "lookback_years": years, "end": clock.today().isoformat()})
+    _name(source, series_id)
+    return _seasonal(source, {"series": series_id, "lookback_years": years,
+                              "end": _last_date(source, [series_id]).isoformat()})
 
 
 def _seasonal(source, body):
@@ -220,7 +241,8 @@ def _series_window(tool: str, action: str, title: str, extra: dict | None = None
     def build(source: DataSource, series_id: str, years: int = 3, **params) -> Reading:
         if not 1 <= years <= 20:
             raise ServerError("years must be 1 to 20")
-        start, end = _window(years)
+        _name(source, series_id)
+        start, end = _ended(source, [series_id], years)
         body = {"series": series_id, "start": start, "end": end, **(extra or {}), **params}
         return build.rebuild(source, body, years)
 
@@ -336,7 +358,8 @@ def _pair(tool: str, action: str, title: str, units: str | None = None, context=
     def build(source: DataSource, series_a: str, series_b: str, years: int = 3, **params) -> Reading:
         if not 1 <= years <= 20:
             raise ServerError("years must be 1 to 20")
-        start, end = _window(years)
+        _name(source, series_a), _name(source, series_b)
+        start, end = _ended(source, [series_a, series_b], years)
         return rebuild_pair(source, {"series_a": series_a, "series_b": series_b, "start": start, "end": end, **params}, years)
 
     def rebuild_pair(source, body, years):
@@ -369,7 +392,9 @@ def _many(tool: str, action: str, title: str, units: str, flatten_doc=None, cont
             raise ServerError("give 2 to 8 series")
         if not 1 <= years <= 20:
             raise ServerError("years must be 1 to 20")
-        start, end = _window(years)
+        for s in series_ids:
+            _name(source, s)
+        start, end = _ended(source, list(series_ids), years)
         return rebuild_many(source, {"series": list(series_ids), "start": start, "end": end, **(extra or {}), **params}, years)
 
     def rebuild_many(source, body, years):
@@ -457,6 +482,26 @@ def report(source: DataSource, preset: str, as_of: str | None = None) -> Reading
     return _report(source, body)
 
 
+def _schema(source: DataSource) -> dict:
+    """The server's signal catalogue (each signal's metric, operator and thresholds); {} when it cannot be read."""
+    try:
+        return source.action("derived_signals", {"schema": True}).get("schema") or {}
+    except ServerError:
+        return {}
+
+
+def _thresholds(schema: dict, ids) -> dict[str, float]:
+    """The numbers a firing signal is compared with (`threshold`, or `low` and `high` for a band), as values named
+    <signal>.threshold, so the server's trigger sentence ("... of 0 is below the 20 threshold") can be quoted back."""
+    out = {}
+    for sid in ids:
+        spec = schema.get(sid) or {}
+        for k in ("threshold", "low", "high"):
+            if _num(spec.get(k)) is not None:
+                out[f"{sid}.{k}"] = float(spec[k])
+    return out
+
+
 def _report(source, body):
     doc = source.action("report", body)
     rows = doc.get("rows") or []
@@ -477,6 +522,7 @@ def _report(source, body):
     for k, v in (sig.get("metrics") or {}).items():
         if _num(v) is not None:
             values[f"metric.{k}"] = float(v)
+    values.update(_thresholds(_schema(source), [a.get("id") for a in (sig.get("active") or [])]))
     units = sorted({u for r in rows for u in (r.get("units"), r.get("display_units")) if u})
     parts = [f"Headline: {n.get('headline', '')}", f"Lede: {n.get('lede', '')}"]
     parts += [f"Also: {s}" for s in (n.get("supporting") or [])]
@@ -505,16 +551,20 @@ def _signals(source, body, fetched_at=""):
     doc = source.action("derived_signals", body)
     # the series behind each metric, from the server's own catalogue (its source hints), so the answer names the
     # data the signals were computed from and the staleness check can look at it
-    try:
-        schema = source.action("derived_signals", {"schema": True}).get("schema") or {}
-    except ServerError:
-        schema = {}
+    schema = _schema(source)
     behind = sorted({sid for spec in schema.values() if spec.get("key") in body["metrics"]
                      for sid in ((spec.get("source_hint") or {}).get("series_ids") or [])})
     values = {f"metric.{k}": float(v) for k, v in body["metrics"].items()}
     for k in ("signals_evaluated", "active_count", "contradiction_count", "contradiction_total"):
         if _num(doc.get(k)) is not None:
             values[k] = float(doc[k])
+    values.update(_thresholds(schema, doc.get("active") or []))
+    for c in doc.get("contradictions") or []:   # the scores its trigger sentence quotes
+        if c.get("active"):
+            for leg in ((c.get("basis") or {}).get("requires") or []):
+                if _num(leg.get("score")) is not None:
+                    values[f"{c.get('id')}.{leg.get('id')}.score"] = float(leg["score"])
+    values["contradictions_not_evaluated"] = float(len(doc.get("contradictions_skipped") or []))
     allsig = doc.get("signals") or {}
     parts = []
     for sid in doc.get("active") or []:
@@ -597,7 +647,8 @@ def history(source: DataSource, series_id: str, years: int = 5) -> Reading:
     Excel workbook fills the whole window with ES.Table, so every value can be read and downloaded."""
     if not 1 <= years <= 40:
         raise ServerError("years must be 1 to 40")
-    start, end = _window(years)
+    _name(source, series_id)
+    start, end = _ended(source, [series_id], years)
     return _history(source, {"series": series_id, "start": start, "end": end})
 
 

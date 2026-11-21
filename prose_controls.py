@@ -168,6 +168,7 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, near the high end of its range."),
     dict(readings=[report], summary="Regular gasoline fell 0.19 to 3.81 dollars per gallon; total gasoline stocks are 215.9 million barrels."),
     dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a three-year average of 434,167."),
+    dict(readings=[seasonal3], summary="Over 36 months of the same week, the average was 434,167 thousand barrels."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
@@ -189,6 +190,15 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
     # not before 21 Nov 2026), and this still passes: the rules do not tie a number to its own unit.
     ("a report's price change written as a stock in million barrels (the adversary, 21 Nov 2026)",
      dict(readings=[report], summary="Gasoline stocks were 0.19 million barrels on the week.")),
+    # windows in words the rule does not read (the adversary, round 2): no number in them, or one the answer has
+    ("a three-year average called the average of the past decade",
+     dict(readings=[seasonal3], summary="Stocks of 417,797 thousand barrels are below the average of the past decade, 434,167.")),
+    ("with a three-year and a five-year reading cited, the five-year window given to the three-year figure",
+     dict(readings=[seasonal3, seasonal3.model_copy(update={"key": "seasonal:PET.WCESTUS1.W:5",
+                                                            "values": {"current_value": 417797.0, "seasonal_avg": 433637.2, "lookback_years": 5.0}})],
+          summary="Stocks of 417,797 thousand barrels are below their five-year average of 434,167.")),
+    ("stocks including the SPR, where the series excludes it",
+     dict(facts=[stocks], summary="US crude stocks including the SPR are 414,417 thousand barrels.")),
 ]
 
 

@@ -140,6 +140,9 @@ class Pool:
                 self.dates.add(dt.date.fromisoformat(d))
             except ValueError:
                 pass
+        # a number that is part of a hyphenated term of the text ("12-month roll yield", "3-2-1") is a name
+        for m in re.finditer(r"\b(\d+)(?=-[A-Za-z0-9])", _blank_dates(text)):
+            self.names.add(m[1])
         for tok, _, _, whole, glued in _numbers(_blank_dates(text)):
             if glued:
                 self.tokens.add(whole)
@@ -176,6 +179,9 @@ def pool_of(answer: DeskAnswer) -> Pool:
     for r in answer.readings:
         for k, v in r.values.items():
             p.add(k, v)
+            # a window of N years may be written in months ("over 36 months", the adversary)
+            if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
+                p.counts.append(12 * v)
             # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
             q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
             if q:
@@ -359,7 +365,7 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
         for k, v in r.values.items():
             if not v:
                 continue
-            if "change" in k:
+            if "change" in k and not k.startswith("metric."):   # a snapshot metric is a level the rules compare
                 moves.append(v)
             elif "_minus_" in k:
                 a, b = (_words(part.replace("_", " ")) for part in k.split("_minus_", 1))
