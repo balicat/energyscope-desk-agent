@@ -41,10 +41,16 @@ cites it, and does not speculate.
   prose uses the wrong word and never the right one.
 - **A research question gets a scorecard, not an opinion.** "Is the crude market tightening?" is answered from ten
   lines fixed in code, in four groups: time structure (Brent and WTI curves, spot against futures for each), US
-  crude stocks (level against the five-year average for the week, Cushing against its own three years, the
-  four-week change against its usual), refining demand (refinery runs against the same week of earlier years,
-  the 3-2-1 crack) and fund positioning. The model writes the conclusion but cannot pick the lines, and the ones
-  that disagree are added to the caveats by code.
+  crude stocks (the seasonal percentile of the level, Cushing's z-score, the four-week change against its usual),
+  refining demand (refinery utilisation, the 3-2-1 crack's z-score) and fund positioning. The model writes the
+  conclusion but cannot pick the lines, and the ones that disagree are added to the caveats by code.
+  Since 21 Nov 2026 six of the lines are scored by the EnergyScope server's own signals: the metric comes from its
+  live snapshot and the verdict from its evaluation of the named signal (crude_undersupplied, cushing_tight,
+  refinery_strong, steep_backwardation, crack_extreme, wti_specs_short and their opposites), so the scorecard and
+  the signals reading cannot disagree. Before, a public answer had said "US crude stocks neutral" (3.4% below the
+  five-year average, inside the line's 5% band) next to the server's "crude stocks at a seasonal percentile of 0".
+  The owner chose one definition, the server's: those six lines mark extremes and have no record of their own
+  here, so the balance reads neutral more often. The four lines with no server signal keep the history below.
   The first version counted the ten lines equally. The reviewer ran it over 417 weeks and showed why that was
   wrong: Cushing read "tight" in 300 of them (every week of three whole years), the four-week line changed its
   vote in 30% of consecutive weeks, refinery runs read "tight" every summer, and four of the ten lines were all
@@ -152,7 +158,7 @@ cites it, and does not speculate.
 | `get_futures_spread` | Brent minus WTI on futures of the same delivery month, with its percentile and history, and the spot spread beside it with where the difference comes from |
 | `get_futures_crack` | a crack spread on NYMEX futures of one delivery month |
 | `get_crack_spread` | 3-2-1, gasoline or distillate margin in dollars per barrel |
-| `get_evidence` | a scorecard for a thesis. `crude_tightness`: ten fixed lines in four groups, each scored tight, loose or neutral against a stated threshold and printed with how often it has read each way in eight years; the balance counts groups; the lines against it go into the caveats by code |
+| `get_evidence` | a scorecard for a thesis. `crude_tightness`: ten fixed lines in four groups, each scored tight, loose or neutral against a stated threshold; six are scored by the server's own signals on the metrics `get_signals` reads, the other four print how often they have read each way in eight years; the balance counts groups; the lines against it go into the caveats by code |
 | `get_watch` | flags for the week or month: unusual moves, stretched fund positioning, a curve that changed shape, stocks outside their five-year range, related prices that parted ways |
 | `get_arbitrage_scenario`, `get_crack_scenario` | what-if: the arbitrage score or a crack spread recomputed with changed prices, marked hypothetical |
 | `get_surprises` | the five most unusual moves over a week or month across an 18-series watchlist, by z-score against each series' own two years |
