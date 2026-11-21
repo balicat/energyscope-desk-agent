@@ -129,6 +129,26 @@ class Pool:
         for tok, _, _, whole, glued in _numbers(_blank_dates(joined)):
             (self.tokens if glued else self.names).add(whole if glued else tok)
 
+    def context(self, text: str, quotable: bool = True) -> None:
+        """A reading's or a spread's code-written text: its dates and its letter-and-digit names (M12) may be
+        written; a plain number in it is an AMOUNT and takes the money, percent, scale and per-unit tests like any
+        value. Until 21 Nov 2026 such a number was a name and skipped them ("Gasoline stocks were 0.19 million
+        barrels" passed on 0.19 dollars a gallon from a report's text: the adversary). A server reading's text
+        gives no numbers at all (`quotable` False): every number it holds is also one of its values."""
+        for d in _ISO.findall(text):
+            try:
+                self.dates.add(dt.date.fromisoformat(d))
+            except ValueError:
+                pass
+        for tok, _, _, whole, glued in _numbers(_blank_dates(text)):
+            if glued:
+                self.tokens.add(whole)
+            elif quotable:
+                try:
+                    self.amounts.append(_parse(tok)[0])
+                except ValueError:
+                    pass
+
     def label(self, *parts: str) -> None:
         self.units += " " + unit_key(" ".join(parts).replace("_", " "))
 
@@ -150,7 +170,8 @@ def pool_of(answer: DeskAnswer) -> Pool:
         for k, v in s.extras.items():
             p.add(k, v)
         p.dates.add(s.period)
-        p.text(s.name_a, s.series_a, s.name_b, s.series_b, s.context, s.note)
+        p.text(s.name_a, s.series_a, s.name_b, s.series_b, s.note)
+        p.context(s.context)
         p.label(s.units, s.name_a, s.name_b)
     for r in answer.readings:
         for k, v in r.values.items():
@@ -160,8 +181,10 @@ def pool_of(answer: DeskAnswer) -> Pool:
             if q:
                 p.names.add(q[1])
         p.dates.add(r.period)
-        p.text(r.title, r.note, r.context, r.counter, r.key, " ".join(r.series_ids), " ".join(r.values))
-        p.label(r.units, r.title, r.note, r.context, " ".join(r.values))
+        p.text(r.title, r.note, r.counter, r.key, " ".join(r.series_ids), " ".join(r.values))
+        p.context(r.context, quotable=r.request is None)
+        # the units a quoted number may carry: the reading's own, never words that happen to stand in its text
+        p.label(r.units, r.title, r.note, " ".join(r.values))
     return p
 
 
@@ -231,10 +254,47 @@ def model_caveats(answer: DeskAnswer) -> list[str]:
     return [c for c in answer.caveats if not c.startswith(CODE_CAVEATS)]
 
 
+_YEARWORD = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+             "ten": 10, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40}
+_WINDOW = re.compile(r"\b(\d{1,2}|" + "|".join(_YEARWORD) + r")(?:-|\s+)(?:(?:earlier|prior|previous|past|last)\s+)?years?\b", re.I)
+
+
+def _years_in(text: str) -> set[int]:
+    return {int(m[1]) if m[1].isdigit() else _YEARWORD[m[1].lower()] for m in _WINDOW.finditer(text)}
+
+
+def window_problems(answer: DeskAnswer) -> list[str]:
+    """A window named in words ("the five-year average", "over ten years") must be one a reading or fact used.
+    Until 21 Nov 2026 the words were free: a three-year seasonal average written as "five-year" passed (the
+    adversary). Allowed: the years a reading names in its values (years, lookback_years ...) or its own text,
+    a fact's lookback in whole years, a spread's percentile_years."""
+    allowed: set[int] = set()
+    for r in answer.readings:
+        allowed |= {int(v) for k, v in r.values.items() if "years" in k.lower().split(".")[-1] and float(v).is_integer()}
+        # a window named in a value's own name: us_stocks_vs_5y_pct
+        allowed |= {int(t[:-1]) for k in r.values for t in re.split(r"[._]", k.lower()) if re.fullmatch(r"\d{1,2}y", t)}
+        allowed |= _years_in(" ".join((r.title, r.note, r.context, r.counter)))
+    for f in answer.facts:
+        if f.lookback_days and f.lookback_days >= 300:
+            allowed.add(round(f.lookback_days / 365.25))
+    for s in answer.spreads:
+        allowed |= {int(v) for k, v in s.extras.items() if k.endswith("years")}
+        allowed |= _years_in(s.context + " " + s.note)
+    out = []
+    for text in [answer.summary, *model_caveats(answer)]:
+        for m in _WINDOW.finditer(text):
+            n = int(m[1]) if m[1].isdigit() else _YEARWORD[m[1].lower()]
+            if n not in allowed:
+                out.append(f"{m.group().strip()} (no reading or fact uses a window of {n} years"
+                           + (f"; they use {sorted(allowed)}" if allowed else "") + ")")
+    return out
+
+
 def untraceable(answer: DeskAnswer) -> list[str]:
-    """Numbers and dates in the summary and in the model's caveats that trace to nothing."""
+    """Numbers and dates in the summary and in the model's caveats that trace to nothing, and windows named in
+    words that no reading used."""
     pool = pool_of(answer)
-    return [b for text in [answer.summary, *model_caveats(answer)] for b in text_problems(text, pool)]
+    return [b for text in [answer.summary, *model_caveats(answer)] for b in text_problems(text, pool)] + window_problems(answer)
 
 
 # A caveat is for the reader. One that talks about the machinery (reading keys, the facts list, tool

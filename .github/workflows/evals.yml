@@ -24,6 +24,8 @@ jobs:
         run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python excel_controls.py
       - name: Fact control, a fact may be dropped only when a cited reading carries it
         run: python fact_controls.py
+      - name: Engine control, the server readings refuse unlike spreads and their check re-reads the signals' inputs
+        run: LIBRARIAN_TODAY=$(python -c "import json;print(json.load(open('fixtures/series.json'))['as_of'])") python engine_controls.py
       # Four since the Excel sheets (19 Nov 2026): the planted wrong price also makes its sheet fail to reproduce.
       - name: Control run, validator off, exactly four assertions must fail
         run: python run_evals.py --source fixture --no-guard --expect-failures 4

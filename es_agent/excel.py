@@ -27,6 +27,9 @@ written by `workbook` (30 cells) gave the reported value in every cell.
 It compares values, so a formula that fetches the wrong date passes when the series had the same value on
 both days (found by this module's own control: WTI on a US holiday).
 
+Dates are fixed in every sheet except the ES.Seasonal one: that function takes no end date and reads the latest
+value, so its tab follows the next weekly figure (it says so in its first row).
+
 A reading the EnergyScope server computed (engine.py) gets a sheet that calls the add-in function sending the
 same request: =ES.Seasonal, =ES.Percentile, =ES.Stats, =ES.Spread, =ES.RollingCorr. Each row picks one field
 out of the table the function fills (INDEX and MATCH on the field's name), so the reader sees the add-in's own
@@ -203,6 +206,10 @@ def _function_sheet(r: Reading) -> Sheet | None:
     for field, words in SHOWN[tool]:
         if field in r.values:
             rows.append(Row(label=f"{words} ({field})", formula=fn_formula(tool, body, field), value=r.values[field]))
+    if tool == "seasonal" and rows:
+        # ES.Seasonal takes no end date: it compares the latest value, so this tab moves with the next one
+        rows[0] = rows[0].model_copy(update={"label": rows[0].label + "; ES.Seasonal reads the latest value, so "
+                                                                        "after the next one this tab moves with it"})
     if tool == "seasonal":
         for k, v in r.values.items():
             if k.startswith("value_in_"):
@@ -284,7 +291,7 @@ def _percentile(r: Reading, source: DataSource) -> Sheet | None:
         return None
     rows = [
         Row(label=f"Latest, {r.period} ({r.units})", formula=_get(series_id, r.period), value=r.values["target_value"]),
-        Row(label="Percentile: the share of the window's values at or below the latest", formula=RANK_EXACT,
+        Row(label="Percentile: the latest's rank in the window (values equal to it count half)", formula=RANK_EXACT,
             value=r.values["percentile"]),
         Row(label="Lowest value of the window", formula="=MIN(W)", value=r.values["min"]),
         Row(label="Highest value of the window", formula="=MAX(W)", value=r.values["max"]),
@@ -644,8 +651,9 @@ def _moved(formula: str, sheet: Sheet | None = None) -> str:
     showed #NAME? in every such cell."""
     text = formula.lstrip("=")
     if _FN.match(formula):
-        # an add-in function: its arguments are written into the formula, so nothing moves; the file names an
-        # add-in function with the prefix _xll., as it does ES.Value and ES.Table
+        # an add-in function: its arguments are written into the formula, so no cell reference is moved; the file
+        # names an add-in function with the prefix _xll., as it does ES.Value and ES.Table. (Its numbers can still
+        # change: ES.Seasonal has no end date and follows the latest value.)
         return re.sub(r"\bES\.", "_xll.ES.", text)
     if sheet is not None and sheet.window is not None:
         rng = window_range(sheet)

@@ -80,16 +80,22 @@ def _period(doc: dict, *fields: str) -> dt.date:
     return clock.today()
 
 
+_DATEISH = re.compile(r"period|date|start|end|first|last|peak|trough", re.I)
+
+
 def _item(x) -> str:
-    """One list item as a line: its scalar fields, dates as YYYY-MM-DD."""
+    """One list item as a line: its scalar fields; a field named as a date (period, start, trough ...) written
+    YYYY-MM-DD. Only those: any eight-digit number with a valid month and day would otherwise become a date
+    ("generation 20111225.0 MWh", the adversary, 21 Nov 2026)."""
     if isinstance(x, dict):
         parts = []
         for k, v in x.items():
             if isinstance(v, (dict, list)) or v is None or k in ("date_short", "index"):
                 continue
-            parts.append(f"{k} {_iso(v) if isinstance(v, str) else (round(v, 6) if isinstance(v, float) else v)}")
+            shown = _iso(v) if isinstance(v, str) and _DATEISH.search(k) else (round(v, 6) if isinstance(v, float) else v)
+            parts.append(f"{k} {shown}")
         return ", ".join(parts)
-    return _iso(x)
+    return str(x)
 
 
 def _lines(label: str, items, most: int = MAX_LINES) -> str:
@@ -101,7 +107,7 @@ def _lines(label: str, items, most: int = MAX_LINES) -> str:
 
 
 def _clip(text: str) -> str:
-    text = " ".join(_iso(text).split())
+    text = " ".join(text.split())
     return text if len(text) <= MAX_CONTEXT else text[:MAX_CONTEXT].rsplit(" ", 1)[0] + " ..."
 
 
@@ -179,7 +185,9 @@ def seasonal(source: DataSource, series_id: str, years: int = 5) -> Reading:
     """ES.Seasonal: the latest value against the same week (weekly) or month (monthly) of earlier years."""
     if not 2 <= years <= 10:
         raise ServerError("years must be 2 to 10")
-    return _seasonal(source, {"series": series_id, "lookback_years": years})
+    # `end` pins the comparison to a day, so it can be asked again (the server reads `end`; it ignores `as_of`).
+    # ES.Seasonal has no end argument: its Excel tab follows the latest value (the tab says so).
+    return _seasonal(source, {"series": series_id, "lookback_years": years, "end": clock.today().isoformat()})
 
 
 def _seasonal(source, body):
@@ -304,7 +312,27 @@ hp_filter = _series_window("hp_filter", "hp_filter", "trend and cycle (Hodrick-P
 
 # ---- two or more series -----------------------------------------------------------------------------------
 
-def _pair(tool: str, action: str, title: str, units: str | None = None, context=None):
+def _like_for_like(source: DataSource, a: str, b: str) -> str:
+    """get_spread's rule, for any tool that subtracts one series from another: refuse unlike units, unlike kinds
+    (readings.pairing_note) and unlike rhythms (readings.frequency_note); otherwise the note to carry, if any.
+    Until 21 Nov 2026 get_spread_stats asked none of it and gave WTI M1 minus RBOB M1 as "81.59 USD/bbl" (dollars
+    a barrel minus dollars a gallon) with a percentile (the adversary)."""
+    from .prose import unit_key
+    ua, ub = source.meta(a), source.meta(b)
+    if ua is None or ub is None:
+        raise ServerError(f"Unknown series_id {a if ua is None else b!r}. Use search_series to find a valid ID.")
+    if unit_key(ua.units) != unit_key(ub.units):
+        raise ServerError(f"Units differ ({ua.units!r} vs {ub.units!r}): no spread. Report the two series separately.")
+    why, usable = readings.pairing_note(a, b)
+    if not usable:
+        raise ServerError(why)
+    freq = readings.frequency_note(source, a, b)
+    if freq:
+        raise ServerError(freq)
+    return why
+
+
+def _pair(tool: str, action: str, title: str, units: str | None = None, context=None, like_for_like: bool = False):
     def build(source: DataSource, series_a: str, series_b: str, years: int = 3, **params) -> Reading:
         if not 1 <= years <= 20:
             raise ServerError("years must be 1 to 20")
@@ -313,6 +341,7 @@ def _pair(tool: str, action: str, title: str, units: str | None = None, context=
 
     def rebuild_pair(source, body, years):
         (na, ua), (nb, _) = _name(source, body["series_a"]), _name(source, body["series_b"])
+        note = _like_for_like(source, body["series_a"], body["series_b"]) if like_for_like else ""
         doc = source.action(action, body)
         values = flatten(doc, skip=("series_a", "series_b"))
         values["years"] = float(years)
@@ -321,13 +350,13 @@ def _pair(tool: str, action: str, title: str, units: str | None = None, context=
         ctx = f"Window {body['start']} to {body['end']}. " + (context(doc) if context else "")
         return _reading(tool, action, body, key, f"{na} and {nb}: {title}, last {years} years",
                         _last_row_period(doc, body), units or ua,
-                        [body["series_a"], body["series_b"]], values, ctx)
+                        [body["series_a"], body["series_b"]], values, ctx, counter=note)
 
     build.rebuild = rebuild_pair
     return build
 
 
-spread_stats = _pair("spread_stats", "spread", "the spread (first minus second) against its own history",
+spread_stats = _pair("spread_stats", "spread", "the spread (first minus second) against its own history", like_for_like=True,
                      context=lambda d: "current_spread = first minus second on the latest common date; half_life is in "
                                        "observations: how fast the spread has returned toward its mean.")
 rolling_correlation = _pair("rolling_correlation", "rolling_correlation", "rolling correlation",
@@ -437,12 +466,18 @@ def _report(source, body):
         for k in ("value", "wow", "yoy", "move_z", "seasonal_pctl", "level_z"):
             if _num(r.get(k)) is not None:
                 values[f"{label}.{'seasonal_percentile' if k == 'seasonal_pctl' else k}"] = float(r[k])
+        # the brief writes stocks in the unit it shows them in (215.9 Million Barrels): those figures are values
+        # too, so its sentences can be quoted and traced with their unit
+        if r.get("display_units") and r.get("display_units") != r.get("units"):
+            for k in ("display_value", "display_wow", "display_yoy"):
+                if _num(r.get(k)) is not None:
+                    values[f"{label}.{k.replace('display_', '')}_in_{r['display_units'].lower().replace(' ', '_')}"] = float(r[k])
     n = doc.get("narrative") or {}
     sig = n.get("signals") or {}
     for k, v in (sig.get("metrics") or {}).items():
         if _num(v) is not None:
             values[f"metric.{k}"] = float(v)
-    units = sorted({r.get("units", "") for r in rows if r.get("units")})
+    units = sorted({u for r in rows for u in (r.get("units"), r.get("display_units")) if u})
     parts = [f"Headline: {n.get('headline', '')}", f"Lede: {n.get('lede', '')}"]
     parts += [f"Also: {s}" for s in (n.get("supporting") or [])]
     parts += [f"Extreme: {s}" for s in (n.get("extremes") or [])]
@@ -596,9 +631,11 @@ def _years(body: dict, default: int = 3) -> int:
 
 REBUILD = {
     "percentile": lambda s, b: _percentile(s, b, _years(b)),
+    # The snapshot is read AGAIN: re-sending the body would re-run the rules over the very metric values being
+    # checked (a planted crack_321_z of 0.5697 rebuilt as 0.5697 and matched: the adversary, 21 Nov 2026).
+    "signals": lambda s, b: signals(s),
     "seasonal": _seasonal,
     "report": _report,
-    "signals": _signals,
     "describe": _describe,
     "events": _events,
     "maintenance": _maintenance,

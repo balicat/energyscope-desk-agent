@@ -50,6 +50,19 @@ fut = Spread(series_a="ICE.BRENT.2027-01.D", name_a="Brent 2027-01", series_b="N
 curve = Reading(key="evidence:x", title="Curves", period=D, units="USD/bbl", series_ids=["ICE.BRENT.M1.D"],
                 values={"brent_M1_minus_M12": 14.55, "us_stocks_vs_5y_pct": -4.47})
 
+# A reading the EnergyScope server computed (21 Nov 2026): its text gives no numbers; its values do.
+report = Reading(key="report:eia_weekly", title="US weekly petroleum, standing report as of 2026-11-17", period=D,
+                 units="Dollars per Gallon; Million Barrels; Thousand Barrels", series_ids=["PET.WGTSTUS1.W"],
+                 values={"Total gasoline.value": 215949.0, "Total gasoline.value_in_million_barrels": 215.949,
+                         "Regular gasoline.wow": -0.19, "Regular gasoline.value": 3.81},
+                 context="Lede: Regular gasoline fell by 0.19, to 3.81 Dollars per Gallon, a 2.2-sigma move.",
+                 request={"tool": "report", "action": "report", "body": {"preset": "eia_weekly"}})
+seasonal3 = Reading(key="seasonal:PET.WCESTUS1.W:3", title="US crude stocks: latest against the same time of year, previous 3 years",
+                    period=dt.date(2026, 11, 13), units="Thousand Barrels", series_ids=["PET.WCESTUS1.W"],
+                    values={"current_value": 417797.0, "seasonal_avg": 434167.0, "lookback_years": 3.0},
+                    context="Same week (week=46) in each of 3 earlier years.",
+                    request={"tool": "seasonal", "action": "seasonal", "body": {"series": "PET.WCESTUS1.W", "lookback_years": 3}})
+
 WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a date that differs from the code-written history sentence",
      dict(readings=[freight], summary="Freight is at the 96th percentile and has been above the 90th percentile line since 2026-01-05, 110 days.")),
@@ -124,6 +137,17 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      dict(facts=[brent], summary="Brent futures are at 97.72 USD/bbl.")),
     ("falling words only, when every change is a rise",
      dict(facts=[wti_up], summary="WTI fell 1.20 USD/bbl on the week to 88.10.")),
+    # the adversary, 21 Nov 2026
+    ("a number from a reading's text given a unit no cited series is in (the text's numbers took no unit test)",
+     dict(readings=[freight], summary="Freight is at the 96th percentile, above its line of 25.10 million barrels.")),
+    ("a ten-year average no reading computed", dict(facts=[stocks],
+     summary="US crude stocks are 414,417 thousand barrels, a record high, roughly double their ten-year average.")),
+    ("a three-year seasonal average called five-year", dict(readings=[seasonal3],
+     summary="US crude stocks are 417,797 thousand barrels against a five-year average of 434,167.")),
+    ("a three-year seasonal average called ten-year", dict(readings=[seasonal3],
+     summary="Stocks of 417,797 thousand barrels are below the ten-year average of 434,167.")),
+    ("a number that stands only in a server reading's text", dict(readings=[report],
+     summary="Regular gasoline moved 2.2 sigma to 3.81 dollars per gallon.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
@@ -142,13 +166,17 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(spreads=[fut], summary="The spread is 8.42 USD/bbl, percentile 96.4 of 3 years; the previous spell above the line ended 117 days earlier."),
     dict(readings=[brent_curve], summary="The Brent curve is in backwardation, not contango: M1 93.07 against M12 77.26, and it has steepened over the week."),
     dict(readings=[freight], summary="Tanker freight is at 31.40, percentile 96 of 3 years, near the high end of its range."),
+    dict(readings=[report], summary="Regular gasoline fell 0.19 to 3.81 dollars per gallon; total gasoline stocks are 215.9 million barrels."),
+    dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a three-year average of 434,167."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
     ("two true values attached to the wrong nouns",
      dict(facts=[brent, wti], summary="WTI futures are at 93.07 USD/bbl and Brent futures at 88.10.")),
+    # (until 21 Nov 2026 this case also said "their ten-year average"; the window rule now rejects that phrase, so it
+    # is a wrong answer below and the limit keeps the claims that stay in words alone)
     ("claims made in words alone",
-     dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels, a record high, roughly double their ten-year average.")),
+     dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels, a record high, roughly double their usual level.")),
     ("a change claimed in words where no earlier value was returned",
      dict(spreads=[fut], summary="The Brent-WTI spread for the same delivery month is 8.42 USD/bbl and has narrowed sharply.")),
     ("two true dates attached to the wrong events",
@@ -156,6 +184,11 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
                             values={"latest": 31.4, "percentile": 96.0},
                             context="Above the line since 2026-07-30; the previous spell ended 2024-02-12.")],
           summary="Freight is at percentile 96, above the line since 2024-02-12; the previous spell ended 2026-07-30.")),
+    # A true number put with a unit of another true number: 0.19 is gasoline's weekly fall in dollars a gallon, and
+    # million barrels is the unit the report gives stocks in. The text's numbers now take the unit tests (they did
+    # not before 21 Nov 2026), and this still passes: the rules do not tie a number to its own unit.
+    ("a report's price change written as a stock in million barrels (the adversary, 21 Nov 2026)",
+     dict(readings=[report], summary="Gasoline stocks were 0.19 million barrels on the week.")),
 ]
 
 
