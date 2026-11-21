@@ -274,12 +274,28 @@ def _unit_words(text: str) -> list[str]:
     return out
 
 
-def written_unit(clean: str, start: int, end: int, whole: str) -> Written:
-    """What unit, if any, the prose writes on the number at clean[start:end]: the words right after it up to the
-    next comma, bracket or full stop, and a currency sign or USD right before it."""
+# Units written glued to a number: 95.7mb/d, 417,797bbl, 5,576kb/d, 1.2bn, 30k (the adversary, round 5)
+_SUFFIX = {"mb": "million barrel", "kb": "thousand barrel", "b": "barrel", "bbl": "barrel", "bbls": "barrel",
+           "bpd": "barrel per day", "kbd": "thousand barrel per day", "mbd": "million barrel per day",
+           "kt": "thousand tonne", "t": "tonne", "mt": "tonne", "bcf": "billion cubic", "tcf": "trillion cubic",
+           "mmbtu": "million btu", "k": "thousand", "m": "million", "mn": "million", "mln": "million",
+           "bn": "billion", "pct": "percent"}
+
+
+def glued_suffix(tok: str, whole: str) -> str:
+    """The letters glued AFTER a number ("mb" of 95.7mb), "" when there are none (M1, USD97.72: letters before)."""
+    i = whole.find(tok)
+    return whole[i + len(tok):] if i >= 0 else ""
+
+
+def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "") -> Written:
+    """What unit, if any, the prose writes on the number at clean[start:end]: letters glued after it (`suffix`),
+    then the words right after it up to the next comma, bracket or full stop, and a currency sign or USD before it."""
     w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd")
-    tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", clean[end:end + 48])[0]
-    words, i = _unit_words(tail), 0
+    after = clean[end + len(suffix):end + len(suffix) + 48]
+    tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", after)[0]
+    head = _SUFFIX.get(suffix.lower(), suffix.lower()).split() if suffix else []
+    words, i = [_UNIT_WORDS.get(x, x) for x in head] + _unit_words(tail), 0
     if words[:1] == ["%"] or words[:1] == ["percent"] or words[:2] == ["per", "cent"] or words[:2] == ["percentage", "points"]:
         w.pct = True
         return w
@@ -352,7 +368,8 @@ def text_problems(text: str, pool: Pool) -> list[str]:
     for tok, start, end, whole, glued in _numbers(clean):
         if glued and whole in pool.tokens:
             continue  # M12, PF4: a name a tool returned
-        unit = written_unit(clean, start, end, whole)
+        suffix = glued_suffix(tok, whole) if glued else ""
+        unit = written_unit(clean, start, end, whole, suffix)
         if not glued and tok in pool.names and not unit.any():
             continue  # a number of a name, written without a unit of its own
         if not glued and tok in pool.hyphens and re.match(r"-[A-Za-z0-9]", clean[end:end + 2]):
@@ -370,8 +387,10 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         # ("95.7 million barrels a day" for utilisation in Percent, rescued by an unlabelled snapshot metric of 95.7:
         # the adversary's held-out U08). Unknown-unit values count only when no known-unit value has the number.
         known = [u for u in matches if u is not None]
-        # (a number glued to letters is part of a word, "the M1 contracts": the unit after it is the word's)
-        if unit.any() and not count and not glued and not (any(fits(unit, u) for u in known) if known else True):
+        # A number with letters BEFORE it is part of a word ("the M1 contracts"): the unit after it is the word's.
+        # Letters AFTER it are a unit written on it (95.7mb/d) and are tested like any other.
+        word = glued and not suffix
+        if unit.any() and not count and not word and not (any(fits(unit, u) for u in known) if known else True):
             shown = sorted({u for u in matches if u})
             bad.append(f"{tok} {unit.words()} (the values {tok} matches are in {', '.join(shown) or 'no unit'})")
             continue

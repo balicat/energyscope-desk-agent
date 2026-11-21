@@ -176,6 +176,13 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
                             latest_period=dt.date(2026, 11, 13), latest_value=5576.0)],
           summary="Crude imports were 5,576 thousand barrels in storage.")),
+    # units glued to the number (the adversary, round 5, finding 17)
+    ("a percent written as a rate glued to the number", dict(
+        readings=[report.model_copy(update={"values": {**report.values, "Refinery utilisation.value": 95.7},
+                                            "value_units": {**report.value_units, "Refinery utilisation.value": "Percent"}})],
+        summary="Refinery runs were 95.7mb/d.")),
+    ("a price change written as a stock glued to the number", dict(readings=[report], summary="Gasoline stocks were 0.19mb.")),
+    ("a stock in thousand barrels written as barrels glued to the number", dict(facts=[stocks], summary="Crude stocks were 414,417bbl.")),
     ("a percent written as a rate, rescued by an unlabelled copy of the number (U08)",
      dict(readings=[report.model_copy(update={"values": {**report.values, "Refinery utilisation.value": 95.7, "metric.refinery_util": 95.7},
                                               "value_units": {**report.value_units, "Refinery utilisation.value": "Percent"}})],
@@ -213,6 +220,9 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
                            latest_period=dt.date(2026, 11, 13), latest_value=5576.0)],
          summary="Crude imports were 5,576 thousand barrels a day, or 5,576 thousand barrels daily."),
+    dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
+                           latest_period=dt.date(2026, 11, 13), latest_value=5576.0)], summary="Crude imports were 5,576kb/d."),
+    dict(readings=[report], summary="Total gasoline stocks are 215.9mb and regular gasoline is $3.81/gal."),
     dict(facts=[wti_up], summary="WTI spot rose 1.20 dollars a barrel, or 1.38%, to $88.10 per barrel."),
     dict(readings=[funds], summary="Managed money is net long 151,200 contracts, at the 6.8th percentile."),
     dict(readings=[signals_r], summary="The 12-month curve, M12 minus M1, is -15.26, below the -10 threshold; the OPEC call QoQ change is 0.55."),
