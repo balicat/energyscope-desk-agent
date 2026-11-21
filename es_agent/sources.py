@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import re
+import threading
 import urllib.request
 from typing import Protocol
 
@@ -91,30 +92,51 @@ class Server:
         self.snapshot_url = snapshot_url or os.environ.get("LIBRARIAN_SNAPSHOT", "http://localhost:8816/workspace/live_snapshot")
         self._client = None
         self._headers = []
+        self._lock = threading.Lock()  # serve.py answers questions on several threads
 
     def _connect(self):
-        if self._client is None:
-            from pyarrow import flight
-            client = flight.connect(self.address)
-            # set both only when the handshake succeeded: a client kept without its token would call
-            # unauthenticated for the life of the service
-            self._headers = [client.authenticate_basic_token(self.key, "")] if self.key else []
-            self._client = client
-        return self._client
+        """The client and its token, as one pair (another thread may be logging in again)."""
+        with self._lock:
+            if self._client is None:
+                from pyarrow import flight
+                client = flight.connect(self.address)
+                # set both only when the handshake succeeded: a client kept without its token would call
+                # unauthenticated for the life of the service
+                try:
+                    headers = [client.authenticate_basic_token(self.key, "")] if self.key else []
+                except Exception:
+                    try:
+                        client.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    raise
+                self._client, self._headers = client, headers
+            return self._client, self._headers
+
+    def _drop(self, client):
+        """Forget a client whose token was refused, unless another thread has already replaced it."""
+        with self._lock:
+            if client is not None and self._client is client:
+                self._client, self._headers = None, []
+                try:
+                    client.close()
+                except Exception:  # noqa: BLE001 - closing a dead channel must not hide the real error
+                    pass
 
     def action(self, name: str, request: dict) -> dict | list:
         from pyarrow import flight
         for attempt in (1, 2):
+            client = None
             try:
-                client = self._connect()  # the login can fail too: a refused key, or a server still starting
+                client, headers = self._connect()  # the login can fail too: a refused key, a server still starting
                 results = list(client.do_action(flight.Action(name, json.dumps(request).encode()),
-                                                flight.FlightCallOptions(headers=self._headers, timeout=120)))
+                                                flight.FlightCallOptions(headers=headers, timeout=120)))
                 break
             except flight.FlightUnauthenticatedError as e:
                 # The server keeps its bearer tokens in memory: after it restarts, every token issued
                 # before is refused (21 Nov 2026: get_signals said "authentication error" until the
                 # service was restarted). Log in again once.
-                self._client, self._headers = None, []
+                self._drop(client)
                 if attempt == 2:
                     raise ServerError(str(e).split("\n")[0][:300]) from None
             except flight.FlightError as e:

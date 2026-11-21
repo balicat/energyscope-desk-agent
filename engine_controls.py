@@ -127,7 +127,10 @@ class _RestartedServer:
     """Accepts only the token of its latest handshake, as the real server does after a restart."""
 
     def __init__(self):
-        self.token, self.handshakes = "old-process-token", 0
+        self.token, self.handshakes, self.closed = "old-process-token", 0, 0
+
+    def close(self):
+        self.closed += 1
 
     def authenticate_basic_token(self, key, _password):
         self.handshakes += 1
@@ -149,6 +152,15 @@ try:
     got = srv.action("healthcheck", {})
     checks.append(("after a server restart the next action logs in again and answers",
                    got == {"ok": True} and fake.handshakes == 1, f"{got}, handshakes {fake.handshakes}"))
+    checks.append(("the refused client's channel is closed", fake.closed == 1, f"closed {fake.closed}"))
+    # two questions at once: a thread whose token was refused must not drop the client another thread has
+    # just logged in with (the adversary's note on 0ac9f63)
+    fresh = object()
+    srv._client, srv._headers = fresh, [(b"authorization", b"Bearer fresh")]
+    srv._drop(fake)
+    checks.append(("a thread drops only the client it used, not one another thread just logged in with",
+                   srv._client is fresh, f"client now {srv._client!r}"))
+    srv._client, srv._headers = fake, [(b"authorization", f"Bearer {fake.token}".encode())]
     fake.token = "another-restart"
     got = srv.action("healthcheck", {})
     checks.append(("and again after a second restart", got == {"ok": True} and fake.handshakes == 2,
