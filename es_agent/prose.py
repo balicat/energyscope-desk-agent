@@ -295,6 +295,8 @@ def written_unit(clean: str, start: int, end: int, whole: str) -> Written:
         rest = [x for x in words[i + 1:i + 3] if x not in _SCALES]
         if rest and rest[0] in _PER_NOUNS:
             w.per = rest[0]
+    elif i < len(words) and words[i] == "daily":    # "5,576 thousand barrels daily"
+        w.per = "day"
     return w
 
 
@@ -316,6 +318,14 @@ def fits(w: Written, unit: str | None) -> bool:
     if w.noun and w.noun not in head.split():
         return False
     if w.per and w.per not in per.split():
+        return False
+    # Writing the measure ("barrels") commits to the whole unit: a value in Thousand Barrels written as "417,797
+    # barrels" is a thousandfold error, and one in Thousand Barrels per Day written as "5,576 thousand barrels"
+    # turns a rate into a stock (the adversary's held-out U06 and U10). A bare currency ("89.53 dollars" for a
+    # price per barrel) commits to less, and stays allowed.
+    if w.noun and set(head.split()) & _SCALES - {w.scale}:
+        return False
+    if w.noun and per and not w.per:
         return False
     return True
 
@@ -356,7 +366,12 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         if not matches:
             bad.append(whole if glued else tok)
             continue
-        if unit.any() and not count and not any(fits(unit, u) for u in matches):
+        # A value whose unit is known decides; a copy of the same number of unknown unit does not rescue a misfit
+        # ("95.7 million barrels a day" for utilisation in Percent, rescued by an unlabelled snapshot metric of 95.7:
+        # the adversary's held-out U08). Unknown-unit values count only when no known-unit value has the number.
+        known = [u for u in matches if u is not None]
+        # (a number glued to letters is part of a word, "the M1 contracts": the unit after it is the word's)
+        if unit.any() and not count and not glued and not (any(fits(unit, u) for u in known) if known else True):
             shown = sorted({u for u in matches if u})
             bad.append(f"{tok} {unit.words()} (the values {tok} matches are in {', '.join(shown) or 'no unit'})")
             continue

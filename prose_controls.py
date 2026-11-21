@@ -169,6 +169,17 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a price written in thousand barrels", dict(facts=[wti_up], summary="WTI spot is 88.10 thousand barrels.")),
     ("a fund position in contracts written in dollars", dict(readings=[funds], summary="Managed money is net long $151,200.")),
     ("a percent written for a price", dict(facts=[wti], summary="WTI futures are at 88.10%.")),
+    # the adversary's held-out unit cases that passed the first cut (round 4)
+    ("a stock in thousand barrels written as barrels (U06: a thousandfold error)",
+     dict(facts=[stocks], summary="Crude stocks excluding the SPR were 414,417 barrels.")),
+    ("a rate in thousand barrels a day written as a stock (U10)",
+     dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
+                            latest_period=dt.date(2026, 11, 13), latest_value=5576.0)],
+          summary="Crude imports were 5,576 thousand barrels in storage.")),
+    ("a percent written as a rate, rescued by an unlabelled copy of the number (U08)",
+     dict(readings=[report.model_copy(update={"values": {**report.values, "Refinery utilisation.value": 95.7, "metric.refinery_util": 95.7},
+                                              "value_units": {**report.value_units, "Refinery utilisation.value": "Percent"}})],
+          summary="Refinery runs were 95.7 million barrels a day.")),
     # round 3 of the adversary
     ("the 8 of a 1.8-sigma move written as a stock change (a digit of a decimal is not a name)",
      dict(readings=[signals_r], summary="US crude stocks fell by 8 million barrels on the week.")),
@@ -199,6 +210,9 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[seasonal3], summary="Over 36 months of the same week, the average was 434,167 thousand barrels."),
     # the unit rule must let each number keep its own unit
     dict(facts=[stocks], summary="US crude stocks are 414,417 thousand barrels."),
+    dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
+                           latest_period=dt.date(2026, 11, 13), latest_value=5576.0)],
+         summary="Crude imports were 5,576 thousand barrels a day, or 5,576 thousand barrels daily."),
     dict(facts=[wti_up], summary="WTI spot rose 1.20 dollars a barrel, or 1.38%, to $88.10 per barrel."),
     dict(readings=[funds], summary="Managed money is net long 151,200 contracts, at the 6.8th percentile."),
     dict(readings=[signals_r], summary="The 12-month curve, M12 minus M1, is -15.26, below the -10 threshold; the OPEC call QoQ change is 0.55."),
