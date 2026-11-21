@@ -132,7 +132,8 @@ class _RestartedServer:
     def close(self):
         self.closed += 1
 
-    def authenticate_basic_token(self, key, _password):
+    def authenticate_basic_token(self, key, _password, options=None):
+        self.login_timeout = getattr(options, "timeout", None)
         self.handshakes += 1
         self.token = f"token-{self.handshakes}"
         return (b"authorization", f"Bearer {self.token}".encode())
@@ -165,7 +166,37 @@ try:
     got = srv.action("healthcheck", {})
     checks.append(("and again after a second restart", got == {"ok": True} and fake.handshakes == 2,
                    f"{got}, handshakes {fake.handshakes}"))
-    fake.authenticate_basic_token = lambda k, p: (_ for _ in ()).throw(_flight.FlightUnauthenticatedError("Invalid API key"))
+    checks.append(("the login has a timeout (it holds the lock)", fake.login_timeout is not None,
+                   f"timeout {fake.login_timeout}"))
+    # a call in flight on a channel another thread drops comes back cancelled: one more try on the current channel
+    class _Cancelled:
+        def do_action(self, action, options):
+            srv._client = fake  # meanwhile another thread logged in again on a new channel
+            raise _flight.FlightCancelledError("Cancelled")
+
+        def close(self):
+            pass
+
+    gone = _Cancelled()
+    srv._client, srv._headers = gone, [(b"authorization", f"Bearer {fake.token}".encode())]
+    got = srv.action("healthcheck", {})
+    checks.append(("a call cancelled because its channel was replaced is tried once more on the new one", got == {"ok": True}, str(got)))
+
+    class _Broken:
+        def do_action(self, action, options):
+            raise _flight.FlightInternalError("server fault")
+
+        def close(self):
+            pass
+
+    srv._client, srv._headers = _Broken(), [(b"authorization", b"Bearer x")]
+    try:
+        srv.action("healthcheck", {})
+        checks.append(("a server fault on the current channel is not retried", False, "answered"))
+    except ServerError as e:
+        checks.append(("a server fault on the current channel is not retried", "server fault" in str(e), str(e)[:90]))
+    srv._client, srv._headers = fake, [(b"authorization", f"Bearer {fake.token}".encode())]
+    fake.authenticate_basic_token = lambda k, p, o=None: (_ for _ in ()).throw(_flight.FlightUnauthenticatedError("Invalid API key"))
     fake.token = "third"
     try:
         srv.action("healthcheck", {})

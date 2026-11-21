@@ -63,6 +63,9 @@ class DataSource(Protocol):
     def snapshot(self) -> dict: ...
 
 
+LOGIN_TIMEOUT_S = 10  # the Flight handshake; a call itself has 120 s
+
+
 class ServerError(RuntimeError):
     """The server refused or could not answer (an unknown series, too little history, a refused request)."""
 
@@ -103,7 +106,10 @@ class Server:
                 # set both only when the handshake succeeded: a client kept without its token would call
                 # unauthenticated for the life of the service
                 try:
-                    headers = [client.authenticate_basic_token(self.key, "")] if self.key else []
+                    # a timeout: the login holds the lock, so a server that hangs instead of refusing would
+                    # otherwise hold every question's server call behind it (the adversary, 21 Nov 2026)
+                    headers = ([client.authenticate_basic_token(self.key, "", flight.FlightCallOptions(timeout=LOGIN_TIMEOUT_S))]
+                               if self.key else [])
                 except Exception:
                     try:
                         client.close()
@@ -140,6 +146,12 @@ class Server:
                 if attempt == 2:
                     raise ServerError(str(e).split("\n")[0][:300]) from None
             except flight.FlightError as e:
+                # A call in flight on a channel another thread has just dropped (its token refused, right after
+                # a restart) comes back cancelled, not Unauthenticated: try once more on the current channel.
+                with self._lock:
+                    replaced = client is not None and self._client is not client
+                if attempt == 1 and replaced:
+                    continue
                 raise ServerError(str(e).split("\n")[0][:300]) from None
         if not results:
             raise ServerError(f"{name}: no answer")
