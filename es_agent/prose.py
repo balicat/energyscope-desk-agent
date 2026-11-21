@@ -70,7 +70,7 @@ _SPELLED = re.compile(rf"\b{_COUNTING}(?:[\s-]+(?:and\s+)?{_NUMWORD})*\s+(?:us\s
 _UNIT_WORDS = {"usd": "dollars", "$": "dollars", "us$": "dollars", "/": " per ", "bbl": "barrel", "barrels": "barrel",
                "gal": "gallon", "gallons": "gallon", "mt": "tonne", "tonnes": "tonne", "ton": "tonne", "mmbtu": "million btu",
                # for the unit rule (21 Nov 2026): OPEC's mb/d, plurals of the nouns a value's unit names
-               "mb": "million barrel", "kb": "thousand barrel", "d": "day", "bbls": "barrel", "contracts": "contract",
+               "mb": "million barrel", "kb": "thousand barrel", "tb": "thousand barrel", "d": "day", "bbls": "barrel", "contracts": "contract",
                "rigs": "rig", "dollar": "dollars", "tons": "tonne"}
 
 

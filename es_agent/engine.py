@@ -616,6 +616,25 @@ def signals(source: DataSource) -> Reading:
                     snap.get("fetched_at", ""))
 
 
+def metric_unit(label: str) -> str | None:
+    """The unit a signal metric's catalogue label names: "($/bbl; ...)" -> Dollars per Barrel, a z-score -> "1", a
+    percentile -> percent; None when the label names none."""
+    low = label.lower()
+    if "z-score" in low or "zscore" in low or re.search(r"\bz\b", low) or "correlation" in low:
+        return "1"
+    if "percentile" in low or "pctl" in low:
+        return "percent"
+    inside = re.search(r"\(([^;)]*)", label)
+    if inside:
+        from .prose import _unit_words
+        words = _unit_words(inside[1].replace("$", " usd "))
+        if "%" in words or "percent" in words:
+            return "percent"
+        if set(words) & {"dollars", "barrel", "gallon", "tonne", "btu", "day", "million", "thousand"}:
+            return " ".join(words)
+    return None
+
+
 def _signals(source, body, fetched_at=""):
     doc = source.action("derived_signals", body)
     # the series behind each metric, from the server's own catalogue (its source hints), so the answer names the
@@ -654,11 +673,19 @@ def _signals(source, body, fetched_at=""):
                  "is two or more signals firing together. They describe the data and are not forecasts.")
     # The units the metrics are in, as the server's catalogue labels them ("12-month curve, M12-M1 ($/bbl; ...)"),
     # so "15.26 dollars per barrel" for m1_m12 is not refused for want of a unit word (the live gate, 21 Nov 2026).
-    # The metrics keep no unit of their own (value_units): which label belongs to which metric is the catalogue's.
+    # Each metric whose label names a unit carries it (value_units), so "15.26 million barrels" for it is refused
+    # (the adversary); a metric whose label names none stays of unknown unit, matched on its number alone.
     labels = sorted({spec.get("label", "") for spec in schema.values() if spec.get("key") in body["metrics"] and spec.get("label")})
+    vu = {}
+    for spec in schema.values():
+        key = spec.get("key")
+        if key in body["metrics"] and spec.get("label") and f"metric.{key}" not in vu:
+            unit = metric_unit(spec["label"])
+            if unit:
+                vu[f"metric.{key}"] = unit
     return _reading("signals", "derived_signals", body, "signals:live", "The server's signals and contradictions, live",
                     clock.today(), "as each metric: " + "; ".join(labels), behind, values, " ".join(parts),
-                    f"metric snapshot of {_iso(fetched_at)[:10]}" if fetched_at else "")
+                    f"metric snapshot of {_iso(fetched_at)[:10]}" if fetched_at else "", value_units=vu)
 
 
 def describe(source: DataSource, series_id: str) -> Reading:

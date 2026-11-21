@@ -69,7 +69,8 @@ fair_from = [("eia_weekly report", engine.report(source, "eia_weekly")), ("seaso
              ("spread", engine.spread_stats(source, "PET.RBRTE.D", "PET.RWTC.D", 3)),
              ("volatility", engine.volatility(source, "PET.RWTC.D", 3, window=20)),
              ("history", engine.history(source, "PET.RWTC.D", 5)),
-             ("rolling correlation", engine.rolling_correlation(source, "PET.RWTC.D", "PET.RBRTE.D", 3, window=90))]
+             ("rolling correlation", engine.rolling_correlation(source, "PET.RWTC.D", "PET.RBRTE.D", 3, window=90)),
+             ("signals", live)]
 quoted, unfair = 0, []
 for name, reading in fair_from:
     for key, value in reading.values.items():
@@ -85,6 +86,14 @@ for name, reading in fair_from:
             unfair.append(f"{name} {key} '{phrase}': {found[:1]}")
 checks.append((f"every server value quoted with its own unit passes: {quoted - len(unfair)} of {quoted}", not unfair,
                "; ".join(unfair[:4])))
+# a signal metric whose catalogue label names a unit takes no other (the adversary, round 8)
+m1m12 = live.values.get("metric.m1_m12")
+if m1m12 is not None:
+    wrong_units = [f"{abs(m1m12):.2f} million barrels", f"{abs(m1m12):.2f} percent", f"{abs(m1m12):.2f} dollars a gallon"]
+    passed = [w for w in wrong_units if not _m.untraceable_numbers(_A(facts=[], readings=[live], cites=[live.key],
+                                                                         summary=f"The curve metric is {w}."))]
+    checks.append(("the curve metric (labelled $/bbl) written in another unit is refused", not passed and
+                   live.value_units.get("metric.m1_m12") is not None, f"passed: {passed}; unit {live.value_units.get('metric.m1_m12')}"))
 
 # 9. fair quotes: the server's own sentences, quoted back word for word with their reading cited, must pass the
 # prose rules (the instructions tell the model to quote them "with its numbers and dates unchanged")
