@@ -284,6 +284,9 @@ _SUFFIX = {"mb": "million barrel", "kb": "thousand barrel", "b": "barrel", "bbl"
            "bn": "billion", "pct": "percent"}
 
 
+_CURRENCY_PREFIX = {"USD", "EUR", "GBP"}
+
+
 def glued_suffix(tok: str, whole: str) -> str:
     """The letters glued AFTER a number ("mb" of 95.7mb), "" when there are none (M1, USD97.72: letters before)."""
     i = whole.find(tok)
@@ -293,7 +296,7 @@ def glued_suffix(tok: str, whole: str) -> str:
 def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "") -> Written:
     """What unit, if any, the prose writes on the number at clean[start:end]: letters glued after it (`suffix`),
     then the words right after it up to the next comma, bracket or full stop, and a currency sign or USD before it."""
-    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd")
+    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].upper() in _CURRENCY_PREFIX)
     after = clean[end + len(suffix):end + len(suffix) + 48]
     tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", after)[0]
     head = _SUFFIX.get(suffix.lower(), suffix.lower()).split() if suffix else []
@@ -371,6 +374,17 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         if glued and whole in pool.tokens:
             continue  # M12, PF4: a name a tool returned
         suffix = glued_suffix(tok, whole) if glued else ""
+        if glued:
+            # Fail closed (the adversary, round 6): letters glued to a number are a name only when a tool returned
+            # the whole token, or it is a contract month (M1 to M12); a currency in front (USD5.94) is money; a unit
+            # behind it must be one this module reads (95.7mb/d). Anything else could hide a unit no rule reads
+            # ("95.7MMbbl/d" for a percent), so it is refused with the way to write it.
+            prefix = whole[:whole.find(tok)] if whole.find(tok) >= 0 else ""
+            if re.fullmatch(r"M(?:1[0-2]|[1-9])", whole):
+                continue
+            if (prefix and prefix.upper() not in _CURRENCY_PREFIX) or (suffix and suffix.lower() not in _SUFFIX):
+                bad.append(f"{whole} (write the number apart from its letters, and the unit as a word)")
+                continue
         unit = written_unit(clean, start, end, whole, suffix)
         if not glued and tok in pool.names and not unit.any():
             continue  # a number of a name, written without a unit of its own
@@ -389,10 +403,8 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         # ("95.7 million barrels a day" for utilisation in Percent, rescued by an unlabelled snapshot metric of 95.7:
         # the adversary's held-out U08). Unknown-unit values count only when no known-unit value has the number.
         known = [u for u in matches if u is not None]
-        # A number with letters BEFORE it is part of a word ("the M1 contracts"): the unit after it is the word's.
-        # Letters AFTER it are a unit written on it (95.7mb/d) and are tested like any other.
-        word = glued and not suffix
-        if unit.any() and not count and not word and not (any(fits(unit, u) for u in known) if known else True):
+        # (a glued number that gets here has a currency in front or a unit behind it: both are tested)
+        if unit.any() and not count and not (any(fits(unit, u) for u in known) if known else True):
             shown = sorted({u for u in matches if u})
             bad.append(f"{tok} {unit.words()} (the values {tok} matches are in {', '.join(shown) or 'no unit'})")
             continue

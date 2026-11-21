@@ -183,6 +183,14 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
         summary="Refinery runs were 95.7mb/d.")),
     ("a price change written as a stock glued to the number", dict(readings=[report], summary="Gasoline stocks were 0.19mb.")),
     ("a stock in thousand barrels written as barrels glued to the number", dict(facts=[stocks], summary="Crude stocks were 414,417bbl.")),
+    # round 6 (finding 18): a currency glued in front is money and is tested; unknown glued letters are refused
+    ("a price per gallon written per barrel with USD glued in front", dict(readings=[report], summary="Diesel cost USD3.81 a barrel.")),
+    ("a price per barrel written per gallon with USD glued in front", dict(facts=[wti], summary="WTI futures were USD88.10/gal.")),
+    ("a percent written as a rate in a unit no rule reads", dict(
+        readings=[report.model_copy(update={"values": {**report.values, "Refinery utilisation.value": 95.7},
+                                            "value_units": {**report.value_units, "Refinery utilisation.value": "Percent"}})],
+        summary="Refinery runs were 95.7MMbbl/d.")),
+    ("a price change written in a unit no rule reads", dict(readings=[report], summary="Gasoline stocks were 0.19mmb.")),
     ("a percent written as a rate, rescued by an unlabelled copy of the number (U08)",
      dict(readings=[report.model_copy(update={"values": {**report.values, "Refinery utilisation.value": 95.7, "metric.refinery_util": 95.7},
                                               "value_units": {**report.value_units, "Refinery utilisation.value": "Percent"}})],
@@ -223,6 +231,7 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(facts=[SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
                            latest_period=dt.date(2026, 11, 13), latest_value=5576.0)], summary="Crude imports were 5,576kb/d."),
     dict(readings=[report], summary="Total gasoline stocks are 215.9mb and regular gasoline is $3.81/gal."),
+    dict(facts=[wti], summary="WTI futures were USD88.10 a barrel, and the M1 contract leads the curve."),
     # a percent named pct_... (the live gate refused it, 21 Nov 2026)
     dict(readings=[seasonal3.model_copy(update={"values": {**seasonal3.values, "pct_vs_avg": -3.652869},
                                                 "value_units": {"current_value": "Thousand Barrels", "seasonal_avg": "Thousand Barrels"}})],
