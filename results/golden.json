@@ -1559,7 +1559,63 @@
    }
   ],
   "spreads": [],
-  "summary": "The server's signals and contradictions, live on 2026-11-21: metric.m1_m12 -15.26, metric.brent_wti_spread 3.41, metric.gasoline_seasonal_pctl 80.00, metric.brent_wti_zscore -0.45, metric.roll_yield_pct -16.49, metric.crack_321_z 0.07, metric.bwet_z 3.33, metric.crack_diesel_z 1.70, metric.wti_price_pctl 88.65, metric.cushing_7d_pct -4.05, metric.refinery_util 95.70, metric.crude_seasonal_pctl 0.00, metric.cushing_z 0.49, metric.wti_mm_pctl 6.78, metric.opec_world_demand_revision 0.10, metric.opec_call_qoq_change up 0.55, metric.opec_call_production_gap 4.41, metric.distillate_seasonal_pctl 0.00, metric.production_seasonal_pctl 100.00, metric.hdd_anomaly_z -0.98, metric.vix_corr 0.10, metric.crack_gasoline_z -1.65, metric.brent_mm_pctl 41.03, metric.eu_gas_seasonal_pctl 0.00, metric.cdd_anomaly_z 0.00, metric.hdd_oil_anomaly_z -0.97, metric.opec_compliance_gap_max_kbd 479.00, signals_evaluated 42.00, active_count 13.00, contradiction_count 1.00, contradiction_total 16.00, distillate_undersupplied.threshold 20.00, crude_undersupplied.threshold 20.00, production_at_seasonal_high.threshold 99.00, eu_gas_stocks_tight.threshold 20.00, opec_compliance_gap_extreme.threshold 200.00, opec_production_gap.threshold 2.00, refinery_strong.threshold 92.00, brent_positioning_median.low 30.00, brent_positioning_median.high 70.00, opec_call_rising.threshold 0.00, steep_backwardation.threshold -10.00, wti_specs_short.threshold 10.00, freight_extreme.threshold 3.00, punishing_carry.threshold -15.00, regime_curve_destruction.steep_backwardation.score 0.35, regime_curve_destruction.punishing_carry.score 0.10, contradictions_not_evaluated 7.00."
+  "summary": "The server's signals and contradictions, live on 2026-11-21: metric.crack_321_z 0.07, metric.brent_wti_zscore -0.45, metric.m1_m12 -15.26, metric.roll_yield_pct -16.49, metric.bwet_z 3.33, metric.wti_price_pctl 88.65, metric.brent_wti_spread 3.41, metric.cushing_7d_pct -4.05, metric.refinery_util 95.70, metric.crude_seasonal_pctl 0.00, metric.crack_diesel_z 1.70, metric.distillate_seasonal_pctl 0.00, metric.crack_gasoline_z -1.65, metric.wti_mm_pctl 6.78, metric.opec_world_demand_revision 0.10, metric.opec_call_qoq_change up 0.55, metric.opec_call_production_gap 4.41, metric.vix_corr 0.10, metric.brent_mm_pctl 41.03, metric.gasoline_seasonal_pctl 80.00, metric.production_seasonal_pctl 100.00, metric.eu_gas_seasonal_pctl 0.00, metric.cushing_z 0.49, metric.hdd_anomaly_z -0.98, metric.cdd_anomaly_z 0.00, metric.hdd_oil_anomaly_z -0.97, metric.opec_compliance_gap_max_kbd 479.00, signals_evaluated 42.00, active_count 13.00, contradiction_count 1.00, contradiction_total 16.00, distillate_undersupplied.threshold 20.00, crude_undersupplied.threshold 20.00, production_at_seasonal_high.threshold 99.00, eu_gas_stocks_tight.threshold 20.00, opec_compliance_gap_extreme.threshold 200.00, opec_production_gap.threshold 2.00, refinery_strong.threshold 92.00, brent_positioning_median.low 30.00, brent_positioning_median.high 70.00, opec_call_rising.threshold 0.00, steep_backwardation.threshold -10.00, wti_specs_short.threshold 10.00, freight_extreme.threshold 3.00, punishing_carry.threshold -15.00, regime_curve_destruction.steep_backwardation.score 0.35, regime_curve_destruction.punishing_carry.score 0.10, contradictions_not_evaluated 7.00."
+ },
+ "short_history_spread": {
+  "caveats": [
+   "Shorter history: NYMEX.HO.M1.D begins on 2026-11-02, so these figures are taken over the 18 days since then, not over 3 years."
+  ],
+  "cites": [
+   "spread_stats:NYMEX.HO.M1.D,NYMEX.RBOB.M1.D:3"
+  ],
+  "facts": [],
+  "readings": [
+   {
+    "context": "Window 2023-11-21 to 2026-11-20. current_spread = first minus second on the latest common date; half_life is in observations: how fast the spread has returned toward its mean.",
+    "counter": "Shorter history: NYMEX.HO.M1.D begins on 2026-11-02, so these figures are taken over the 18 days since then, not over 3 years.",
+    "hypothetical": false,
+    "key": "spread_stats:NYMEX.HO.M1.D,NYMEX.RBOB.M1.D:3",
+    "note": "",
+    "period": "2026-11-20",
+    "request": {
+     "action": "spread",
+     "body": {
+      "end": "2026-11-20",
+      "series_a": "NYMEX.HO.M1.D",
+      "series_b": "NYMEX.RBOB.M1.D",
+      "start": "2023-11-21"
+     },
+     "tool": "spread_stats"
+    },
+    "series_ids": [
+     "NYMEX.HO.M1.D",
+     "NYMEX.RBOB.M1.D"
+    ],
+    "title": "NY Harbor ULSD (heating oil) futures M1 (1st nearby, NYMEX HO) and RBOB gasoline futures M1 (1st nearby, NYMEX RB): the spread (first minus second) against its own history, last 3 years",
+    "units": "USD/gal",
+    "value_units": {
+     "current_spread": "USD/gal",
+     "max": "USD/gal",
+     "mean": "USD/gal",
+     "min": "USD/gal",
+     "std": "USD/gal",
+     "zscore": "1"
+    },
+    "values": {
+     "current_spread": 1.437,
+     "max": 1.6371,
+     "mean": 1.54132,
+     "min": 1.437,
+     "observations": 15.0,
+     "percentile": 6.666667,
+     "std": 0.060281,
+     "years": 3.0,
+     "zscore": -1.730569
+    }
+   }
+  ],
+  "spreads": [],
+  "summary": "NY Harbor ULSD (heating oil) futures M1 (1st nearby, NYMEX HO) and RBOB gasoline futures M1 (1st nearby, NYMEX RB): the spread (first minus second) against its own history, last 3 years on 2026-11-20: observations 15.00, current_spread 1.44, mean 1.54, std 0.06, min 1.44, max 1.64, zscore -1.73, percentile 6.67, years 3.00."
  },
  "spot_vs_futures": {
   "caveats": [],

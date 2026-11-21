@@ -131,6 +131,28 @@ def _ended(source: DataSource, ids: list[str], years: int) -> tuple[str, str]:
     return start, _last_date(source, ids).isoformat()
 
 
+def _shorter(source: DataSource, ids: list[str], body: dict, years: int) -> str:
+    """The caveat a window reading owes when its data begin well inside the window asked for: "last 3 years" of
+    a pair whose front months begin on 2 November is 15 observations (the adversary, 21 Nov 2026, finding 16). The
+    percentile reading had it already; every window tool now does. Code writes it; it goes to the caveats."""
+    try:
+        start = dt.date.fromisoformat(body["start"])
+    except (KeyError, ValueError):
+        return ""
+    firsts = []
+    for sid in ids:
+        hist = source.history(sid, start=start)
+        if not hist:
+            return ""
+        firsts.append(hist[0][0])
+    first = max(firsts)
+    if first <= start + dt.timedelta(days=45):
+        return ""
+    which = ids[firsts.index(first)]
+    return (f"Shorter history: {which} begins on {first}, so these figures are taken over the "
+            f"{(dt.date.fromisoformat(body.get('end', str(clock.today()))) - first).days} days since then, not over {years} years.")
+
+
 def _window(years: int) -> tuple[str, str]:
     """A window of `years` ending today, both ends fixed in the request so it can be sent again (and so the
     Excel sheet fixes the same dates)."""
@@ -289,6 +311,7 @@ def _series_window(tool: str, action: str, title: str, extra: dict | None = None
         p = _period(doc, *period) if any(doc.get(f) for f in period) else _last_row_period(doc, body)
         return _reading(tool, action, body, key, f"{name}: {title}, last {years} years", p,
                         units(u) if callable(units) else (units or u), [body["series"]], values, ctx,
+                        counter=_shorter(source, [body["series"]], body, years),
                         value_units=units_of(values, u, unitless_all=unitless))
 
     build.rebuild = rebuild_series
@@ -402,7 +425,8 @@ def _pair(tool: str, action: str, title: str, units: str | None = None, context=
         ctx = f"Window {body['start']} to {body['end']}. " + (context(doc) if context else "")
         return _reading(tool, action, body, key, f"{na} and {nb}: {title}, last {years} years",
                         _last_row_period(doc, body), units or ua,
-                        [body["series_a"], body["series_b"]], values, ctx, counter=note,
+                        [body["series_a"], body["series_b"]], values, ctx,
+                        counter=" ".join(x for x in (note, _shorter(source, [body["series_a"], body["series_b"]], body, years)) if x),
                         value_units=units_of(values, ua, unitless_all=units is not None))
 
     build.rebuild = rebuild_pair
@@ -437,6 +461,7 @@ def _many(tool: str, action: str, title: str, units: str, flatten_doc=None, cont
         ctx = f"Window {body['start']} to {body['end']}. " + (context(doc) if context else "")
         return _reading(tool, action, body, key, f"{', '.join(names)}: {title}, last {years} years",
                         min(clock.today(), dt.date.fromisoformat(body["end"])), units, list(body["series"]), values, ctx,
+                        counter=_shorter(source, list(body["series"]), body, years),
                         value_units=units_of(values, None, unitless_all=True))
 
     build.rebuild = rebuild_many
@@ -715,7 +740,7 @@ def _history(source, body):
            "Every value is in the chart on the page and in the Excel workbook's table.")
     return _reading("history", "", body, f"history:{body['series']}:{years}", f"{name}, last {years} years",
                     hist[-1][0], units, [body["series"]], values, ctx, note=f"first value {hist[0][0]}",
-                    value_units=units_of(values, units))
+                    counter=_shorter(source, [body["series"]], body, years), value_units=units_of(values, units))
 
 
 # ---- rebuilding from the request -------------------------------------------------------------------------

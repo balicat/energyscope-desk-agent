@@ -48,6 +48,16 @@ checks.append(("the true signals reading rebuilds unchanged", engine.rebuild(sou
 s = engine.seasonal(source, "PET.WCESTUS1.W", 5)
 checks.append(("the seasonal reading's request names its end date", "end" in s.request["body"], str(s.request["body"])))
 
+# 16. a window reading whose data begin well inside the window says so (front months begin 2 Nov 2026)
+try:
+    short = engine.spread_stats(source, "NYMEX.HO.M1.D", "NYMEX.RBOB.M1.D", 3)
+    checks.append(("a spread's statistics over 3 years of front months that began in November say 'Shorter history'",
+                   short.counter.startswith("Shorter history:") or "Shorter history:" in short.counter, short.counter[:90]))
+except Exception as e:
+    checks.append(("a spread's statistics over a short history", False, f"{type(e).__name__}: {e}"[:120]))
+full = engine.stats(source, "PET.RWTC.D", 3)
+checks.append(("WTI spot over 3 years carries no 'Shorter history'", "Shorter history" not in full.counter, full.counter[:90]))
+
 # 9. fair quotes: the server's own sentences, quoted back word for word with their reading cited, must pass the
 # prose rules (the instructions tell the model to quote them "with its numbers and dates unchanged")
 import re as _re
