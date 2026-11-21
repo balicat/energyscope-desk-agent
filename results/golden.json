@@ -1503,7 +1503,7 @@
      "WEATHER.HDD.POP.US.TOTAL.W"
     ],
     "title": "The server's signals and contradictions, live",
-    "units": "as each metric",
+    "units": "as each metric: 12-month curve, M12\u2212M1 ($/bbl; negative = backwardation \u2014 key name is legacy); 12-month roll yield (%, M12 vs M1); 3-2-1 crack z-score; BWET freight z-score; Brent managed money net positioning percentile; Brent-WTI spread ($/bbl); Brent-WTI spread z-score; Cushing 7-day percent change; Cushing inventory z-score; EU gas storage fullness seasonal percentile (AGSI+); OPEC call on DoC crude QoQ change (mb/d); OPEC call-vs-production gap (mb/d); OPEC world demand MoM revision (mb/d); US cooling degree days anomaly z-score (vs 10-yr avg); US crude production seasonal percentile; US heating degree days anomaly z-score (vs 10-yr avg); US oil-heating-weighted heating degree days anomaly z-score (vs same week, prior years); US refinery utilization (%); VIX-WTI correlation; WTI managed money net positioning percentile; WTI price historical percentile; crude stocks seasonal percentile; diesel crack z-score; distillate stocks seasonal percentile; gasoline crack z-score; gasoline stocks seasonal percentile; max OPEC direct-vs-secondary production gap (tb/d)",
     "value_units": {},
     "values": {
      "active_count": 13.0,
@@ -1990,16 +1990,12 @@
      "breakpoints.3.mean_before": "Dollars per Barrel",
      "breakpoints.3.shift": "Dollars per Barrel",
      "n_breakpoints": "Dollars per Barrel",
-     "segments.1.count": "Dollars per Barrel",
      "segments.1.mean": "Dollars per Barrel",
      "segments.1.std": "Dollars per Barrel",
-     "segments.2.count": "Dollars per Barrel",
      "segments.2.mean": "Dollars per Barrel",
      "segments.2.std": "Dollars per Barrel",
-     "segments.3.count": "Dollars per Barrel",
      "segments.3.mean": "Dollars per Barrel",
      "segments.3.std": "Dollars per Barrel",
-     "segments.4.count": "Dollars per Barrel",
      "segments.4.mean": "Dollars per Barrel",
      "segments.4.std": "Dollars per Barrel"
     },
@@ -2231,7 +2227,6 @@
     "title": "Cushing, OK WTI Spot Price FOB, Daily: descriptive statistics, last 3 years",
     "units": "Dollars per Barrel",
     "value_units": {
-     "count": "Dollars per Barrel",
      "first_value": "Dollars per Barrel",
      "kurtosis": "1",
      "last_value": "Dollars per Barrel",

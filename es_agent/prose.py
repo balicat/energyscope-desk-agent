@@ -83,8 +83,8 @@ def unit_key(units: str) -> str:
 def _kind(key: str) -> str:
     # a server reading's names are nested with dots ("coverage.observations", "segments.2.mean"): split on both
     parts = re.split(r"[._]", key.lower())
-    # a half-life is counted in observations ("a half-life of 10.04 days")
-    if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years", "life") for p in parts):
+    # a half-life is counted in observations ("a half-life of 10.04 days"); a value named count is a count (stats)
+    if key in ("lines", "tight", "loose", "neutral") or key.startswith("groups_") or "observations" in parts or any(p in ("days", "weeks", "years", "life", "count") for p in parts):
         return "count"
     # pct anywhere in the name is a percent: the server's pct_vs_avg and pct_change (the live gate, 21 Nov 2026,
     # refused "3.65 percent below the average" while pct_vs_avg was read as an amount in thousand barrels)
@@ -179,7 +179,9 @@ class Pool:
                     pass
 
     def label(self, *parts: str) -> None:
-        self.units += " " + unit_key(" ".join(parts).replace("_", " "))
+        # the same word reader as the unit rule, so a unit inside punctuation counts: "($/bbl;" is dollars per barrel
+        text = " ".join(parts).replace("_", " ")
+        self.units += " " + unit_key(text) + " " + " ".join(_unit_words(text))
 
 
 def pool_of(answer: DeskAnswer) -> Pool:
@@ -316,7 +318,7 @@ def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "")
         rest = [x for x in words[i + 1:i + 3] if x not in _SCALES]
         if rest and rest[0] in _PER_NOUNS:
             w.per = rest[0]
-    elif i < len(words) and words[i] == "daily":    # "5,576 thousand barrels daily"
+    elif w.noun and i < len(words) and words[i] == "daily":    # "5,576 thousand barrels daily", not "748 daily values"
         w.per = "day"
     return w
 
@@ -439,6 +441,9 @@ def window_problems(answer: DeskAnswer) -> list[str]:
         allowed |= {int(v) for k, v in r.values.items() if "years" in k.lower().split(".")[-1] and float(v).is_integer()}
         # a window named in a value's own name: us_stocks_vs_5y_pct
         allowed |= {int(t[:-1]) for k in r.values for t in re.split(r"[._]", k.lower()) if re.fullmatch(r"\d{1,2}y", t)}
+        # a window counted in weekly reports: positioning's percentile_weeks of 156 is three years (the live gate
+        # refused "the three-year range" on 21 Nov 2026)
+        allowed |= {round(v / 52) for k, v in r.values.items() if k.lower().endswith("weeks") and v >= 50}
         allowed |= _years_in(" ".join((r.title, r.note, r.context, r.counter)))
     for f in answer.facts:
         if f.lookback_days and f.lookback_days >= 300:

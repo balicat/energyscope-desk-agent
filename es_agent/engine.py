@@ -652,8 +652,12 @@ def _signals(source, body, fetched_at=""):
         parts.append(f"Not evaluated: {len(skipped)} contradictions lack an input metric.")
     parts.append("A signal is a fixed rule over one metric (a z-score, a seasonal percentile, a spread); a contradiction "
                  "is two or more signals firing together. They describe the data and are not forecasts.")
+    # The units the metrics are in, as the server's catalogue labels them ("12-month curve, M12-M1 ($/bbl; ...)"),
+    # so "15.26 dollars per barrel" for m1_m12 is not refused for want of a unit word (the live gate, 21 Nov 2026).
+    # The metrics keep no unit of their own (value_units): which label belongs to which metric is the catalogue's.
+    labels = sorted({spec.get("label", "") for spec in schema.values() if spec.get("key") in body["metrics"] and spec.get("label")})
     return _reading("signals", "derived_signals", body, "signals:live", "The server's signals and contradictions, live",
-                    clock.today(), "as each metric", behind, values, " ".join(parts),
+                    clock.today(), "as each metric: " + "; ".join(labels), behind, values, " ".join(parts),
                     f"metric snapshot of {_iso(fetched_at)[:10]}" if fetched_at else "")
 
 

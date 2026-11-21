@@ -400,7 +400,8 @@ def get_rolling_correlation(ctx: RunContext[Deps], series_a: str, series_b: str,
 def get_spread_stats(ctx: RunContext[Deps], series_a: str, series_b: str, years: int = 3) -> Reading:
     """series_a minus series_b against its own history over `years` years: current spread, mean, standard
     deviation, min, max, z-score, percentile and half-life (how fast it has returned to its mean). Same units
-    and kind (spot with spot, future with future). The server's ES.Spread."""
+    and kind (spot with spot, future with future). The server's ES.Spread. It returns a READING: cite its key and
+    quote its values; do not list it under spreads (that list is for get_spread only)."""
     return _server(ctx, "get_spread_stats", {"series_a": series_a, "series_b": series_b, "years": years},
                    lambda: engine.spread_stats(ctx.deps.source, series_a, series_b, years))
 

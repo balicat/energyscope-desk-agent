@@ -232,6 +232,14 @@ RIGHT = [  # correct prose that the rules must not reject
                            latest_period=dt.date(2026, 11, 13), latest_value=5576.0)], summary="Crude imports were 5,576kb/d."),
     dict(readings=[report], summary="Total gasoline stocks are 215.9mb and regular gasoline is $3.81/gal."),
     dict(facts=[wti], summary="WTI futures were USD88.10 a barrel, and the M1 contract leads the curve."),
+    # three true sentences the live gate refused on 21 Nov 2026 (e0637c8)
+    dict(readings=[signals_r.model_copy(update={"units": "as each metric: 12-month curve, M12-M1 ($/bbl; negative = backwardation)"})],
+         summary="The 12-month curve spread is -15.26 dollars per barrel, below the -10 threshold."),
+    dict(readings=[funds], summary="Managed money is net long 151,200 contracts, at the 6.8th percentile of its three-year range."),
+    dict(readings=[Reading(key="stats:PET.RWTC.D:3", title="WTI spot: descriptive statistics, last 3 years", period=D,
+                           units="Dollars per Barrel", series_ids=["PET.RWTC.D"], values={"count": 748.0, "mean": 75.930294},
+                           value_units={"mean": "Dollars per Barrel"}, request={"tool": "stats", "action": "stats", "body": {}})],
+         summary="Over 748 daily values, WTI averaged 75.93 dollars a barrel."),
     # a percent named pct_... (the live gate refused it, 21 Nov 2026)
     dict(readings=[seasonal3.model_copy(update={"values": {**seasonal3.values, "pct_vs_avg": -3.652869},
                                                 "value_units": {"current_value": "Thousand Barrels", "seasonal_avg": "Thousand Barrels"}})],
