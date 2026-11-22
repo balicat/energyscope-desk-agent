@@ -66,6 +66,13 @@ class DataSource(Protocol):
 LOGIN_TIMEOUT_S = 10  # the Flight handshake; a call itself has 120 s
 
 
+def _close(client) -> None:
+    try:
+        client.close()
+    except Exception:  # noqa: BLE001 - closing a dead channel must not hide the real error
+        pass
+
+
 class ServerError(RuntimeError):
     """The server refused or could not answer (an unknown series, too little history, a refused request)."""
 
@@ -98,36 +105,40 @@ class Server:
         self._lock = threading.Lock()  # serve.py answers questions on several threads
 
     def _connect(self):
-        """The client and its token, as one pair (another thread may be logging in again)."""
+        """The client and its token, as one pair (another thread may be logging in again).
+
+        The login runs OUTSIDE the lock, on a client of this thread's own, with a timeout; the lock is taken only to
+        install the pair, or to keep the one another thread installed first. Held through the login, the lock made
+        four questions wait 40 s behind a hanging server instead of 10 (the adversary, 21 Nov 2026)."""
+        with self._lock:
+            if self._client is not None:
+                return self._client, self._headers
+        from pyarrow import flight
+        client = flight.connect(self.address)
+        try:
+            # a client is kept only together with its token: one kept without it would call unauthenticated for
+            # the life of the service
+            headers = ([client.authenticate_basic_token(self.key, "", flight.FlightCallOptions(timeout=LOGIN_TIMEOUT_S))]
+                       if self.key else [])
+        except Exception:
+            _close(client)
+            raise
         with self._lock:
             if self._client is None:
-                from pyarrow import flight
-                client = flight.connect(self.address)
-                # set both only when the handshake succeeded: a client kept without its token would call
-                # unauthenticated for the life of the service
-                try:
-                    # a timeout: the login holds the lock, so a server that hangs instead of refusing would
-                    # otherwise hold every question's server call behind it (the adversary, 21 Nov 2026)
-                    headers = ([client.authenticate_basic_token(self.key, "", flight.FlightCallOptions(timeout=LOGIN_TIMEOUT_S))]
-                               if self.key else [])
-                except Exception:
-                    try:
-                        client.close()
-                    except Exception:  # noqa: BLE001
-                        pass
-                    raise
                 self._client, self._headers = client, headers
-            return self._client, self._headers
+                return client, headers
+            current = (self._client, self._headers)
+        _close(client)  # another thread logged in first: use its pair
+        return current
 
     def _drop(self, client):
         """Forget a client whose token was refused, unless another thread has already replaced it."""
         with self._lock:
             if client is not None and self._client is client:
                 self._client, self._headers = None, []
-                try:
-                    client.close()
-                except Exception:  # noqa: BLE001 - closing a dead channel must not hide the real error
-                    pass
+            else:
+                return
+        _close(client)
 
     def action(self, name: str, request: dict) -> dict | list:
         from pyarrow import flight

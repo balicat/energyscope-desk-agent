@@ -71,6 +71,8 @@ class Reading(BaseModel):
                                  "tool, the server action and the request sent. The check sends it again.")
     value_units: dict[str, str] = Field(default_factory=dict, description="Written by code: the unit of each value "
                                         "('1' for none, such as a z-score). A number written with a unit must match a value in it.")
+    table: list[list[str]] = Field(default_factory=list, description="Written by code: a table the page shows as it is, "
+                                   "the first row its header (the evidence scorecard: each group's verdict and why).")
 
 
 class SeriesFact(BaseModel):

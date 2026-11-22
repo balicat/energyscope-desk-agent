@@ -54,7 +54,7 @@ def verify(answer: DeskAnswer, source: DataSource) -> list[str]:
     for r in answer.readings:
         # A reading the server computed is checked by sending its request again; one computed here is rebuilt here.
         truth = engine.rebuild(source, r) if r.request else readings.compute(source, r.key)
-        if truth is None or truth.period != r.period or truth.context != r.context or truth.counter != r.counter or set(truth.values) != set(r.values) or not all(
+        if truth is None or truth.period != r.period or truth.context != r.context or truth.counter != r.counter or truth.table != r.table or set(truth.values) != set(r.values) or not all(
             metrics.close(truth.values[k], r.values[k]) for k in r.values
         ):
             problems.append(f"reading {r.key} differs from source")

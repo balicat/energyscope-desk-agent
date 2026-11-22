@@ -990,7 +990,7 @@ def _server_lines(source: DataSource) -> list[dict]:
         beyond = (_num((allsig.get(fired) or {}).get("score")) or 0.0) if fired else 0.0
         values = {f"metric.{key}": x, **_thresholds(schema, [s for s, _ in specs])}
         out.append({"name": name, "group": group, "verdict": verdict, "beyond": beyond, "date": date, "ids": ids,
-                    "values": values,
+                    "values": values, "signal": fired,
                     "text": f"{what}: {round(x, 2):g} ({date}; scored by the server's signals: {rules})"})
     return out
 
@@ -1074,18 +1074,37 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
 
     word = {1: "tight", -1: "loose", 0: "neutral"}
 
-    def weigh(some: list[dict]) -> tuple[dict[str, int], list[int], int, int, str]:
+    def judge(mine: list[dict]) -> tuple[int, str]:
+        """A group's verdict and why, decided here, never by the model (David, 21 Nov 2026: "the model shouldn't
+        decide how to resolve disagreements between indicators and server rules"). A server signal that fires
+        inside the group decides it; two that disagree leave it neutral; with none firing, more than half of its
+        lines decide, as before."""
+        fired = [ln for ln in mine if ln.get("signal")]
+        if fired:
+            sides = {ln["verdict"] for ln in fired}
+            names = ", ".join(ln["signal"] for ln in fired)
+            if len(sides) == 1:
+                return sides.pop(), (f"the server's signal {names} fired" if len(fired) == 1
+                                     else f"the server's signals {names} fired")
+            return 0, "the server's signals disagree: " + ", ".join(f"{ln['signal']} ({word[ln['verdict']]})" for ln in fired)
+        votes = [ln["verdict"] for ln in mine]
+        v = 1 if votes.count(1) * 2 > len(votes) else -1 if votes.count(-1) * 2 > len(votes) else 0
+        return v, (f"no server signal fired; its lines: {votes.count(1)} tight, {votes.count(-1)} loose, "
+                   f"{votes.count(0)} neutral")
+
+    def weigh(some: list[dict]) -> tuple[dict[str, int], list[int], int, int, str, dict[str, str]]:
         by_group: dict[str, int] = {}
+        why: dict[str, str] = {}
         for g in GROUPS:
-            mine = [ln["verdict"] for ln in some if ln["group"] == g]
-            if mine:  # a group reads tight or loose only when more than half of its lines do
-                by_group[g] = 1 if mine.count(1) * 2 > len(mine) else -1 if mine.count(-1) * 2 > len(mine) else 0
+            mine = [ln for ln in some if ln["group"] == g]
+            if mine:
+                by_group[g], why[g] = judge(mine)
         physical = [v for g, v in by_group.items() if g != "sentiment"]
         total, threshold = sum(physical), (2 if len(physical) >= 3 else len(physical))
         verdict = "points to a tight market" if total >= threshold else "points to a loose market" if total <= -threshold else "is mixed"
-        return by_group, physical, total, threshold, verdict
+        return by_group, physical, total, threshold, verdict, why
 
-    groups, counted, diff, need, balance = weigh(lines)
+    groups, counted, diff, need, balance, why = weigh(lines)
     # One judgement is the analyst's, not a threshold: is a high crack spread evidence of CRUDE tightness, or of
     # plentiful crude against dear products? The note says whether today's verdict depends on the answer.
     without = weigh([ln for ln in lines if ln["name"] != "crack"])
@@ -1096,7 +1115,7 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
     else:
         depends = ""
     values: dict[str, float] = {"groups_counted": len(counted), "groups_tight": counted.count(1), "groups_loose": counted.count(-1),
-                                "groups_neutral": counted.count(0), "lines": len(lines)}
+                                "groups_neutral": counted.count(0), "groups_needed_for_a_balance": need, "lines": len(lines)}
     for g, v in groups.items():
         values[f"{g}_group_verdict"] = v
     for ln in lines:
@@ -1107,22 +1126,31 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         return "; ".join(f"{ln['text']} [{word[ln['verdict']]}]" for ln in sorted(group, key=lambda ln: -ln["beyond"]))
 
     context = " ".join(
-        f"{GROUPS[g]}, {word[v]} ({sum(ln['verdict'] == v for ln in lines if ln['group'] == g)} of "
-        f"{sum(ln['group'] == g for ln in lines)} lines): {listing([ln for ln in lines if ln['group'] == g])}."
+        f"{GROUPS[g]}, {word[v]} ({why[g]}): {listing([ln for ln in lines if ln['group'] == g])}."
         for g, v in groups.items())
+    in_words = {1: "one", 2: "two", 3: "three", 4: "four"}
+    if counted and len(set(counted)) == 1:
+        overall = f"all {in_words.get(len(counted), len(counted))} groups of physical evidence read {word[counted[0]]}"
+    else:
+        overall = (f"of {len(counted)} groups of physical evidence, {counted.count(1)} read tight, {counted.count(-1)} loose "
+                   f"and {counted.count(0)} neutral; a balance takes a net of {need} groups on one side")
+    label = {"structure": "Time structure", "stocks": "US crude stocks", "refining": "Refining demand",
+             "sentiment": "Fund positioning (sentiment, not counted)"}
+    table = [["Group", "Verdict", "Why"]]
+    table += [[label[g], word[v], why[g]] for g, v in groups.items()]
+    table.append(["Overall balance", {"points to a tight market": "points to a tight market",
+                                      "points to a loose market": "points to a loose market",
+                                      "is mixed": "mixed"}[balance], overall])
     side = 1 if diff >= need else -1 if diff <= -need else 0
     minority = [ln for ln in lines if side and ln["verdict"] == -side]
-    plain = {"structure": "time structure", "stocks": "US crude stocks", "refining": "refining demand"}
-    said = ", ".join(f"{plain[g]} {word[v]}, {sum(ln['verdict'] == v for ln in lines if ln['group'] == g)} of "
-                     f"{sum(ln['group'] == g for ln in lines)} lines" for g, v in groups.items() if g != "sentiment")
     return Reading(
         key=f"evidence:{thesis}", title="Is the crude market tight? Evidence for and against, in groups",
         period=max(ln["date"] for ln in lines), units="percent, dollars per barrel, thousand barrels, z-scores (stated on each line)",
-        series_ids=list(dict.fromkeys(i for ln in lines for i in ln["ids"])), values=values,
-        note=(f"The evidence {balance}: of {len(counted)} groups of physical evidence, {counted.count(1)} read tight, "
-              f"{counted.count(-1)} loose and {counted.count(0)} neutral ({said}). The lines inside a group measure nearly "
-              "the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its "
-              "lines do. Fund positioning "
+        series_ids=list(dict.fromkeys(i for ln in lines for i in ln["ids"])), values=values, table=table,
+        note=(f"The evidence {balance}: {overall}. Each group's verdict is decided by code, and the table gives the reason: a "
+              "server signal that fires inside a group decides it, two that disagree leave it neutral, and with none firing "
+              "the group reads tight or loose only when more than half of its lines do (the lines inside a group measure "
+              "nearly the same thing, so groups are counted, not lines). Fund positioning "
               f"is sentiment: it reads {word[groups.get('sentiment', 0)]} and is shown but not counted. Each line states its "
               "threshold. The lines scored by the server's signals use the server's metric and its signals' verdict, the "
               "same as the server's signal reading, and mark extremes; the others have no server signal and, where eight "
@@ -1132,6 +1160,14 @@ def evidence(source: DataSource, thesis: str) -> Reading | None:
         context=context,
         counter=("Against the balance of the evidence: " + "; ".join(ln["text"] for ln in minority) + ".") if minority else "")
 
+
+def why_no_evidence(source: DataSource, thesis: str) -> str:
+    """The refusal when evidence() returns None, saying which part is missing (the adversary, 21 Nov 2026: with the
+    server's snapshot unreadable the whole scorecard is withheld, and "not enough recent data" would be untrue)."""
+    if thesis == "crude_tightness" and not _server_lines(source):
+        return ("The EnergyScope server's signals could not be read, so the six scorecard lines they score are missing; "
+                "the scorecard is not given without them.")
+    return f"Not enough recent data for {thesis}."
 
 def default_units(r: Reading) -> dict[str, str]:
     """The unit of each value of the readings whose values are of one unit (or of two, named): a curve, a crack, a

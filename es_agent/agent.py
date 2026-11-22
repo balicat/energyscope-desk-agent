@@ -72,7 +72,9 @@ How to work
   true and measure different things. If they point different ways, say so: give both numbers with their dates
   and where the context says the difference comes from. Do not pick one silently.
 - An evidence reading is a scorecard in groups. Lead with its balance and how the groups read (time structure,
-  US crude stocks, refining demand), then the strongest line of each group with its number, using the word in
+  US crude stocks, refining demand), each with the reason its table gives ("the server's signal crude_undersupplied
+  fired"): code decides every group's verdict, so report it as written and never weigh the lines yourself. Then
+  the strongest line of each group with its number, using the word in
   square brackets after each line (tight, loose, neutral) and no other. Always say what points the other way,
   and that fund positioning is sentiment and is not counted. Do not add evidence of your own, and do not call
   it a forecast. You may use up to five sentences.
@@ -561,7 +563,8 @@ def get_evidence(ctx: RunContext[Deps], thesis: Literal["crude_tightness"]) -> R
     get_signals reads, and the others say how often they have read each way in eight years. The balance counts
     groups. Use for 'is the market tight / tightening / loosening', 'what is the evidence', 'what argues against'."""
     ctx.deps.emit("get_evidence", {"thesis": thesis})
-    return _keep(ctx, readings.evidence(ctx.deps.source, thesis), f"Not enough recent data for {thesis}.")
+    r = readings.evidence(ctx.deps.source, thesis)
+    return _keep(ctx, r, readings.why_no_evidence(ctx.deps.source, thesis) if r is None else "")
 
 
 @agent.tool

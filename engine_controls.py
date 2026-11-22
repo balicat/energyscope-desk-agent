@@ -166,7 +166,7 @@ try:
     got = srv.action("healthcheck", {})
     checks.append(("and again after a second restart", got == {"ok": True} and fake.handshakes == 2,
                    f"{got}, handshakes {fake.handshakes}"))
-    checks.append(("the login has a timeout (it holds the lock)", fake.login_timeout is not None,
+    checks.append(("the login has a timeout", fake.login_timeout is not None,
                    f"timeout {fake.login_timeout}"))
     # a call in flight on a channel another thread drops comes back cancelled: one more try on the current channel
     class _Cancelled:
@@ -254,7 +254,94 @@ checks.append(("an evidence line follows the server's evaluation: crude stocks o
                planted.values.get("us_stocks_verdict") == -1 and planted.values.get("metric.crude_seasonal_pctl") == 95.0,
                f"verdict {planted.values.get('us_stocks_verdict')}, metric {planted.values.get('metric.crude_seasonal_pctl')}"))
 checks.append(("the evidence reading rebuilds unchanged from the same source",
-               _readings.compute(source, ev.key).values == ev.values, ""))
+               _readings.compute(source, ev.key).values == ev.values and _readings.compute(source, ev.key).table == ev.table, ""))
+
+# 12. the group rule David chose (21 Nov 2026): a server signal firing inside a group decides it, two that disagree
+# leave it neutral, none firing leaves it to its lines; the table carries each group's reason, written by code.
+rows = {r[0]: r for r in ev.table[1:]}
+n_groups = len([k for k in ev.values if k.endswith("_group_verdict")])
+checks.append(("the scorecard's table: a header, a row for each group and the overall balance",
+               ev.table[:1] == [["Group", "Verdict", "Why"]] and "Overall balance" in rows and len(ev.table) == n_groups + 2,
+               str(ev.table)[:300]))
+want = "tight" if "crude_undersupplied" in active else "loose" if "crude_oversupplied" in active else None
+srow = rows.get("US crude stocks", [])
+checks.append(("a group in which a server signal fired takes its verdict, and the reason names the signal",
+               want is not None and srow[1:2] == [want] and "crude_" in srow[2], f"{want}: {srow}"))
+trow = rows.get("Time structure", [])
+checks.append(("a group's reason says whether a server signal decided it or its lines did",
+               bool(trow) and ("fired" in trow[2] or "its lines" in trow[2]), str(trow)))
+
+
+class _Disagree(_Planted):
+    """crude_undersupplied and cushing_full both firing: two server signals in one group pointing apart."""
+
+    def snapshot(self):
+        return self.inner.snapshot()
+
+    def action(self, name, request):
+        if name == "derived_signals" and not request.get("schema"):
+            d = dict(self.inner.action(name, request))
+            d["active"] = ([a for a in d.get("active") or [] if a not in ("crude_oversupplied", "cushing_tight")]
+                           + ["crude_undersupplied", "cushing_full"])
+            return d
+        return self.inner.action(name, request)
+
+
+drow = {r[0]: r for r in _readings.evidence(_Disagree(source), "crude_tightness").table[1:]}.get("US crude stocks", [])
+checks.append(("two server signals that disagree inside a group leave it neutral, and the reason names both",
+               drow[1:2] == ["neutral"] and "crude_undersupplied" in drow[2] and "cushing_full" in drow[2], str(drow)))
+
+
+class _NoSnapshot(_Planted):
+    def snapshot(self):
+        raise ServerError("the live metric snapshot could not be read: test")
+
+
+checks.append(("with the server's signals unreadable the refusal says so, not 'not enough recent data'",
+               _readings.evidence(_NoSnapshot(source), "crude_tightness") is None
+               and "signals could not be read" in _readings.why_no_evidence(_NoSnapshot(source), "crude_tightness"), ""))
+
+# 13. a hanging login does not queue the threads: four questions on one Server give up within one timeout
+import threading as _threading
+import time as _time
+
+from es_agent import sources as _sources
+
+
+class _Hang:
+    def authenticate_basic_token(self, key, _password, options=None):
+        _time.sleep(getattr(options, "timeout", None) or 0.3)
+        raise _flight.FlightTimedOutError("Deadline Exceeded")
+
+    def close(self):
+        pass
+
+
+_saved = _sources.LOGIN_TIMEOUT_S
+_sources.LOGIN_TIMEOUT_S = 0.3
+_flight.connect = lambda address: _Hang()
+try:
+    hung = _Server(address="grpc://unused", key="demo")
+    errs = []
+
+    def _ask():
+        try:
+            hung.action("healthcheck", {})
+        except ServerError as e:
+            errs.append(str(e))
+
+    t0 = _time.time()
+    ts = [_threading.Thread(target=_ask) for _ in range(4)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    took = _time.time() - t0
+    checks.append(("four questions behind a hanging login give up together (one timeout), not one after another",
+                   len(errs) == 4 and took < 2 * 0.3 + 0.5, f"{len(errs)} errors in {took:.2f} s"))
+finally:
+    _sources.LOGIN_TIMEOUT_S = _saved
+    _flight.connect = _orig_connect
 
 wrong = 0
 for what, ok, detail in checks:
