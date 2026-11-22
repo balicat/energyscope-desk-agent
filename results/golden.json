@@ -33,6 +33,7 @@
      "PET.RBRTE.D",
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "US crude to Europe, price indicator: Brent-WTI on 2027-01 futures, tanker freight proxy, Brent curve",
     "units": "Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
     "value_units": {},
@@ -101,6 +102,7 @@
      "ICE.BRENT.M11.D",
      "ICE.BRENT.M12.D"
     ],
+    "table": [],
     "title": "Brent futures curve (NYMEX BZ, settles on ICE Brent)",
     "units": "USD/bbl",
     "value_units": {
@@ -208,6 +210,7 @@
      "PET.RWTC.D",
      "PET.RBRTE.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily and Europe Brent Spot Price FOB, Daily: rolling correlation, last 3 years",
     "units": "correlation coefficient",
     "value_units": {
@@ -281,6 +284,7 @@
      "PET.EER_EPMRU_PF4_RGC_DPG.D",
      "PET.EER_EPD2F_PF4_Y35NY_DPG.D"
     ],
+    "table": [],
     "title": "3-2-1 crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -313,18 +317,20 @@
   "summary": "3-2-1 crack spread: WTI, Gulf Coast gasoline, New York Harbor heating oil on 2026-11-17: crack 34.85, crude 89.53, gasoline_per_gallon 2.46, distillate_per_gallon 3.96, gasoline_per_barrel 103.40, distillate_per_barrel 166.32, gallons_per_barrel 42.00, crack_percentile 76.60, percentile_years 3.00, crack_p10 14.69, crack_p90 56.87."
  },
  "crude_tight": {
-  "caveats": [],
+  "caveats": [
+   "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net, percentile of about five years of weekly values: 6.78 (2026-11-17; scored by the server's signals: tight when above 90 (wti_specs_extended); loose when below 10 (wti_specs_short))."
+  ],
   "cites": [
    "evidence:crude_tightness"
   ],
   "facts": [],
   "readings": [
    {
-    "context": "Time structure, tight (3 of 4 lines): WTI futures curve: M1 is 11.01 above M12, 13.09% of M1 (2026-11-20; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-15 to 2024-04-05) [tight]; WTI spot: 4.88 dollars above its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [tight]; Brent 12-month curve, M12 minus M1 in dollars per barrel (negative is backwardation): -15.26 (2026-11-20; scored by the server's signals: tight when below -10 (steep_backwardation); loose when above 5 (steep_contango)) [tight]; Brent spot: 0.20 dollars below its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [neutral]. US crude stocks, neutral (2 of 3 lines): US commercial crude stocks, seasonal percentile (the level against the same week of the last five years): 0 (2026-11-13; scored by the server's signals: tight when below 20 (crude_undersupplied); loose when above 80 (crude_oversupplied)) [tight]; US crude stocks over four weeks: a build of 5,280 thousand barrels against a usual build of 5,492 for the time of year, a gap of 0.05% of stocks (2026-11-13; tight below -2%, loose above 2%; since 2018-11-16 this line has read tight 24% of the time and loose 22%) [neutral]; Cushing crude stocks, z-score against about five years of weekly values: 0.49 (2026-11-13; scored by the server's signals: tight when below -2 (cushing_tight); loose when above 2 (cushing_full)) [neutral]. Refining demand, neutral (1 of 2 lines): US refinery utilisation, percent of capacity: 95.7 (2026-11-13; scored by the server's signals: tight when above 92 (refinery_strong); loose when below 85 (refinery_weak)) [tight]; 3-2-1 crack spread, z-score against about five years of trading days: 0.07 (2026-11-17; scored by the server's signals: tight when above 3 (crack_extreme); the server has no signal for the other side, so this line reads tight or neutral) [neutral]. Sentiment (shown, not counted), loose (1 of 1 lines): Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net, percentile of about five years of weekly values: 6.78 (2026-11-17; scored by the server's signals: tight when above 90 (wti_specs_extended); loose when below 10 (wti_specs_short)) [loose].",
-    "counter": "",
+    "context": "Time structure, tight (the server's signal steep_backwardation fired): WTI futures curve: M1 is 11.01 above M12, 13.09% of M1 (2026-11-20; tight when M1 is more than 2% above, loose when more than 2% below; no record of its own, the history starts in 2026; as a rough proxy, EIA's WTI contract 1 stood above contract 4 on 62% of days from 2018-11-15 to 2024-04-05) [tight]; WTI spot: 4.88 dollars above its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [tight]; Brent 12-month curve, M12 minus M1 in dollars per barrel (negative is backwardation): -15.26 (2026-11-20; scored by the server's signals: tight when below -10 (steep_backwardation); loose when above 5 (steep_contango)) [tight]; Brent spot: 0.20 dollars below its 2027-01 future (2026-11-17; tight when more than 1 dollar above, loose when more than 1 dollar below; no record, the history starts in 2026) [neutral]. US crude stocks, tight (the server's signal crude_undersupplied fired): US commercial crude stocks, seasonal percentile (the level against the same week of the last five years): 0 (2026-11-13; scored by the server's signals: tight when below 20 (crude_undersupplied); loose when above 80 (crude_oversupplied)) [tight]; US crude stocks over four weeks: a build of 5,280 thousand barrels against a usual build of 5,492 for the time of year, a gap of 0.05% of stocks (2026-11-13; tight below -2%, loose above 2%; since 2018-11-16 this line has read tight 24% of the time and loose 22%) [neutral]; Cushing crude stocks, z-score against about five years of weekly values: 0.49 (2026-11-13; scored by the server's signals: tight when below -2 (cushing_tight); loose when above 2 (cushing_full)) [neutral]. Refining demand, tight (the server's signal refinery_strong fired): US refinery utilisation, percent of capacity: 95.7 (2026-11-13; scored by the server's signals: tight when above 92 (refinery_strong); loose when below 85 (refinery_weak)) [tight]; 3-2-1 crack spread, z-score against about five years of trading days: 0.07 (2026-11-17; scored by the server's signals: tight when above 3 (crack_extreme); the server has no signal for the other side, so this line reads tight or neutral) [neutral]. Sentiment (shown, not counted), loose (the server's signal wti_specs_short fired): Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net, percentile of about five years of weekly values: 6.78 (2026-11-17; scored by the server's signals: tight when above 90 (wti_specs_extended); loose when below 10 (wti_specs_short)) [loose].",
+    "counter": "Against the balance of the evidence: Fund positioning in WTI, a measure of sentiment and not of barrels: managed-money net, percentile of about five years of weekly values: 6.78 (2026-11-17; scored by the server's signals: tight when above 90 (wti_specs_extended); loose when below 10 (wti_specs_short)).",
     "hypothetical": false,
     "key": "evidence:crude_tightness",
-    "note": "The evidence is mixed: of 3 groups of physical evidence, 1 read tight, 0 loose and 2 neutral (time structure tight, 3 of 4 lines, US crude stocks neutral, 2 of 3 lines, refining demand neutral, 1 of 2 lines). The lines inside a group measure nearly the same thing, so groups are counted, not lines; a group reads tight or loose only when more than half of its lines do. Fund positioning is sentiment: it reads loose and is shown but not counted. Each line states its threshold. The lines scored by the server's signals use the server's metric and its signals' verdict, the same as the server's signal reading, and mark extremes; the others have no server signal and, where eight years of history exist, say how often they have read tight and loose, so a line that usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it is not a forecast. Whether a high crack spread is evidence of crude tightness is a judgement, not a threshold. Without that line, refining demand reads tight and the evidence points to a tight market, so today's verdict depends on it.",
+    "note": "The evidence points to a tight market: all three groups of physical evidence read tight. Each group's verdict is decided by code, and the table gives the reason: a server signal that fires inside a group decides it, two that disagree leave it neutral, and with none firing the group reads tight or loose only when more than half of its lines do (the lines inside a group measure nearly the same thing, so groups are counted, not lines). Fund positioning is sentiment: it reads loose and is shown but not counted. Each line states its threshold. The lines scored by the server's signals use the server's metric and its signals' verdict, the same as the server's signal reading, and mark extremes; the others have no server signal and, where eight years of history exist, say how often they have read tight and loose, so a line that usually fires can be discounted. It covers the futures curves and US data, not the world balance, and it is not a forecast. Whether a high crack spread is evidence of crude tightness is a judgement, not a threshold. Without that line, refining demand reads tight and the evidence points to a tight market, so today's verdict does not depend on it.",
     "period": "2026-11-20",
     "request": null,
     "series_ids": [
@@ -353,6 +359,38 @@
      "PET.EER_EPMRU_PF4_Y35NY_DPG.D",
      "CFTC.WTI.MM_Net"
     ],
+    "table": [
+     [
+      "Group",
+      "Verdict",
+      "Why"
+     ],
+     [
+      "Time structure",
+      "tight",
+      "the server's signal steep_backwardation fired"
+     ],
+     [
+      "US crude stocks",
+      "tight",
+      "the server's signal crude_undersupplied fired"
+     ],
+     [
+      "Refining demand",
+      "tight",
+      "the server's signal refinery_strong fired"
+     ],
+     [
+      "Fund positioning (sentiment, not counted)",
+      "loose",
+      "the server's signal wti_specs_short fired"
+     ],
+     [
+      "Overall balance",
+      "points to a tight market",
+      "all three groups of physical evidence read tight"
+     ]
+    ],
     "title": "Is the crude market tight? Evidence for and against, in groups",
     "units": "percent, dollars per barrel, thousand barrels, z-scores (stated on each line)",
     "value_units": {},
@@ -370,8 +408,9 @@
      "fund_positioning_verdict": -1.0,
      "groups_counted": 3.0,
      "groups_loose": 0.0,
-     "groups_neutral": 2.0,
-     "groups_tight": 1.0,
+     "groups_needed_for_a_balance": 2.0,
+     "groups_neutral": 0.0,
+     "groups_tight": 3.0,
      "lines": 10.0,
      "metric.crack_321_z": 0.069665,
      "metric.crude_seasonal_pctl": 0.0,
@@ -382,11 +421,11 @@
      "refinery_strong.threshold": 92.0,
      "refinery_utilisation_verdict": 1.0,
      "refinery_weak.threshold": 85.0,
-     "refining_group_verdict": 0.0,
+     "refining_group_verdict": 1.0,
      "sentiment_group_verdict": -1.0,
      "steep_backwardation.threshold": -10.0,
      "steep_contango.threshold": 5.0,
-     "stocks_group_verdict": 0.0,
+     "stocks_group_verdict": 1.0,
      "structure_group_verdict": 1.0,
      "us_stocks_4w_change": 5280.0,
      "us_stocks_4w_gap_pct": -0.05,
@@ -407,7 +446,7 @@
    }
   ],
   "spreads": [],
-  "summary": "Is the crude market tight? Evidence for and against, in groups on 2026-11-20: groups_counted 3.00, groups_tight 1.00, groups_loose 0.00, groups_neutral 2.00, lines 10.00, structure_group_verdict 1.00, stocks_group_verdict 0.00, refining_group_verdict 0.00, sentiment_group_verdict -1.00, wti_M1_minus_M12 11.01, wti_slope_pct 13.09, wti_front_above_fourth_month_share_pct 62.40, wti_curve_verdict 1.00, wti_spot_minus_its_future 4.88, wti_spot_premium_verdict 1.00, brent_spot_minus_its_future -0.20, brent_spot_premium_verdict 0.00, us_stocks_4w_change up 5280.00, us_stocks_4w_usual_change up 5492.20, us_stocks_4w_gap_pct -0.05, us_stocks_4w_tight_share_pct 24.50, us_stocks_4w_loose_share_pct 21.80, us_stocks_4w_verdict 0.00, metric.m1_m12 -15.26, steep_backwardation.threshold -10.00, steep_contango.threshold 5.00, brent_curve_verdict 1.00, metric.crude_seasonal_pctl 0.00, crude_undersupplied.threshold 20.00, crude_oversupplied.threshold 80.00, us_stocks_verdict 1.00, metric.cushing_z 0.49, cushing_tight.threshold -2.00, cushing_full.threshold 2.00, cushing_stocks_verdict 0.00, metric.refinery_util 95.70, refinery_strong.threshold 92.00, refinery_weak.threshold 85.00, refinery_utilisation_verdict 1.00, metric.crack_321_z 0.07, crack_extreme.threshold 3.00, crack_verdict 0.00, metric.wti_mm_pctl 6.78, wti_specs_extended.threshold 90.00, wti_specs_short.threshold 10.00, fund_positioning_verdict -1.00."
+  "summary": "Is the crude market tight? Evidence for and against, in groups on 2026-11-20: groups_counted 3.00, groups_tight 3.00, groups_loose 0.00, groups_neutral 0.00, groups_needed_for_a_balance 2.00, lines 10.00, structure_group_verdict 1.00, stocks_group_verdict 1.00, refining_group_verdict 1.00, sentiment_group_verdict -1.00, wti_M1_minus_M12 11.01, wti_slope_pct 13.09, wti_front_above_fourth_month_share_pct 62.40, wti_curve_verdict 1.00, wti_spot_minus_its_future 4.88, wti_spot_premium_verdict 1.00, brent_spot_minus_its_future -0.20, brent_spot_premium_verdict 0.00, us_stocks_4w_change up 5280.00, us_stocks_4w_usual_change up 5492.20, us_stocks_4w_gap_pct -0.05, us_stocks_4w_tight_share_pct 24.50, us_stocks_4w_loose_share_pct 21.80, us_stocks_4w_verdict 0.00, metric.m1_m12 -15.26, steep_backwardation.threshold -10.00, steep_contango.threshold 5.00, brent_curve_verdict 1.00, metric.crude_seasonal_pctl 0.00, crude_undersupplied.threshold 20.00, crude_oversupplied.threshold 80.00, us_stocks_verdict 1.00, metric.cushing_z 0.49, cushing_tight.threshold -2.00, cushing_full.threshold 2.00, cushing_stocks_verdict 0.00, metric.refinery_util 95.70, refinery_strong.threshold 92.00, refinery_weak.threshold 85.00, refinery_utilisation_verdict 1.00, metric.crack_321_z 0.07, crack_extreme.threshold 3.00, crack_verdict 0.00, metric.wti_mm_pctl 6.78, wti_specs_extended.threshold 90.00, wti_specs_short.threshold 10.00, fund_positioning_verdict -1.00."
  },
  "crude_vs_5y": {
   "caveats": [],
@@ -435,6 +474,7 @@
     "series_ids": [
      "PET.WCESTUS1.W"
     ],
+    "table": [],
     "title": "U.S. Ending Stocks excluding SPR of Crude Oil, Weekly: latest against the same time of year, previous 5 years",
     "units": "Thousand Barrels",
     "value_units": {
@@ -524,6 +564,7 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily: the series card",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -686,6 +727,7 @@
      "PET.W_EPD2F_PRS_NUS_DPG.W",
      "PET.W_EPLLPA_PRS_NUS_DPG.W"
     ],
+    "table": [],
     "title": "US weekly petroleum, standing report as of 2026-11-17",
     "units": "Dollars per Barrel; Dollars per Gallon; Million Barrels; Percent; Thousand Barrels; Thousand Barrels per Day",
     "value_units": {
@@ -1041,6 +1083,7 @@
     "series_ids": [
      "SHIP.BWET.D"
     ],
+    "table": [],
     "title": "Breakwave Tanker Shipping ETF (crude tanker freight futures): latest against its last 3 years",
     "units": "USD",
     "value_units": {
@@ -1102,6 +1145,7 @@
      "NYMEX.RBOB.2026-12.D",
      "NYMEX.HO.2026-12.D"
     ],
+    "table": [],
     "title": "3-2-1 crack spread on futures, 2026-12 delivery: WTI, RBOB, heating oil",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -1150,6 +1194,7 @@
      "PET.RBRTE.D",
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Brent minus WTI on futures, 2027-01 delivery",
     "units": "USD/bbl",
     "value_units": {
@@ -1219,6 +1264,7 @@
     "series_ids": [
      "NG.RNGWHHD.D"
     ],
+    "table": [],
     "title": "Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years",
     "units": "Dollars per Million Btu",
     "value_units": {
@@ -1349,6 +1395,7 @@
      "GME.OMAN.M11.D",
      "GME.OMAN.M12.D"
     ],
+    "table": [],
     "title": "Oman crude futures curve (GME OQD)",
     "units": "USD/bbl",
     "value_units": {
@@ -1488,6 +1535,7 @@
      "WEATHER.HDD.OIL.US.TOTAL.W",
      "WEATHER.HDD.POP.US.TOTAL.W"
     ],
+    "table": [],
     "title": "The server's signals and contradictions, live",
     "units": "as each metric: 12-month curve, M12\u2212M1 ($/bbl; negative = backwardation \u2014 key name is legacy); 12-month roll yield (%, M12 vs M1); 3-2-1 crack z-score; BWET freight z-score; Brent managed money net positioning percentile; Brent-WTI spread ($/bbl); Brent-WTI spread z-score; Cushing 7-day percent change; Cushing inventory z-score; EU gas storage fullness seasonal percentile (AGSI+); OPEC call on DoC crude QoQ change (mb/d); OPEC call-vs-production gap (mb/d); OPEC world demand MoM revision (mb/d); US cooling degree days anomaly z-score (vs 10-yr avg); US crude production seasonal percentile; US heating degree days anomaly z-score (vs 10-yr avg); US oil-heating-weighted heating degree days anomaly z-score (vs same week, prior years); US refinery utilization (%); VIX-WTI correlation; WTI managed money net positioning percentile; WTI price historical percentile; crude stocks seasonal percentile; diesel crack z-score; distillate stocks seasonal percentile; gasoline crack z-score; gasoline stocks seasonal percentile; max OPEC direct-vs-secondary production gap (tb/d)",
     "value_units": {
@@ -1603,6 +1651,7 @@
      "NYMEX.HO.M1.D",
      "NYMEX.RBOB.M1.D"
     ],
+    "table": [],
     "title": "NY Harbor ULSD (heating oil) futures M1 (1st nearby, NYMEX HO) and RBOB gasoline futures M1 (1st nearby, NYMEX RB): the spread (first minus second) against its own history, last 3 years",
     "units": "USD/gal",
     "value_units": {
@@ -1650,6 +1699,7 @@
      "PET.RBRTE.D",
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Brent minus WTI on futures, 2027-01 delivery",
     "units": "USD/bbl",
     "value_units": {
@@ -1721,6 +1771,7 @@
      "PET.RBRTE.D",
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Europe Brent Spot Price FOB, Daily and Cushing, OK WTI Spot Price FOB, Daily: the spread (first minus second) against its own history, last 3 years",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -1818,6 +1869,7 @@
      "BH.United_States.Total.W",
      "ICE_COT.BRENT.MM_Net"
     ],
+    "table": [],
     "title": "Most unusual moves over a week, from a watchlist of 18 series",
     "units": "each series in its own units",
     "value_units": {},
@@ -1869,6 +1921,7 @@
      "PET.RBRTE.D",
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "What to watch: flags from prices, stocks, the curve and positioning over a week",
     "units": "each item in its own units",
     "value_units": {},
@@ -1915,6 +1968,7 @@
      "ICE.BRENT.M1.D",
      "ICE.BRENT.M12.D"
     ],
+    "table": [],
     "title": "What if: US crude to Europe with changed prices",
     "units": "Dollars per Barrel (prices); USD, the ETF's closing price (freight proxy); percent (percentiles)",
     "value_units": {},
@@ -1990,6 +2044,7 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily: structural breaks, last 3 years",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -2071,6 +2126,7 @@
      "NYMEX.WTI.M11.D",
      "NYMEX.WTI.M12.D"
     ],
+    "table": [],
     "title": "WTI futures curve (NYMEX CL)",
     "units": "USD/bbl",
     "value_units": {
@@ -2138,6 +2194,7 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily, last 5 years",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -2184,6 +2241,7 @@
      "CFTC.WTI.MM_Short",
      "CFTC.WTI.OI"
     ],
+    "table": [],
     "title": "WTI crude (NYMEX): managed-money positioning",
     "units": "contracts",
     "value_units": {
@@ -2237,6 +2295,7 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily: descriptive statistics, last 3 years",
     "units": "Dollars per Barrel",
     "value_units": {
@@ -2304,6 +2363,7 @@
     "series_ids": [
      "PET.RWTC.D"
     ],
+    "table": [],
     "title": "Cushing, OK WTI Spot Price FOB, Daily: volatility (annualised, rolling and GARCH(1,1)), last 3 years",
     "units": "annualised, as a fraction (the _pct values: the same in percent)",
     "value_units": {
