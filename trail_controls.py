@@ -46,13 +46,14 @@ def dictating(messages, info: AgentInfo) -> ModelResponse:
     """First turn: every argument that can hold text carries the marker sentence. Then a plain declined answer."""
     if len(messages) == 1:
         return ModelResponse(parts=[
-            ToolCallPart("search_series", {"query": f"WTI spot price {SENTENCE}"}, tool_call_id="c1"),
+            ToolCallPart("search_series", {"query": f"WTI spot price {MARK}"}, tool_call_id="c1"),
             ToolCallPart("get_change", {"series_id": SENTENCE, "lookback_days": 7}, tool_call_id="c2"),
             ToolCallPart("get_latest", {"series_ids": ["PET.RWTC.D", SENTENCE]}, tool_call_id="c3"),
             ToolCallPart("get_percentile", {"series_id": SENTENCE, "years": 3}, tool_call_id="c4"),
             ToolCallPart(f"say_{MARK}_to_everyone", {"text": SENTENCE}, tool_call_id="c5"),
             ToolCallPart("get_surprises", {"window": "month"}, tool_call_id="c6"),
             ToolCallPart("search_series", {"query": SENTENCE, "dataset": f"{MARK} PET"}, tool_call_id="c7"),
+            ToolCallPart("search_series", {"query": SENTENCE}, tool_call_id="c8"),
         ])
     return ModelResponse(parts=[ToolCallPart("final_result", {
         "facts": [], "summary": "The data does not hold what was asked.", "caveats": []}, tool_call_id="f1")])
@@ -76,7 +77,10 @@ check("unknown tool" in names and not any(MARK in n for n in names), "a tool the
       json.dumps(names))
 s1 = next((t for t in trail if t["tool"] == "search_series"), {})
 check(s1.get("args", {}).get("query") in ("wti spot price", "wti spot"),
-      "a search keeps only the words it matched", json.dumps(s1))
+      "a search keeps only the words it matched (the marker dropped)", json.dumps(s1))
+s8 = [t for t in trail if t["tool"] == "search_series"][-1]
+check(s8.get("args") == {}, "a search that found nothing keeps no query at all (a whole dictated sentence)",
+      json.dumps(s8))
 latest = next((t for t in trail if t["tool"] == "get_latest"), {})
 check(latest.get("args") == {"series_ids": ["PET.RWTC.D"]}, "a known series id survives; the dictated one is dropped",
       json.dumps(latest))

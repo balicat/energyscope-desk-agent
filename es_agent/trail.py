@@ -104,11 +104,20 @@ def clean(fn, args: dict | None, source, hits=None, datasets=()) -> dict:
 
 def build(parts, calls: dict, tools) -> list[dict]:
     """The trail of one run from its message parts: each tool call in order, with the arguments its tool recorded
-    after validation (`calls`, by tool_call_id). A call that was sent back (a RetryPromptPart for it) or never
-    recorded keeps its tool name only; a tool the agent does not have is named "unknown tool"."""
+    after validation (`calls`, by tool_call_id). A call that was sent back or never recorded keeps its tool name
+    only; a tool the agent does not have is named "unknown tool". Pydantic AI 2.x returns a refused call as a
+    ToolReturnPart with outcome "retried" (and a RetryInfo); older versions as a RetryPromptPart: both are read."""
     from pydantic_ai.messages import RetryPromptPart, ToolCallPart
 
-    retried = {p.tool_call_id for p in parts if isinstance(p, RetryPromptPart) and getattr(p, "tool_call_id", None)}
+    def refused(p) -> bool:
+        if not getattr(p, "tool_call_id", None):
+            return False
+        if isinstance(p, RetryPromptPart):
+            return True
+        return getattr(p, "part_kind", "") == "tool-return" and (
+            getattr(p, "outcome", "success") not in (None, "success") or getattr(p, "retry", None) is not None)
+
+    retried = {p.tool_call_id for p in parts if refused(p)}
     trail = []
     for p in parts:
         if not isinstance(p, ToolCallPart) or p.tool_name == "final_result":
