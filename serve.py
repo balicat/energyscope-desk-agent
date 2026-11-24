@@ -34,7 +34,7 @@ from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior, Usage
 from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
-from es_agent.agent import Deps, agent, tables_only
+from es_agent.agent import MODEL_REQUESTS_PER_QUESTION, Deps, agent, tables_only
 from es_agent.charts import charts_for
 from es_agent.memory import Sessions, with_context
 from es_agent.scripted import is_rejection, scripted
@@ -59,7 +59,6 @@ PER_DAY = int(os.environ.get("LIBRARIAN_PER_DAY", "200"))
 NTFY = os.environ.get("LIBRARIAN_NTFY", "")  # where to say that half, then nine tenths, of the day is spent
 ALERT_AT = (50, 90)
 USD_PER_DAY = float(os.environ.get("LIBRARIAN_USD_PER_DAY", "2"))
-MODEL_REQUESTS_PER_QUESTION = 8
 
 _run_lock = threading.Lock()  # one question at a time: the lake reads and the spend stay predictable
 _state_lock = threading.Lock()

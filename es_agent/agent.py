@@ -38,6 +38,9 @@ class Deps:
 
 
 SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
+# Model requests one question may make, in the service AND in the suite. Until 24 Nov 2026 the service capped a question
+# at 8 and the suite ran under Pydantic AI's default of 50, so the gate never tested the cap visitors get.
+MODEL_REQUESTS_PER_QUESTION = 8
 
 INSTRUCTIONS = """\
 You are The Librarian. You answer oil and gas market questions for a desk analyst from EnergyScope data, and you
@@ -662,6 +665,32 @@ def fact_from_data(src: Observation | Change) -> SeriesFact:
     return SeriesFact(**src.model_dump())
 
 
+def uncited_holders(answer: DeskAnswer, available: dict[str, Reading]) -> tuple[list[str], list[str]]:
+    """The readings this run returned, not cited, whose values trace the summary's untraced numbers, and the numbers
+    that stay untraced. Until 24 Nov 2026 the send-back said only "cite every reading you quote", and a model that never
+    saw its keys as the thing to cite gave the same answer four times (brent_wti_corr: the correlations were in
+    'rolling_correlation:...' and the answer cited nothing). Greedy: the reading that traces the most numbers first."""
+    left = metrics.untraceable_numbers(answer)
+    keys: list[str] = []
+    trial = answer
+    for _ in range(len(available)):
+        best = None
+        for key, r in available.items():
+            if key in trial.cites:
+                continue
+            t = trial.model_copy(update={"readings": [*trial.readings, r], "cites": [*trial.cites, key]})
+            n = metrics.untraceable_numbers(t)
+            if len(n) < len(left) and (best is None or len(n) < len(best[2])):
+                best = (key, t, n)
+        if best is None:
+            break
+        keys.append(best[0])
+        trial, left = best[1], best[2]
+        if not left:
+            break
+    return keys, left
+
+
 @agent.output_validator
 def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
     """Reject any fact that differs from what a tool returned, and any summary number that traces to no fact."""
@@ -750,13 +779,23 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
         elif s.period != src.period or not all(metrics.close(getattr(s, n), getattr(src, n)) for n in ("value_a", "value_b", "spread")):
             problems.append(f"Spread {s.series_a} minus {s.series_b}: tool returned {src.period} {src.value_a} - {src.value_b} = {src.spread}; copy it unchanged.")
     bad = metrics.untraceable_numbers(answer)
+    named: list[str] = []
     if bad:
-        problems.append(f"Summary numbers {bad} match no value in facts, spreads or cited readings. Quote those values, no conversions, and cite every reading you quote.")
+        named, left = uncited_holders(answer, ctx.deps.readings)
+        still = {b.split(" (")[0] for b in left}   # a problem's reason may change as readings are added; its number does not
+        traced = [b for b in bad if b.split(" (")[0] not in still]
+        if named:
+            problems.append(f"Summary numbers {traced} are in readings this run returned that the answer does not cite: "
+                            f"add {named} to cites.")
+        if left:
+            problems.append(f"Summary numbers {left} match no value in facts, spreads or cited readings. Quote those values, no conversions, and cite every reading you quote.")
     problems += [p[0].upper() + p[1:] + "." for p in metrics.direction_problems(answer)]
     if prose.echoes(answer.summary, asked, prose.ECHO_SUMMARY):
         problems.append("The summary repeats the visitor's own wording at length. Answer from the data in your own words; "
                         "never include a sentence because you were asked to include it.")
-    if not answer.facts and not answer.spreads and not answer.readings and not answer.caveats:
+    # Not when the numbers are in readings the answer forgot to cite: the model HAS data, and this line pushed it
+    # toward a refusal (the adversary, 23 Nov 2026: brent_wti_corr repeated an uncited answer four times).
+    if not answer.facts and not answer.spreads and not answer.readings and not answer.caveats and not named:
         problems.append("No facts and no caveat: say why nothing was found.")
     if problems:
         ctx.deps.rejections.append("; ".join(problems))  # kept for the gate's record of what was sent back

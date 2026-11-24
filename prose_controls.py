@@ -73,6 +73,16 @@ seasonal3 = Reading(key="seasonal:PET.WCESTUS1.W:3", title="US crude stocks: lat
                     values={"current_value": 417797.0, "seasonal_avg": 434167.0, "lookback_years": 3.0},
                     context="Same week (week=46) in each of 3 earlier years.",
                     request={"tool": "seasonal", "action": "seasonal", "body": {"series": "PET.WCESTUS1.W", "lookback_years": 3}})
+# The five-year seasonal reading as engine.seasonal writes it, units and all (the adversary's P11, 23 Nov 2026)
+_by_year = {"2021": 434020.0, "2022": 431665.0, "2023": 448054.0, "2024": 430292.0, "2025": 424155.0}
+seasonal5 = Reading(key="seasonal:PET.WCESTUS1.W:5", title="US crude stocks: latest against the same time of year, previous 5 years",
+                    period=dt.date(2026, 11, 13), units="Thousand Barrels", series_ids=["PET.WCESTUS1.W"],
+                    values={"current_value": 417797.0, "seasonal_avg": 433637.2, "lookback_years": 5.0,
+                            **{f"history_by_year.{y}": v for y, v in _by_year.items()}},
+                    value_units={"current_value": "Thousand Barrels", "seasonal_avg": "Thousand Barrels",
+                                 **{f"history_by_year.{y}": "Thousand Barrels" for y in _by_year}},
+                    context="Same week (week=46) in each of 5 earlier years: " + ", ".join(f"{y} {v:,.0f}" for y, v in _by_year.items()) + ".",
+                    request={"tool": "seasonal", "action": "seasonal", "body": {"series": "PET.WCESTUS1.W", "lookback_years": 5}})
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a date that differs from the code-written history sentence",
@@ -202,9 +212,23 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      dict(readings=[signals_r], summary="Brent rose $12 a barrel.")),
     ("a snapshot metric that rose, said to have fell",
      dict(readings=[signals_r], summary="The opec call qoq change fell by 0.55.")),
+    # 24 Nov 2026: a reading's thousand-barrel values may be written in million barrels, and a server text's
+    # parameter (week=46) may be quoted. These keep both doors narrow.
+    ("a thousand-barrel stock converted to million barrels but written as thousand",
+     dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 thousand barrels.")),
+    ("a thousand-barrel stock written with its own digits in million barrels",
+     dict(readings=[seasonal5], summary="US crude stocks stand at 417,797 million barrels.")),
+    ("a server text's week number given a unit",
+     dict(readings=[seasonal5], summary="US crude stocks fell by 46 thousand barrels on the week.")),
+    ("a server text's week number given as a percent",
+     dict(readings=[seasonal5], summary="US crude stocks are 46 percent below their five-year average.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
+    # the adversary's P11 (23 Nov 2026): both were refused until 24 Nov
+    dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 million barrels, below the five-year average for "
+                                       "the week of 433,637.2 thousand barrels."),
+    dict(readings=[seasonal5], summary=seasonal5.context),
     dict(facts=[wti_up], summary="WTI rose 1.20 USD/bbl (1.38%) over 7 days to 88.10 on 2026-11-17, from 86.90 on 2026-11-10."),
     dict(facts=[wti_up], summary="WTI was 88.10 USD/bbl on 2026-11-17, up 1.20 from 86.90, still below Brent.", caveats=["One week of data only."]),
     dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl below WTI spot on 2026-11-11: 87.48 against 88.10."),
@@ -292,6 +316,19 @@ def main() -> int:
         if found:
             print(f"REJECTED a correct answer: {kw['summary']}\n          -> {found}")
         failed += bool(found)
+    # The send-back names the uncited reading that holds the summary's numbers (24 Nov 2026, the adversary on
+    # brent_wti_corr): the right one of three, and none when no reading holds them.
+    from es_agent.agent import uncited_holders
+    pool = {r.key: r for r in (seasonal3, seasonal5, funds)}
+    keys, left = uncited_holders(DeskAnswer(facts=[], summary="US crude stocks are 417,797 thousand barrels, below the "
+                                                               "five-year average of 433,637.2."), pool)
+    ok = keys == [seasonal5.key] and not left
+    print(f"{'named    ' if ok else 'NOT NAMED'} the uncited reading that holds the numbers: {keys}, left {left}")
+    failed += not ok
+    keys, left = uncited_holders(DeskAnswer(facts=[], summary="US crude stocks are 399,999 thousand barrels."), pool)
+    ok = not keys and bool(left)
+    print(f"{'none     ' if ok else 'WRONGLY NAMED'} for a number no reading holds: {keys}, left {left}")
+    failed += not ok
     for label, kw in LIMIT:
         found = problems(kw)
         print(f"{'now caught: move it to WRONG' if found else 'limit    '} {label}")

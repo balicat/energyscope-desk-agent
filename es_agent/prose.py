@@ -80,6 +80,18 @@ def unit_key(units: str) -> str:
     return " ".join(_UNIT_WORDS.get(w, w) for w in text.split())
 
 
+def also_in(units: str, value: float) -> dict[str, float]:
+    """The same value in the unit people ask for. EIA publishes stocks in thousand barrels; a person asks
+    for million barrels. The conversion is done here so the model has a figure to quote and never divides.
+    Facts carry it (`also`); a reading's values get it in the pool of quotable numbers (`pool_of`)."""
+    key = unit_key(units)
+    if key == "thousand barrel":
+        return {"million_barrels": round(value / 1000, 3)}
+    if key == "thousand barrel per day":
+        return {"million_barrels_per_day": round(value / 1000, 3)}
+    return {}
+
+
 def _kind(key: str) -> str:
     # a server reading's names are nested with dots ("coverage.observations", "segments.2.mean"): split on both
     parts = re.split(r"[._]", key.lower())
@@ -169,6 +181,11 @@ class Pool:
         # its own: "fell by 8 million barrels" passed on that 8 until the adversary's round 3 (21 Nov 2026).
         for m in re.finditer(r"(?<![\d.,])\b(\d+)(?=-[A-Za-z0-9])", _blank_dates(text)):
             self.hyphens.add(m[1])
+        # A server text's parameters ("week=46") are names: they may be written, without a unit. A number written
+        # with a unit still needs a value in that unit (the adversary's P11, 23 Nov 2026: the seasonal reading's own
+        # first sentence, quoted back, was refused on its week number).
+        if not quotable:
+            self.names |= set(re.findall(r"\b[a-z_]+=(\d+)\b", _blank_dates(text)))
         for tok, _, _, whole, glued in _numbers(_blank_dates(text)):
             if glued:
                 self.tokens.add(whole)
@@ -211,6 +228,11 @@ def pool_of(answer: DeskAnswer) -> Pool:
     for r in answer.readings:
         for k, v in r.values.items():
             p.add(k, v, r.value_units.get(k))   # no entry: a reading of mixed units, its unit is not known
+            # a value in thousand barrels may be written in million barrels, as a fact's may (`also`): code converts,
+            # so "about 417.8 million barrels" for 417,797 thousand is checked against 417.797 (the adversary's P11)
+            for name, conv in also_in(r.value_units.get(k) or "", v).items():
+                p.put(conv, "amount", name.replace("_", " "))
+                p.label(name)
             # a window of N years may be written in months ("over 36 months", the adversary)
             if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
                 p.put(12 * v, "count", None)

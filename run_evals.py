@@ -16,15 +16,17 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 
 from pydantic_ai import capture_run_messages
-from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.usage import UsageLimits
 from pydantic_evals import Case, Dataset, increment_eval_metric
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext, MaxToolCalls
 
 from es_agent import clock, metrics, prose
-from es_agent.agent import Deps, agent
+from es_agent.agent import MODEL_REQUESTS_PER_QUESTION, Deps, agent
 from es_agent.memory import Turn, with_context
 from es_agent.models import DeskAnswer
 from es_agent.readings import WATCHLIST
@@ -282,7 +284,18 @@ REPEATS_SEEN = {"arb_us_europe", "brent_curve", "brent_wti_spread", "crack_321",
                 "wti_volatility"}
 
 
-def make_task(model_name: str, enforce: bool = True):
+def requests_in(messages) -> int:
+    return sum(isinstance(m, ModelResponse) for m in messages)
+
+
+def calls_in(messages) -> int:
+    return sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for m in messages for p in m.parts)
+
+
+def make_task(model_name: str, enforce: bool = True, run_opts: dict | None = None):
+    # The service's cap on model requests applies here too (since 24 Nov 2026; the suite ran under 50 before).
+    opts = {"usage_limits": UsageLimits(request_limit=MODEL_REQUESTS_PER_QUESTION), **(run_opts or {})}
+
     async def task(question: str) -> DeskAnswer:
         model = scripted(*PLANS[question]) if model_name == "scripted" else model_name
 
@@ -290,21 +303,25 @@ def make_task(model_name: str, enforce: bool = True):
             return [str(getattr(p, "content", ""))[:600] for m in messages for p in m.parts if is_rejection(p)]
 
         deps = Deps(source=SOURCE, enforce=enforce)
+        began = time.perf_counter()
         with capture_run_messages() as seen:
             try:
-                result = await agent.run(question, model=model, deps=deps)
+                result = await agent.run(question, model=model, deps=deps, **opts)
             except Exception as e:  # retries ran out: the case names itself and says what the validator objected to
                 # The validator's own record is used too: inside the evaluation harness the captured messages can be empty.
                 RUNS[question] = {"retries": max(len(said(seen)), len(deps.rejections)), "ran_out": f"{type(e).__name__}: {e}"[:300],
                                   "validator": said(seen) or [r[:600] for r in deps.rejections], "usd": round(spent(seen), 5),
-                                  "repeats": list(deps.repeats)}
+                                  "repeats": list(deps.repeats), "requests": requests_in(seen), "tool_calls": calls_in(seen),
+                                  "seconds": round(time.perf_counter() - began, 2)}
                 raise
         parts = [p for m in result.all_messages() for p in m.parts]
         # The validator's own record is the count. Until 18 Nov 2026 only the messages were counted, and a live
         # model's rejections arrive as a part type that count did not know: live runs were reported with no retries.
         retried = max(len(deps.rejections), sum(is_rejection(p) for p in parts))
         RUNS[question] = {"retries": retried, "ran_out": None, "validator": [r[:600] for r in deps.rejections] or said(result.all_messages()),
-                          "usd": round(spent(result.all_messages()), 5), "repeats": list(deps.repeats)}
+                          "usd": round(spent(result.all_messages()), 5), "repeats": list(deps.repeats),
+                          "requests": requests_in(result.all_messages()), "tool_calls": calls_in(result.all_messages()),
+                          "seconds": round(time.perf_counter() - began, 2)}
         increment_eval_metric("retries", retried)
         increment_eval_metric("tool_calls", sum(isinstance(p, ToolCallPart) and p.tool_name != "final_result" for p in parts))
         increment_eval_metric("tokens", result.usage.total_tokens or 0)
@@ -340,7 +357,25 @@ def main() -> int:
     ap.add_argument("--expect-failures", type=int, help="exit 1 unless exactly this many assertions fail (control run)")
     ap.add_argument("--golden", choices=["write", "check"], help="write or compare the answers in results/golden.json")
     ap.add_argument("--record-fixture", action="store_true", help="save every series this run reads to --fixture")
+    # Settings to measure (24 Nov 2026). Left out, each is what the service uses.
+    ap.add_argument("--request-limit", type=int, default=MODEL_REQUESTS_PER_QUESTION,
+                    help=f"model requests a question may make (the service's: {MODEL_REQUESTS_PER_QUESTION})")
+    ap.add_argument("--retries", type=int, help="send-backs a question may get, tool and answer alike (the agent's: 3)")
+    ap.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"], help="the model's effort level (the model's default)")
+    ap.add_argument("--thinking", choices=["adaptive", "disabled"], help="the model's thinking (the model's default)")
     args = ap.parse_args()
+    run_opts: dict = {"usage_limits": UsageLimits(request_limit=args.request_limit)}
+    model_settings: dict = {}
+    if args.effort:
+        model_settings["anthropic_effort"] = args.effort
+    if args.thinking:
+        model_settings["anthropic_thinking"] = {"type": args.thinking}
+    if model_settings:
+        run_opts["model_settings"] = model_settings   # merged over the agent's own (prompt caching stays on)
+    if args.retries is not None:
+        run_opts["retries"] = args.retries
+    settings = {"request_limit": args.request_limit, "retries": args.retries if args.retries is not None else "agent (3)",
+                "effort": args.effort or "model default", "thinking": args.thinking or "model default"}
 
     try:  # local-only tracing so the span-based evaluators (MaxToolCalls) can see tool calls
         import logfire
@@ -358,7 +393,7 @@ def main() -> int:
     if args.record_fixture:
         SOURCE = RecordingSource(SOURCE)
 
-    report = build_dataset().evaluate_sync(make_task(args.model, not args.no_guard), name=args.model + (" (guard off)" if args.no_guard else ""), max_concurrency=1, progress=False)
+    report = build_dataset().evaluate_sync(make_task(args.model, not args.no_guard, run_opts), name=args.model + (" (guard off)" if args.no_guard else ""), max_concurrency=1, progress=False)
     report.print(include_input=False, include_output=False, include_durations=True)
     passed, total, errored, failed = tally(report)
     for case, name, reason in failed:
@@ -388,6 +423,12 @@ def main() -> int:
           f"{EXCEL['readings_with_a_sheet']} of {EXCEL['readings']} readings have a sheet")
     print(f"retries: {retries} in total across {sum(bool(r['retries']) for r in by_case.values())} of {len(SUITE)} cases; "
           f"ran out: {ran_out or 'none'}")
+    requests = sum(r.get("requests", 0) for r in by_case.values())
+    calls = sum(r.get("tool_calls", 0) for r in by_case.values())
+    seconds = sum(r.get("seconds", 0.0) for r in by_case.values()) / max(len(by_case), 1)
+    most = max((r.get("requests", 0) for r in by_case.values()), default=0)
+    print(f"work: {requests} model requests (most in one question: {most}), {calls} tool calls, {seconds:.1f} s an answer; "
+          f"settings: " + ", ".join(f"{k}={v}" for k, v in settings.items()))
 
     code = 0
     if args.record_fixture:
@@ -411,7 +452,9 @@ def main() -> int:
         os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
         with open(args.report, "w", encoding="utf-8") as f:
             json.dump({"model": args.model, "data_as_of": str(clock.today()), "passed": passed, "total": total, "errored": errored,
-                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "usd": round(usd, 4), "cases": by_case},
+                       "failed": failed, "retries": retries, "max_retries": args.max_retries, "ran_out": ran_out, "usd": round(usd, 4),
+                       "settings": settings, "requests": requests, "most_requests": most, "tool_calls": calls,
+                       "seconds_per_answer": round(seconds, 2), "cases": by_case},
                       f, indent=1)
     if args.gate:
         hard = [f for f in failed if f[1] in HARD]

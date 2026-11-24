@@ -15,15 +15,7 @@ from . import prose
 from .models import Change, DeskAnswer, Observation, SeriesHit, Spread
 
 
-def also_in(units: str, value: float) -> dict[str, float]:
-    """The same value in the unit people ask for. EIA publishes stocks in thousand barrels; a person asks
-    for million barrels. The conversion is done here so the model has a figure to quote and never divides."""
-    key = unit_key(units)
-    if key == "thousand barrel":
-        return {"million_barrels": round(value / 1000, 3)}
-    if key == "thousand barrel per day":
-        return {"million_barrels_per_day": round(value / 1000, 3)}
-    return {}
+also_in = prose.also_in  # one conversion table, shared with the prose checks
 
 
 def latest_obs(hit: SeriesHit, history: list[tuple[dt.date, float]]) -> Observation | None:

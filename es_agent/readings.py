@@ -512,7 +512,11 @@ def percentile(source: DataSource, series_id: str, years: int = 3) -> Reading | 
     # The window is the one the data has. A series that begins inside the window asked for is ranked against its
     # own shorter history, and the answer must not say "of its last ten years": code says so in a caveat.
     short = hist[0][0] > _since(366 * years) + dt.timedelta(days=45)
-    return Reading(key=f"percentile:{series_id}:{years}", title=f"{hit.name}: latest against its last {years} years",
+    # The title says the window the data has: "against its last 3 years" over 18 days of history contradicted the
+    # reading's own counter line (found by the second reader, 23 Nov 2026).
+    title = (f"{hit.name}: latest against its history since {hist[0][0]} ({(d - hist[0][0]).days} days; {years} years asked for)"
+             if short else f"{hit.name}: latest against its last {years} years")
+    return Reading(key=f"percentile:{series_id}:{years}", title=title,
                    period=d, units=hit.units, series_ids=[series_id], values=values,
                    note="percentile 0 = lowest of the window, 100 = highest", context=context,
                    counter=(f"Shorter history: {series_id} begins on {hist[0][0]}, so its percentile, low, high and average are "
