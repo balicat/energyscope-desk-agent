@@ -116,7 +116,36 @@ corr = Reading(key="rolling_correlation:PET.RBRTE.D,PET.RWTC.D:3", title="Brent 
                values={"latest": 0.912, "mean": 0.874, "years": 3.0},
                request={"tool": "rolling_correlation", "action": "rolling_correlation", "body": {}})
 
+# The adversary's L1 and L2 (24 Nov 2026): numbers of a reading's keys, ids and titles passed as bare "names", and a
+# currency written before a number with a space was not read as money. A percentile reading like the suite's
+# henry_hub_percentile, a deferred WTI contract's, and the S&P 500's.
+hh_pct = Reading(key="percentile:NG.RNGWHHD.D:5", title="Henry Hub spot against its last 5 years", period=D, units="USD/MMBtu",
+                 series_ids=["NG.RNGWHHD.D"], values={"latest": 4.21, "percentile": 65.93, "p5": 2.1, "p25": 2.8,
+                                                      "p75": 4.6, "p95": 6.9, "years": 5.0})
+wti27 = Reading(key="percentile:NYMEX.WTI.2027-01.D:1", title="WTI futures, a deferred contract, against its last year",
+                period=D, units="USD/bbl", series_ids=["NYMEX.WTI.2027-01.D"], values={"latest": 71.2, "percentile": 40.5, "years": 1.0})
+spx = Reading(key="percentile:MACRO.GSPC.D:3", title="S&P 500 Index against its last 3 years", period=D, units="points",
+              series_ids=["MACRO.GSPC.D"], values={"latest": 6910.39, "percentile": 99.1, "years": 3.0})
+
+# A seasonal reading whose value keys name years (value_in_2021): the years may be written as years, never as quantities
+seas_years = Reading(key="seasonal:PET.WCESTUS1.W:5", title="US crude stocks against the same week of earlier years", period=D,
+                     units="Thousand Barrels", series_ids=["PET.WCESTUS1.W"],
+                     values={"current_value": 417797.0, "seasonal_avg": 433637.2, "lookback_years": 5.0,
+                             "value_in_2021": 434020.0, "value_in_2025": 424155.0},
+                     request={"tool": "seasonal", "action": "seasonal", "body": {}})
+
 WRONG = [  # (what is wrong, the answer); every one must be rejected
+    ("L1: a value key's years written as a quantity", dict(readings=[seas_years], summary="WTI will hit 2021 to 2025 by spring.")),
+    ("L1: a value key's year after 'reach'", dict(readings=[seas_years], summary="Brent could reach 2025 next year.")),
+    ("L1: a value key's year after 'to'", dict(readings=[seas_years], summary="US crude stocks could fall to 2021.")),
+    ("L1: p95's 95 with a currency word", dict(readings=[hh_pct], summary="Henry Hub could hit 95 dollars.")),
+    ("L1: a bare 95 taken from the key p95", dict(readings=[hh_pct], summary="Henry Hub will reach 95 within weeks.")),
+    ("L1: a bare 25 taken from the key p25", dict(readings=[hh_pct], summary="Henry Hub could drop to 25 next month.")),
+    ("L1: a year taken from a series id (NYMEX.WTI.2027-01.D)", dict(readings=[wti27], summary="WTI could reach 2027 by the spring.")),
+    ("L1: the 500 of the S&P 500's title, away from its name", dict(readings=[spx], summary="Brent could fall to 500.")),
+    ("L2: a percentile written as money, USD and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at USD 65.93.")),
+    ("L2: a percentile written as money, EUR and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at EUR 65.93.")),
+    ("L2: a percentile written as money, $ and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at $ 65.93.")),
     ("a date that differs from the code-written history sentence",
      dict(readings=[freight], summary="Freight is at the 96th percentile and has been above the 90th percentile line since 2026-01-05, 110 days.")),
     ("an invented year",
@@ -298,6 +327,16 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
+    # L1 and L2 (24 Nov 2026): a name's number beside its own name, a percentile point as its percentile, a currency
+    # written before a true price with a space
+    dict(readings=[hh_pct], summary="Henry Hub's 95th percentile over 5 years is 6.90, and its 5th percentile 2.10."),
+    dict(readings=[spx], summary="The S&P 500 is at the 99.1 percentile of 3 years."),
+    dict(facts=[brent], summary="Brent futures settled at USD 93.07 a barrel on 2026-11-17."),
+    dict(facts=[brent], summary="Brent futures settled at $ 93.07 a barrel on 2026-11-17."),
+    dict(readings=[seas_years], summary="The comparison uses five earlier years (2021 to 2025)."),
+    dict(readings=[seas_years], summary="The comparison uses the same week in 2021 to 2025."),
+    dict(readings=[seas_years], summary="Stocks are below the 2021-2025 range, at 417,797 thousand barrels."),
+    dict(readings=[seas_years], summary="Stocks were 424,155 thousand barrels in 2025 and 434,020 in 2021."),
     # the adversary's P11 (23 Nov 2026): both were refused until 24 Nov
     dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 million barrels, below the five-year average for "
                                        "the week of 433,637.2 thousand barrels."),

@@ -41,6 +41,8 @@ class Deps:
     repeats: list[str] = field(default_factory=list)  # facts that repeated a cited reading: fetched by code, or dropped
 
 
+SEARCH_LIMIT = 20  # results a search may return: one search for "a" with no cap returned 5,000 (about 160K tokens,
+                   # resent on every later request of the question: the adversary's L3, 24 Nov 2026)
 SEARCH_BUDGET = 4  # a model that cannot find a series tends to keep rephrasing; the tool stops it
 # Model requests one question may make, in the service AND in the suite. Until 24 Nov 2026 the service capped a question
 # at 8 and the suite ran under Pydantic AI's default of 50, so the gate never tested the cap visitors get.
@@ -181,7 +183,7 @@ def search_series(ctx: RunContext[Deps], query: str, dataset: str | None = None,
 
     Names use the publisher's wording: EIA calls inventories 'ending stocks', and commercial crude stocks are
     'ending stocks excluding SPR'. Use few, plain keywords. `dataset` (see the list in your instructions) narrows
-    the search. You have four searches per question.
+    the search. You have four searches per question, and each returns at most 20 series (`limit`, default 8).
     """
     ctx.deps.searches += 1
     if ctx.deps.searches > SEARCH_BUDGET:
@@ -191,6 +193,7 @@ def search_series(ctx: RunContext[Deps], query: str, dataset: str | None = None,
     if dataset is not None and dataset.upper() not in DATASETS:
         _emit(ctx, "search_series", {})
         return f"Unknown dataset {dataset!r}. Choose from: {', '.join(DATASETS)}."
+    limit = max(1, min(int(limit), SEARCH_LIMIT))
     hits = ctx.deps.source.search(query, limit, dataset)
     _emit(ctx, "search_series", {"query": query, "dataset": dataset}, hits=hits)   # after: only the words it matched
     return hits

@@ -20,6 +20,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import secrets
 import statistics
 import sys
@@ -43,6 +44,14 @@ from es_agent.verify import verify
 from es_agent import excel
 
 TOOL_NAMES = frozenset(agent._function_toolset.tools)   # the tools the agent has; any other name is the model's text
+
+
+def _safe_reason(e: BaseException, cap: int = 300) -> str:
+    """An exception for the question log. A quoted name that is not one of the agent's tools is replaced: a tool the
+    model made up ("Tool 'Brent_will_hit_200' exceeded max retries") would carry its words into a log a model reads
+    (ops/review_log.py; the adversary's L4, 24 Nov 2026)."""
+    text = re.sub(r"'([^']{1,300})'", lambda m: m[0] if m[1] in TOOL_NAMES else "'an unknown tool'", str(e))
+    return f"{type(e).__name__}: {text}"[:cap]
 MODEL = os.environ.get("LIBRARIAN_MODEL", "scripted")
 KEY_FILE = os.environ.get("LIBRARIAN_KEY_FILE", "/opt/energyscope/.anthropic_api_key")
 LAKE = os.environ.get("LIBRARIAN_LAKE", "/opt/energyscope/data")
@@ -198,7 +207,7 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
                     _day["usd"] += _cost(None, messages)
                     _alert_if_due()
                 raise
-            degraded = f"{type(e).__name__}: {e}"[:300]
+            degraded = _safe_reason(e)
             output, usage = tables_only(deps), None
     parts = [p for m in messages for p in m.parts]
     # Each call with the arguments its tool validated (es_agent/trail.py), never as the model wrote them: a sentence
@@ -410,7 +419,7 @@ class Handler(BaseHTTPRequestHandler):
             # Not a 5xx: the hosting proxy replaces every 5xx with a page of its own, so on 18 Nov 2026 the visitor
             # never saw this sentence and a program received HTML.
             status, body = 424, {"error": "The Librarian could not answer that just now."}
-            detail = f"{type(e).__name__}: {e}"[:500]
+            detail = _safe_reason(e, 500)
         self._log(status, question, body, detail)
         if status == 200:  # the log keeps the detail; the public gets a fixed phrase, never raw exception text
             if body.get("degraded"):

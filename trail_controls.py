@@ -101,5 +101,38 @@ check(surprises.get("args") == {"window": "month"}, "a fixed choice survives", j
 ev_search = [e for e in events if e["tool"] == "search_series"]
 check(bool(ev_search) and all("dataset" not in e["args"] for e in ev_search[1:]),
       "an unknown dataset is not repeated", json.dumps(ev_search))
+
+# The adversary's L3 (24 Nov 2026): a search's limit was uncapped; one search for "a" returned 5,000 series, about
+# 160K tokens resent on every later request of the question.
+from types import SimpleNamespace  # noqa: E402
+import es_agent.agent as A  # noqa: E402
+
+
+class _Stub:
+    asked: list[int] = []
+
+    def search(self, query, limit=10, dataset=None):
+        self.asked.append(limit)
+        return []
+
+    def meta(self, series_id):
+        return None
+
+
+stub = _Stub()
+fake = SimpleNamespace(deps=SimpleNamespace(searches=0, source=stub, emit=lambda tool, args: None, calls={}), tool_call_id=None)
+A.search_series(fake, "a", None, 5000)
+A.search_series(fake, "a", None, 0)
+A.search_series(fake, "a")
+check(stub.asked == [A.SEARCH_LIMIT, 1, 8] and A.SEARCH_LIMIT == 20,
+      "a search asks the source for at most 20 series, at least 1, 8 by default", repr(stub.asked))
+check("at most 20 series" in (A.search_series.__doc__ or ""), "the tool's description tells the model the cap")
+
+# The adversary's L4: the question log's degraded_reason carried a tool name the model made up.
+import serve as S  # noqa: E402
+reason = S._safe_reason(ValueError(f"Tool 'Brent_will_hit_200_{MARK}' exceeded max retries count of 3"))
+check(MARK not in reason and "an unknown tool" in reason, "a made-up tool name never reaches the question log", reason)
+known = S._safe_reason(ValueError("Tool 'get_change' exceeded max retries count of 3"))
+check("'get_change'" in known, "a real tool's name is kept", known)
 print(f"\n{len(FAILS)} FAIL(s)")
 sys.exit(1 if FAILS else 0)

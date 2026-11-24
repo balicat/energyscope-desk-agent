@@ -130,6 +130,66 @@ def _numbers(text: str):
         yield tok, start, end, text[s:e], glued
 
 
+# Words too common to tie a number to a name: "Brent could fall to 500" has "to" beside its 500, as "up to 500" might
+# in a title, and that must not make it the S&P 500's.
+_PLAIN_WORDS = {"a", "an", "the", "to", "of", "at", "in", "on", "by", "for", "and", "or", "from", "with", "is", "was",
+                "are", "be", "as", "up", "down", "over", "under", "than", "per", "its", "it", "this", "that"}
+
+
+_COMPOUND = re.compile(r"\d+(?:[-,:]\d+)+|\d+-[A-Za-z]+")    # 3-2-1, 2027-01, 1,1, 2:1, 20-day
+# segments.1.count, metric.crack_321_z, value_in_2021: a letter somewhere, so a decimal (92.94) is never one
+_IDENT = re.compile(r"(?=[\w.]*[A-Za-z])[A-Za-z0-9]+(?:[._][A-Za-z0-9]+)+")
+_WINDOW_AFTER = re.compile(r"[\s-]+(?:trading\s+)?(?:days?|weeks?|months?|years?|quarters?|observations?|sessions?)\b", re.I)
+_YEAR_WORDS = {"in", "since", "during", "of", "for", "from", "between", "until", "each", "year", "years", "and", "with",
+               "where", "when", "only"}
+_RANGE_TO = r"\s*(?:to|through|and|\u2013|\u2014|-)\s*"
+
+
+def _year_position(text: str, start: int, end: int) -> bool:
+    """A year where a year goes: after in, since, during, of, for, from, between, until, each, year(s), and, with,
+    where, when, only; in brackets; before a colon; before its own value in a list ("2021 434,020", "2022 at
+    431665.0"); after "the" and before a word ("the 2025 level"); or as either end of a range of years whose first
+    end is itself in such a place ("in 2021 to 2025", "(2021 to 2025)", "the 2021-2025 range"). Not after "to" or
+    "reach": "rise to 2027" is a quantity, and so is "hit 2021 to 2025"."""
+    m = re.search(r"((?:19|20)\d\d)" + _RANGE_TO + r"$", text[max(0, start - 14):start])
+    if m:   # the second end of a range: it stands where the first end stands
+        first = max(0, start - 14) + m.start(1)
+        return _year_place(text, first, first + 4, range_after=True)
+    return _year_place(text, start, end, range_after=bool(re.match(_RANGE_TO + r"(?:19|20)\d\d\b", text[end:end + 14])))
+
+
+def _year_place(text: str, start: int, end: int, range_after: bool = False) -> bool:
+    before = re.search(r"([A-Za-z]+)\W*$", text[max(0, start - 20):start])
+    word = before[1].lower() if before else ""
+    if word in _YEAR_WORDS or re.search(r"\(\s*$", text[max(0, start - 3):start]):
+        return True   # ... or in brackets: "424155.0 thousand barrels (2025)", "(2021 to 2025)"
+    if range_after:   # "the 2021-2025 range", "424155.0 to 448054.0 thousand barrels, 2021 to 2025"
+        return word == "the" or bool(re.search(r",\s*$", text[max(0, start - 3):start]))
+    if re.match(r"\s*[(:]", text[end:end + 3]):
+        return True   # "2025 (424,155)", "2025: 424,155"
+    if re.match(r" (?:at )?\d[\d,]*(?:\.\d+)?(?![\d.]|\s*(?:%|percent))", text[end:end + 20]):
+        return True   # a year before its own value in a list: "2021 434,020", "2022 at 431665.0"
+    return word == "the" and bool(re.match(r" [A-Za-z]", text[end:end + 2]))
+
+
+def _signed_at(text: str, start: int) -> bool:
+    """A sign written right before the number, not a hyphen of a term ("-2" in "of -2", not the 2 of "3-2-1")."""
+    return start > 0 and text[start - 1] in "+-\u2212" and (start < 2 or not text[start - 2].isalnum())
+
+
+def _beside(text: str, start: int, end: int) -> tuple[str, ...]:
+    """The word right before text[start:end] and the two right after it, lowercased, a plural folded to its singular
+    ("days" is "day"), a hyphen read as a space ("an 18-series watchlist"); "" for none or a plain word."""
+    before = re.search(r"([A-Za-z][A-Za-z&']*)[.\s]*$", text[max(0, start - 40):start])
+    after = re.match(r"[\s-]*([A-Za-z][A-Za-z&']*)(?:[\s-]+([A-Za-z][A-Za-z&']*))?", text[end:end + 60])
+    words = [before[1] if before else ""] + ([after[1], after[2] or ""] if after else ["", ""])
+
+    def fold(w: str) -> str:
+        w = w.lower().strip("'")
+        return w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
+    return tuple("" if fold(w) in _PLAIN_WORDS else fold(w) for w in words)
+
+
 @dataclass
 class Pool:
     """Everything the tools returned that the prose may quote."""
@@ -140,6 +200,15 @@ class Pool:
     percentiles: list[float] = field(default_factory=list)  # a subset of percents: ranks, for the high/low rule
     dates: set[dt.date] = field(default_factory=set)
     names: set[str] = field(default_factory=set)    # plain numbers that are part of a name or of code-written text
+    # ... and the words beside each in the text it came from: a name's number may be written only beside one of them
+    # ("S&P 500", "No. 2 heating oil"), never on its own ("Brent could fall to 500": the adversary's L1, 24 Nov 2026)
+    name_words: dict[str, set[str]] = field(default_factory=dict)
+    pctl_names: set[str] = field(default_factory=set)  # the 95 of a key p95: written only as an ordinal, "the 95th"
+    terms: set[str] = field(default_factory=set)       # compound terms of names and ids: 3-2-1, 2027-01, 1,1, 20-day
+    idents: set[str] = field(default_factory=set)      # key-like identifiers: segments.1.count, value_in_2021
+    key_numbers: set[str] = field(default_factory=set)  # plain numbers of keys and ids: a window, written with its noun
+    key_years: set[str] = field(default_factory=set)    # years of keys and ids: written only where a year goes
+    signed: set[str] = field(default_factory=set)        # numbers a name writes with a sign: the -2 and +2 of a scale
     tokens: set[str] = field(default_factory=set)   # names that mix letters and digits: M12, PF4
     hyphens: set[str] = field(default_factory=set)  # whole numbers of a hyphenated term of a text: the 12 of 12-month
     phrases: set[tuple[str, str]] = field(default_factory=set)  # a server text's parameters: ("week", "46") of week=46
@@ -171,8 +240,67 @@ class Pool:
                 self.dates.add(dt.date.fromisoformat(d))
             except ValueError:
                 pass
-        for tok, _, _, whole, glued in _numbers(_blank_dates(joined)):
-            (self.tokens if glued else self.names).add(whole if glued else tok)
+        blanked = _blank_dates(joined)
+        self._shapes(blanked)
+        for tok, start, end, whole, glued in _numbers(blanked):
+            if glued:
+                self.tokens.add(whole)
+                continue
+            self.names.add(tok)
+            self.name_words.setdefault(tok, set()).update(w for w in _beside(blanked, start, end) if w)
+            if _signed_at(blanked, start):
+                self.signed.add(tok)
+
+    def _shapes(self, text: str) -> None:
+        self.terms |= {m.lower() for m in _COMPOUND.findall(text)}
+        self.idents |= {m.lower() for m in _IDENT.findall(text) if any(c.isdigit() for c in m)}
+
+    def ids(self, *parts: str) -> None:
+        """Series ids, reading keys and value keys: their dates and their letter-and-digit names (M12) may be written,
+        never a bare number of theirs. Until 24 Nov 2026 every number in them was a name, so "WTI could reach 2027"
+        passed on the id NYMEX.WTI.2027-01.D and "Henry Hub will reach 95" on the key p95 (the adversary's L1)."""
+        joined = " ".join(parts)
+        for d in _ISO.findall(joined):
+            try:
+                self.dates.add(dt.date.fromisoformat(d))
+            except ValueError:
+                pass
+        blanked = _blank_dates(joined)
+        self._shapes(blanked)
+        for tok, _, _, whole, glued in _numbers(blanked):
+            if glued:
+                self.tokens.add(whole)
+            elif re.fullmatch(r"(?:19|20)\d\d", tok):
+                self.key_years.add(tok)
+            else:
+                self.key_numbers.add(tok)
+
+    def named(self, clean: str, start: int, end: int, tok: str) -> bool:
+        """Is the number at clean[start:end] written as part of a name a tool returned, and not as a quantity? A key's,
+        an id's or a title's number may be written only in the shapes a name takes:
+          - inside the same compound term or key ("the 3-2-1 crack", "2027-01 delivery", "GARCH(1,1)", "the 20-day",
+            "segments.1.count", "value_in_2021");
+          - a percentile point of the reading (key p95) as an ordinal: "the 95th percentile", "the 10th and 90th";
+          - a key's window with its noun: "the latest 90 observations";
+          - a key's year where a year goes: "in 2023", "2025 (424,155)";
+          - a number a name writes with a sign, with that sign: "a scale of -2 to +2";
+          - beside a word that stood beside it in the name: "the S&P 500", "No. 2 heating oil".
+        Never alone: "Henry Hub will reach 95", "WTI could reach 2027", "Brent could fall to 500" (the adversary's L1,
+        24 Nov 2026: every number of a key, an id or a title had been a name that passed anywhere without a unit)."""
+        for pat, known in ((_COMPOUND, self.terms), (_IDENT, self.idents)):
+            for m in pat.finditer(clean):
+                if m.start() <= start and end <= m.end() and m.group().lower() in known:
+                    return True
+        if tok in self.pctl_names and re.match(r"(?:st|nd|rd|th)\b", clean[end:end + 3], re.I):
+            return True
+        if tok in self.key_numbers and _WINDOW_AFTER.match(clean[end:end + 32]):
+            return True
+        if tok in self.key_years and _year_position(clean, start, end):
+            return True
+        if tok in self.signed and _signed_at(clean, start):
+            return True
+        words = self.name_words.get(tok)
+        return bool(words) and bool(words & set(_beside(clean, start, end)))
 
     def context(self, text: str, quotable: bool = True) -> None:
         """A reading's or a spread's code-written text: its dates and its letter-and-digit names (M12) may be
@@ -232,7 +360,8 @@ def pool_of(answer: DeskAnswer) -> Pool:
         for k, v in f.also.items():          # million_barrels, million_barrels_per_day
             p.put(v, "amount", k.replace("_", " "))
             p.converted.add(len(p.tagged) - 1)
-        p.text(f.name, f.series_id)
+        p.text(f.name)
+        p.ids(f.series_id)
         p.label(f.units, f.name, " ".join(f.also))
     for s in answer.spreads:
         for x in (s.value_a, s.value_b, s.spread):
@@ -240,7 +369,8 @@ def pool_of(answer: DeskAnswer) -> Pool:
         for k, v in s.extras.items():
             p.add(k, v, s.units)
         p.dates.add(s.period)
-        p.text(s.name_a, s.series_a, s.name_b, s.series_b, s.note)
+        p.text(s.name_a, s.name_b, s.note)
+        p.ids(s.series_a, s.series_b)
         p.context(s.context)
         p.label(s.units, s.name_a, s.name_b)
     for r in answer.readings:
@@ -258,9 +388,10 @@ def pool_of(answer: DeskAnswer) -> Pool:
             # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
             q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
             if q:
-                p.names.add(q[1])
+                p.pctl_names.add(q[1])
         p.dates.add(r.period)
-        p.text(r.title, r.note, r.counter, r.key, " ".join(r.series_ids), " ".join(r.values))
+        p.text(r.title, r.note, r.counter)
+        p.ids(r.key, " ".join(r.series_ids), " ".join(r.values))
         p.context(r.context, quotable=r.request is None)
         # the units a quoted number may carry: the reading's own. A server reading's text never adds to them; the
         # Librarian's own readings of mixed units (watch, evidence) state their units in their text, which stays.
@@ -343,10 +474,21 @@ def glued_suffix(tok: str, whole: str) -> str:
     return whole[i + len(tok):] if i >= 0 else ""
 
 
+# A currency written before the number, with or without a space: "USD 65.93", "EUR 65.93", "$ 65.93" are money as
+# "$65.93" is. Until 24 Nov 2026 only "$" right before the number and USD glued to it were read, so "Henry Hub trades
+# at USD 65.93" passed on a percentile of 65.93 (the adversary's L2).
+_CURRENCY_BEFORE = re.compile(r"(?:\b(?:usd|eur|gbp|us\$|dollars?|euros?)|\$)\s*$", re.I)
+
+
+def _currency_before(clean: str, start: int) -> bool:
+    return bool(_CURRENCY_BEFORE.search(clean[max(0, start - 12):start]))
+
+
 def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "") -> Written:
     """What unit, if any, the prose writes on the number at clean[start:end]: letters glued after it (`suffix`),
     then the words right after it up to the next comma, bracket or full stop, and a currency sign or USD before it."""
-    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].upper() in _CURRENCY_PREFIX)
+    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].upper() in _CURRENCY_PREFIX
+                or _currency_before(clean, start))
     after = clean[end + len(suffix):end + len(suffix) + 48]
     tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", after)[0]
     first = re.match(r"(\s*)([A-Za-z]+)(?![A-Za-z0-9])", tail)
@@ -439,15 +581,16 @@ def text_problems(text: str, pool: Pool) -> list[str]:
                 bad.append(f"{whole} (write the number apart from its letters, and the unit as a word)")
                 continue
         unit = written_unit(clean, start, end, whole, suffix)
-        if not glued and tok in pool.names and not unit.any():
-            continue  # a number of a name, written without a unit of its own
+        if not glued and not unit.any() and pool.named(clean, start, end, tok):
+            continue  # a number of a name, written beside its name's own words and without a unit of its own
         if not glued and not unit.any() and any(n == tok and _in_phrase(clean, start, end, word) for word, n in pool.phrases):
             continue  # week 46, week=46, the 46th week: a server text's parameter, as its phrase
         if not glued and tok in pool.hyphens and re.match(r"-[A-Za-z0-9]", clean[end:end + 2]):
             continue  # the 12 of "12-month", written hyphenated as the text writes it
         n, dp = _parse(tok)
         after = clean[end:end + 40]
-        money = bool(_MONEY.match(after)) or clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd"
+        money = (bool(_MONEY.match(after)) or clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd"
+                 or _currency_before(clean, start))
         pct, count = bool(_PCT.match(after)), bool(_COUNT.match(after))
         kinds = ({"amount"} if money else {"amount", "percent"} if pct else {"count"} if count else {"amount", "percent", "count"})
         hits = [(i, u) for i, (v, kind, u) in enumerate(pool.tagged) if (kind in kinds or kind == "any") and _rounds_to(v, n, dp)]
