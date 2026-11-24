@@ -484,8 +484,13 @@ def _in_phrase(clean: str, start: int, end: int, word: str) -> bool:
     adversary's G2a, 24 Nov 2026)."""
     w = re.escape(word)
     if re.search(rf"\b{w}\s*=?\s*$", clean[:start], re.I):
-        return not re.match(r"\s+of\s+(?!the\s+year\b)", clean[end:], re.I)
-    return bool(re.match(rf"(?:st|nd|rd|th)\s+{w}\s+of\s+the\s+year\b", clean[end:], re.I))
+        return not re.match(rf"\s+of\s+(?!{_YEARLY})", clean[end:], re.I)
+    return bool(re.match(rf"(?:st|nd|rd|th)\s+{w}\s+of\s+{_YEARLY}", clean[end:], re.I))
+
+
+# What a week of the year may be "of": the year, each year, each of the last five years (the adversary's B6: "week 46
+# of each of the last five years" was refused by the G2a fix in 1b631ca)
+_YEARLY = r"(?:the\s+year|(?:each|every)\s+year|(?:each|every)\s+of\s+the\s+(?:last|past|previous)\s+\w+\s+years)\b"
 
 
 def model_caveats(answer: DeskAnswer) -> list[str]:

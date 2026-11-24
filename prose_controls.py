@@ -364,6 +364,9 @@ RIGHT = [  # correct prose that the rules must not reject
     # a server text's parameter, as its phrase
     dict(readings=[seasonal5], summary="In week 46, US crude stocks were 417,797 thousand barrels."),
     dict(readings=[seasonal5], summary="In the 46th week of the year, US crude stocks were 417,797 thousand barrels."),
+    # the adversary's B6 (refused by 1b631ca): a week of each year, not a count of weeks
+    dict(readings=[seasonal5], summary="In week 46 of each of the last five years US crude stocks were above 417,797 thousand barrels."),
+    dict(readings=[seasonal5], summary="In the 46th week of each year, US crude stocks averaged 433,637.2 thousand barrels."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
