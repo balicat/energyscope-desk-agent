@@ -126,6 +126,14 @@ wti27 = Reading(key="percentile:NYMEX.WTI.2027-01.D:1", title="WTI futures, a de
                 period=D, units="USD/bbl", series_ids=["NYMEX.WTI.2027-01.D"], values={"latest": 71.2, "percentile": 40.5, "years": 1.0})
 spx = Reading(key="percentile:MACRO.GSPC.D:3", title="S&P 500 Index against its last 3 years", period=D, units="points",
               series_ids=["MACRO.GSPC.D"], values={"latest": 6910.39, "percentile": 99.1, "years": 3.0})
+# The adversary's three remaining items (242042f1, 24 Nov 2026): a window or count of the data (years 3, observations
+# 747) passed as a market figure; the euro and pound signs were not read as money; a written currency was not checked
+# against the value's own (EUR on a dollar price).
+hh_obs = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub spot against its last 3 years", period=D, units="USD/MMBtu",
+                 series_ids=["NG.RNGWHHD.D"], values={"latest": 4.21, "percentile": 65.93, "years": 3.0, "observations": 747.0})
+hh_fact = SeriesFact(series_id="NG.RNGWHHD.D", name="Henry Hub natural gas spot", units="Dollars per Million Btu",
+                     latest_period=D, latest_value=3.10)
+power_eur = SeriesFact(series_id="ELEC.DE.D", name="German day-ahead power", units="EUR/MWh", latest_period=D, latest_value=95.40)
 
 # A seasonal reading whose value keys name years (value_in_2021): the years may be written as years, never as quantities
 seas_years = Reading(key="seasonal:PET.WCESTUS1.W:5", title="US crude stocks against the same week of earlier years", period=D,
@@ -146,6 +154,18 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("L2: a percentile written as money, USD and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at USD 65.93.")),
     ("L2: a percentile written as money, EUR and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at EUR 65.93.")),
     ("L2: a percentile written as money, $ and a space before it", dict(readings=[hh_pct], summary="Henry Hub trades at $ 65.93.")),
+    ("LF1: the seasonal window of 5 years written as a market figure",
+     dict(readings=[seasonal5], summary="US crude stocks could fall 5 next week.")),
+    ("LF1: the percentile window of 3 years written as a market figure",
+     dict(readings=[hh_obs], summary="Henry Hub could fall 3 next week.")),
+    ("LF1: the count of 747 observations written as a price", dict(readings=[hh_obs], summary="Henry Hub could reach 747 by summer.")),
+    ("LF2: a percentile written as money, the euro sign and a space", dict(readings=[hh_pct], summary="Henry Hub trades at € 65.93.")),
+    ("LF2: a percentile written as money, the pound sign glued", dict(readings=[hh_pct], summary="Henry Hub trades at £65.93.")),
+    ("LF2: a dollar price written in euros", dict(facts=[hh_fact], summary="Henry Hub is at EUR 3.10 per million Btu.")),
+    ("LF2: a dollar price written with the euro sign", dict(facts=[hh_fact], summary="Henry Hub is at €3.10 per million Btu.")),
+    ("LF2: a dollar price written in Canadian dollars", dict(facts=[hh_fact], summary="Henry Hub is at C$ 3.10 per million Btu.")),
+    ("LF2: a dollar price written in pounds", dict(facts=[brent], summary="Brent futures settled at £93.07 a barrel on 2026-11-17.")),
+    ("LF2: a euro price written in dollars", dict(facts=[power_eur], summary="German day-ahead power was $95.40 per MWh.")),
     ("a date that differs from the code-written history sentence",
      dict(readings=[freight], summary="Freight is at the 96th percentile and has been above the 90th percentile line since 2026-01-05, 110 days.")),
     ("an invented year",
@@ -333,6 +353,15 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(readings=[spx], summary="The S&P 500 is at the 99.1 percentile of 3 years."),
     dict(facts=[brent], summary="Brent futures settled at USD 93.07 a barrel on 2026-11-17."),
     dict(facts=[brent], summary="Brent futures settled at $ 93.07 a barrel on 2026-11-17."),
+    # the adversary's three remaining items (242042f1): a window with its noun, each currency where it is the value's own
+    dict(readings=[seasonal5], summary="US crude stocks are below their average for the week over the last 5 years."),
+    dict(readings=[hh_obs], summary="Henry Hub is at the 65.93 percentile of 747 observations over 3 years."),
+    dict(readings=[hh_obs], summary="Over a 3-year window Henry Hub sits at the 65.93 percentile."),
+    dict(facts=[hh_fact], summary="Henry Hub is at USD 3.10 per million Btu."),
+    dict(facts=[hh_fact], summary="Henry Hub is at $3.10 per million Btu."),
+    dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh."),
+    dict(facts=[power_eur], summary="German day-ahead power was EUR 95.40 per MWh."),
+    dict(facts=[power_eur], summary="German day-ahead power was 95.40 euros per MWh."),
     dict(readings=[seas_years], summary="The comparison uses five earlier years (2021 to 2025)."),
     dict(readings=[seas_years], summary="The comparison uses the same week in 2021 to 2025."),
     dict(readings=[seas_years], summary="Stocks are below the 2021-2025 range, at 417,797 thousand barrels."),

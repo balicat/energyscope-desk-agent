@@ -58,9 +58,15 @@ _LOOSE_DATE = re.compile(
     r"\b(?:january|february|march|april|june|july|august|september|october|november|december|"
     r"jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec|"
     r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|q[1-4])\b|\bmay \d|\d(?:st|nd|rd|th)? may\b", re.I)
-_MONEY = re.compile(r"\s*(?:usd|us\$|\$|dollars?|cents?)", re.I)
+_MONEY = re.compile(r"\s*(?:usd|us\$|\$|dollars?|cents?|eur|euros?|€|£|gbp)", re.I)
 _PCT = re.compile(r"\s*(?:%|percent|per cent)", re.I)
 _COUNT = re.compile(r"[\s-]*(?:days?|weeks?|years?|months?|lines?|observations?|reports?)\b", re.I)
+# The nouns a window or count of the data is written with: "5 years", "747 observations", "a 90-day window"
+_META_NOUN = re.compile(r"[\s-]*(?:trading\s+days?|data\s+points?|days?|weeks?|years?|months?|observations?|obs|"
+                        r"values?|points?|readings?|periods?|sessions?|reports?|lines?)\b", re.I)
+# Keys whose value is a window or a count of the data, not a market figure: quotable only with their noun
+_META_KEYS = {"years", "lookback_years", "years_of_history", "history_years", "observations", "obs", "n_obs", "window",
+              "window_days", "n", "count", "periods", "lookback_days"}
 _SCALE = re.compile(r"\s*(thousand|million|billion|trillion|hundred)\b", re.I)
 _PER = re.compile(r"[^.;,]{0,24}?\bper\s+(?:metric\s+)?(barrel|bbl|tonne|ton|mt|gallon|gal|day|mmbtu|btu|mwh|therm)\b", re.I)
 _ORDINAL = {"st", "nd", "rd", "th"}
@@ -77,6 +83,15 @@ _UNIT_WORDS = {"usd": "dollars", "$": "dollars", "us$": "dollars", "/": " per ",
                # for the unit rule (21 Nov 2026): OPEC's mb/d, plurals of the nouns a value's unit names
                "mb": "million barrel", "kb": "thousand barrel", "tb": "thousand barrel", "d": "day", "bbls": "barrel", "contracts": "contract",
                "rigs": "rig", "dollar": "dollars", "tons": "tonne"}
+
+
+# The currency a unit or a written number is in (ported from the display-forms branch's checker, df-checker 759ee70,
+# for the released code; the adversary's LF2 identity case, 24 Nov 2026: "Henry Hub is at EUR 3.10 per million Btu"
+# passed for a dollar price). Dollars and cents are kept apart, and so are dollars, euros and pounds; another
+# country's dollar (C$, A$) is none of the series' currencies.
+_CURRENCY_OF = {"dollars": "dollars", "dollar": "dollars", "cents": "cents", "cent": "cents", "euros": "euros",
+                "euro": "euros", "eur": "euros", "pounds": "pounds", "gbp": "pounds", "sterling": "pounds"}
+_SIGNS = {"$": "dollars", "€": "euros", "£": "pounds"}
 
 
 def unit_key(units: str) -> str:
@@ -215,6 +230,8 @@ class Pool:
     # entries of `tagged` that code converted (thousand to million barrels): by entry, not by value, since a server
     # report's own million-barrel figure has the same value as code's conversion and is not one
     converted: set[int] = field(default_factory=set)
+    # entries of `tagged` that are a window or a count of the data (years, observations, a lookback): with a noun only
+    metas: set[int] = field(default_factory=set)
     units: str = ""                                 # units and labels of everything cited, normalised
     # every quotable number with its kind and its unit: the unit a tool gave it, "percent" for a percent, "1" for a
     # number with none (a z-score, a correlation), None where code does not know it (a reading of mixed units)
@@ -356,6 +373,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
             p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
             p.put(f.lookback_days, "count", None)
+            p.metas.add(len(p.tagged) - 1)
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
         for k, v in f.also.items():          # million_barrels, million_barrels_per_day
             p.put(v, "amount", k.replace("_", " "))
@@ -376,6 +394,8 @@ def pool_of(answer: DeskAnswer) -> Pool:
     for r in answer.readings:
         for k, v in r.values.items():
             p.add(k, v, r.value_units.get(k))   # no entry: a reading of mixed units, its unit is not known
+            if k.lower().split(".")[-1] in _META_KEYS:
+                p.metas.add(len(p.tagged) - 1)
             # a value in thousand barrels may be written in million barrels, as a fact's may (`also`): code converts,
             # so "about 417.8 million barrels" for 417,797 thousand is checked against 417.797 (the adversary's P11)
             for name, conv in also_in(r.value_units.get(k) or "", v).items():
@@ -385,6 +405,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
             # a window of N years may be written in months ("over 36 months", the adversary)
             if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
                 p.put(12 * v, "count", None)
+                p.metas.add(len(p.tagged) - 1)
             # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
             q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
             if q:
@@ -421,17 +442,17 @@ def _parse(tok: str) -> tuple[float, int]:
 @dataclass
 class Written:
     """The unit the prose puts on a number: "417,797 thousand barrels", "$3.81 a gallon", "1.38%"."""
-    currency: bool = False
+    currency: str = ""     # dollars, cents, euros, pounds, or another country's dollars
     scale: str = ""        # thousand, million, billion
     noun: str = ""         # barrel, gallon, tonne, contract, rig, btu, cubic
     per: str = ""          # per barrel, per gallon, per day, per tonne, per btu
     pct: bool = False
 
     def any(self) -> bool:
-        return self.currency or bool(self.scale or self.noun or self.per) or self.pct
+        return bool(self.currency or self.scale or self.noun or self.per) or self.pct
 
     def words(self) -> str:
-        parts = (["dollars"] if self.currency else []) + ([self.scale] if self.scale else []) + ([self.noun] if self.noun else [])
+        parts = ([self.currency] if self.currency else []) + ([self.scale] if self.scale else []) + ([self.noun] if self.noun else [])
         return " ".join(parts + ([f"per {self.per}"] if self.per else []) + (["percent"] if self.pct else []))
 
 
@@ -441,12 +462,17 @@ _NOUNS = {"barrel", "gallon", "tonne", "contract", "rig", "btu", "cubic"}
 _PER_NOUNS = {"barrel", "gallon", "tonne", "day", "btu", "mwh", "therm"}
 
 
+def _currency_of(unit: str) -> str:
+    head = " ".join(_unit_words(unit)).partition(" per ")[0].split()
+    return next((_CURRENCY_OF[w] for w in head if w in _CURRENCY_OF), "")
+
+
 def _unit_words(text: str) -> list[str]:
     """The words of a unit, normalised as unit_key normalises a unit: barrels -> barrel, USD -> dollars, mb -> million
     barrel, "/" -> per."""
     out = []
-    for w in re.findall(r"[a-z]+|/|%", text.lower()):
-        out += (_UNIT_WORDS.get(w, w)).split() if w != "/" else ["per"]
+    for w in re.findall(r"[a-z]+|/|%|[$€£]", text.lower()):
+        out += (_SIGNS.get(w) or _UNIT_WORDS.get(w, w)).split() if w != "/" else ["per"]
     return out
 
 
@@ -458,7 +484,7 @@ _SUFFIX = {"mb": "million barrel", "kb": "thousand barrel", "b": "barrel", "bbl"
            "bn": "billion", "pct": "percent"}
 
 
-_CURRENCY_PREFIX = {"USD", "EUR", "GBP"}
+_CURRENCY_PREFIX = {"USD": "dollars", "EUR": "euros", "GBP": "pounds"}
 
 # EIA writes M for a thousand and MM for a million (Mbbl, MMbbl, Mb/d); IEA's and OPEC's mb/d is a million. Case
 # decides, so these are read as written, before anything is lowercased (the adversary, 24 Nov 2026: "417.8 Mbbl"
@@ -477,18 +503,29 @@ def glued_suffix(tok: str, whole: str) -> str:
 # A currency written before the number, with or without a space: "USD 65.93", "EUR 65.93", "$ 65.93" are money as
 # "$65.93" is. Until 24 Nov 2026 only "$" right before the number and USD glued to it were read, so "Henry Hub trades
 # at USD 65.93" passed on a percentile of 65.93 (the adversary's L2).
-_CURRENCY_BEFORE = re.compile(r"(?:\b(?:usd|eur|gbp|us\$|dollars?|euros?)|\$)\s*$", re.I)
+_CURRENCY_BEFORE = re.compile(r"(?:\b(?P<word>usd|eur|gbp|us\$|(?:c|ca|a|au|nz|hk|s)\$|dollars?|euros?|sterling)|"
+                              r"(?P<sign>[$€£]))\s*$", re.I)
+_WORD_CURRENCY = {"usd": "dollars", "us$": "dollars", "dollar": "dollars", "dollars": "dollars", "eur": "euros",
+                  "euro": "euros", "euros": "euros", "gbp": "pounds", "sterling": "pounds"}
 
 
-def _currency_before(clean: str, start: int) -> bool:
-    return bool(_CURRENCY_BEFORE.search(clean[max(0, start - 12):start]))
+def _currency_before(clean: str, start: int) -> str:
+    """The currency written right before the number, with or without a space: "USD 65.93", "€ 65.93", "£65.93",
+    "$65.93" (the adversary's L2 and LF2). Another country's dollar ("C$ 65.93") is a currency of its own: it fits no
+    series here."""
+    m = _CURRENCY_BEFORE.search(clean[max(0, start - 12):start])
+    if not m:
+        return ""
+    if m["sign"]:
+        return _SIGNS[m["sign"]]
+    word = m["word"].lower()
+    return _WORD_CURRENCY.get(word) or f"{word[:-1].upper()} dollars"
 
 
 def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "") -> Written:
     """What unit, if any, the prose writes on the number at clean[start:end]: letters glued after it (`suffix`),
     then the words right after it up to the next comma, bracket or full stop, and a currency sign or USD before it."""
-    w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].upper() in _CURRENCY_PREFIX
-                or _currency_before(clean, start))
+    w = Written(currency=_currency_before(clean, start) or _CURRENCY_PREFIX.get(whole[:3].upper(), ""))
     after = clean[end + len(suffix):end + len(suffix) + 48]
     tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", after)[0]
     first = re.match(r"(\s*)([A-Za-z]+)(?![A-Za-z0-9])", tail)
@@ -502,7 +539,7 @@ def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "")
     while i < len(words) and words[i] in _SCALES:
         w.scale, i = words[i], i + 1
     if i < len(words) and words[i] in _CURRENCY:
-        w.currency, i = True, i + 1
+        w.currency, i = w.currency or _CURRENCY_OF.get(words[i], "dollars"), i + 1
     if i < len(words) and words[i] in _NOUNS:
         w.noun, i = words[i], i + 1
         if i < len(words) and words[i] == "feet":
@@ -527,7 +564,9 @@ def fits(w: Written, unit: str | None) -> bool:
     head, _, per = u.partition(" per ")
     if w.pct:
         return "percent" in u or "%" in u
-    if w.currency and not set(head.split()) & (_CURRENCY | {"dollars"}):
+    # the currency must be the value's own: dollars are not euros ("EUR 3.10 per million Btu" for a dollar price),
+    # cents are not dollars, and another country's dollar is neither
+    if w.currency and w.currency != _currency_of(unit):
         return False
     if w.scale and w.scale not in head.split():
         return False
@@ -589,14 +628,21 @@ def text_problems(text: str, pool: Pool) -> list[str]:
             continue  # the 12 of "12-month", written hyphenated as the text writes it
         n, dp = _parse(tok)
         after = clean[end:end + 40]
-        money = (bool(_MONEY.match(after)) or clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd"
-                 or _currency_before(clean, start))
+        money = (bool(_MONEY.match(after)) or bool(_currency_before(clean, start))
+                 or whole[:3].upper() in _CURRENCY_PREFIX)
         pct, count = bool(_PCT.match(after)), bool(_COUNT.match(after))
         kinds = ({"amount"} if money else {"amount", "percent"} if pct else {"count"} if count else {"amount", "percent", "count"})
         hits = [(i, u) for i, (v, kind, u) in enumerate(pool.tagged) if (kind in kinds or kind == "any") and _rounds_to(v, n, dp)]
         matches = [u for _, u in hits]
         if not matches:
             bad.append(whole if glued else tok)
+            continue
+        # A window or a count of the data (years 3, lookback_years 5, observations 747) is not a market figure: it
+        # may be written only with its noun, "5 years", "747 observations" (the adversary, 24 Nov 2026: "US crude
+        # stocks could fall 5 next week" passed on the seasonal reading's lookback of 5 years)
+        if all(i in pool.metas for i, _ in hits) and not _META_NOUN.match(after):
+            bad.append(f"{tok} (a window or count of the data, not a market figure: write it with its noun, as in "
+                       f"'{tok} years' or '{tok} observations')")
             continue
         # A figure code converted (thousand to million barrels) is written with its scale: the source says thousand,
         # and a unit word this module does not read ("417.8 mbbl") could carry the thousandfold error past the unit
