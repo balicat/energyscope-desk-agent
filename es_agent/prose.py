@@ -62,11 +62,11 @@ _MONEY = re.compile(r"\s*(?:usd|us\$|\$|dollars?|cents?|eur|euros?|€|£|gbp)",
 _PCT = re.compile(r"\s*(?:%|percent|per cent)", re.I)
 _COUNT = re.compile(r"[\s-]*(?:days?|weeks?|years?|months?|lines?|observations?|reports?)\b", re.I)
 # The nouns a window or count of the data is written with: "5 years", "747 observations", "a 90-day window"
-_META_NOUNS = (r"(?:trading\s+days?|data\s+points?|days?|weeks?|years?|months?|observations?|obs|values?|points?|"
+_META_NOUNS = (r"(?:trading[\s-]+days?|data[\s-]+points?|days?|weeks?|years?|months?|observations?|obs|values?|points?|"
                r"readings?|periods?|sessions?|reports?|lines?|window|sample)")
 # after the number, with up to two describing words between: "5 years", "746 daily observations", "a 90-day window"
 _META_NOUN = re.compile(r"[\s-]*(?:(?:daily|weekly|monthly|annual|yearly|trading|rolling|consecutive|business|calendar|"
-                        r"data|price|sample|historical|earlier|previous|past|full|prior|separate|distinct)\s+){0,2}"
+                        r"data|price|sample|historical|earlier|previous|past|full|prior|separate|distinct)[\s-]+){0,2}"
                         + _META_NOUNS + r"\b", re.I)
 # Keys whose value is a window or a count of the data, not a market figure: quotable only with their noun
 _META_KEYS = {"years", "lookback_years", "years_of_history", "history_years", "observations", "obs", "n_obs", "window",
@@ -676,7 +676,7 @@ def _meta_before(clean: str, start: int, pool: Pool, hits: list) -> bool:
     "lookback_years 5", "a window of 90", "n = 747"?"""
     keys = {re.escape(pool.metas[i]) for i, _ in hits if pool.metas.get(i)}
     alt = "|".join(sorted(keys) + [_META_NOUNS, "n"])
-    return bool(re.search(rf"\b(?:{alt})\s*(?:[:=]|of)?\s*$", clean[max(0, start - 48):start], re.I))
+    return bool(re.search(rf"\b(?:{alt})\s*(?:[:=]|of|is|was|are|were)?\s*$", clean[max(0, start - 48):start], re.I))
 
 
 def _in_phrase(clean: str, start: int, end: int, word: str) -> bool:
