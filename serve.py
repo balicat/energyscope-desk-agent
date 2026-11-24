@@ -31,10 +31,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior, UsageLimitExceeded
-from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
 from es_agent.agent import MODEL_REQUESTS_PER_QUESTION, Deps, agent, tables_only
+from es_agent.trail import build as build_trail
 from es_agent.charts import charts_for
 from es_agent.memory import Sessions, with_context
 from es_agent.scripted import is_rejection, scripted
@@ -42,6 +42,7 @@ from es_agent.sources import FixtureSource, FlightSource, ParquetLakeSource
 from es_agent.verify import verify
 from es_agent import excel
 
+TOOL_NAMES = frozenset(agent._function_toolset.tools)   # the tools the agent has; any other name is the model's text
 MODEL = os.environ.get("LIBRARIAN_MODEL", "scripted")
 KEY_FILE = os.environ.get("LIBRARIAN_KEY_FILE", "/opt/energyscope/.anthropic_api_key")
 LAKE = os.environ.get("LIBRARIAN_LAKE", "/opt/energyscope/data")
@@ -200,11 +201,9 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
             degraded = f"{type(e).__name__}: {e}"[:300]
             output, usage = tables_only(deps), None
     parts = [p for m in messages for p in m.parts]
-    trail = [
-        {"tool": p.tool_name, "args": p.args if isinstance(p.args, dict) else json.loads(p.args or "{}")}
-        for p in parts
-        if isinstance(p, ToolCallPart) and p.tool_name != "final_result"
-    ]
+    # Each call with the arguments its tool validated (es_agent/trail.py), never as the model wrote them: a sentence
+    # in a search, a series id or any free-text argument does not reach the API, the log or the page.
+    trail = build_trail(parts, deps.calls, TOOL_NAMES)
     out = output.model_dump(mode="json")
     # Live check: rebuild every number from the data, independently of the run, and record the result.
     try:

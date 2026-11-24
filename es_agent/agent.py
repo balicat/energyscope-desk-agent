@@ -18,7 +18,7 @@ from typing import Callable, Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from . import engine, metrics, prose, readings
+from . import engine, metrics, prose, readings, trail
 from .models import Change, DeskAnswer, Observation, Reading, SeriesFact, SeriesHit, Spread
 from . import clock
 from .sources import DATASETS, DataSource, ServerError
@@ -33,6 +33,9 @@ class Deps:
     readings: dict[str, Reading] = field(default_factory=dict)  # every computed reading a tool returned, by key
     searches: int = 0  # search_series calls so far in this run
     emit: Callable[[str, dict], None] = lambda tool, args: None  # progress hook: called as each tool starts
+    # Each tool call as its tool validated it (trail.clean), by tool_call_id: the trail and the progress events are
+    # built from these, never from the arguments as the model wrote them.
+    calls: dict[str, dict] = field(default_factory=dict)
     enforce: bool = True  # False = validator off, to prove the evals catch what it would have caught
     rejections: list[str] = field(default_factory=list)  # what the validator sent back in this run
     repeats: list[str] = field(default_factory=list)  # facts that repeated a cited reading: fetched by code, or dropped
@@ -162,6 +165,16 @@ agent = Agent(
 )
 
 
+def _emit(ctx: RunContext[Deps], tool: str, args: dict, hits=None) -> None:
+    """Record one call for the trail and send its progress event, with only the values the tool validated
+    (es_agent/trail.py): never a sentence the model wrote into an argument."""
+    fn = globals().get(tool)
+    shown = trail.clean(fn, args, ctx.deps.source, hits=hits, datasets=DATASETS)
+    if getattr(ctx, "tool_call_id", None):
+        ctx.deps.calls[ctx.tool_call_id] = {"tool": tool, "args": shown}
+    ctx.deps.emit(tool, shown)
+
+
 @agent.tool
 def search_series(ctx: RunContext[Deps], query: str, dataset: str | None = None, limit: int = 8) -> list[SeriesHit] | str:
     """Search series by keywords in the series name, e.g. 'WTI spot price' or 'Cushing ending stocks'.
@@ -171,13 +184,16 @@ def search_series(ctx: RunContext[Deps], query: str, dataset: str | None = None,
     the search. You have four searches per question.
     """
     ctx.deps.searches += 1
-    ctx.deps.emit("search_series", {"query": query, "dataset": dataset})
     if ctx.deps.searches > SEARCH_BUDGET:
+        _emit(ctx, "search_series", {})
         return (f"Search budget of {SEARCH_BUDGET} used; this search was not run. Answer from what you have, "
                 "or return no facts and say in caveats that the data does not hold it.")
     if dataset is not None and dataset.upper() not in DATASETS:
+        _emit(ctx, "search_series", {})
         return f"Unknown dataset {dataset!r}. Choose from: {', '.join(DATASETS)}."
-    return ctx.deps.source.search(query, limit, dataset)
+    hits = ctx.deps.source.search(query, limit, dataset)
+    _emit(ctx, "search_series", {"query": query, "dataset": dataset}, hits=hits)   # after: only the words it matched
+    return hits
 
 
 def read_fact(source: DataSource, series_id: str, lookback_days: int | None) -> Observation | Change | None:
@@ -195,7 +211,7 @@ def read_fact(source: DataSource, series_id: str, lookback_days: int | None) -> 
 @agent.tool
 def get_latest(ctx: RunContext[Deps], series_ids: list[str]) -> list[Observation]:
     """Latest observation (date and value) for one or more series IDs."""
-    ctx.deps.emit("get_latest", {"series_ids": series_ids})
+    _emit(ctx, "get_latest", {"series_ids": series_ids})
     out = []
     for sid in series_ids:
         if ctx.deps.source.meta(sid) is None:
@@ -210,7 +226,7 @@ def get_latest(ctx: RunContext[Deps], series_ids: list[str]) -> list[Observation
 @agent.tool
 def get_change(ctx: RunContext[Deps], series_id: str, lookback_days: int) -> Change:
     """Latest value against the value `lookback_days` earlier (e.g. 7 = week, 28 = four weeks, 365 = year)."""
-    ctx.deps.emit("get_change", {"series_id": series_id, "lookback_days": lookback_days})
+    _emit(ctx, "get_change", {"series_id": series_id, "lookback_days": lookback_days})
     if ctx.deps.source.meta(series_id) is None:
         raise ModelRetry(f"Unknown series_id {series_id!r}. Use search_series to find a valid ID.")
     ch = read_fact(ctx.deps.source, series_id, lookback_days)
@@ -228,7 +244,7 @@ def get_spread(ctx: RunContext[Deps], series_a: str, series_b: str) -> Spread:
     Also returns, written by code: where the spread ranks in its own three years and whether it is unusual
     (`extras`, `context`), and a `note` when one series is a future and the other a spot price. It refuses a
     contract on a month's average price (Dubai) against anything else: report those two values separately."""
-    ctx.deps.emit("get_spread", {"series_a": series_a, "series_b": series_b})
+    _emit(ctx, "get_spread", {"series_a": series_a, "series_b": series_b})
     hits = []
     for sid in (series_a, series_b):
         hit = ctx.deps.source.meta(sid)
@@ -266,7 +282,7 @@ def get_curve(ctx: RunContext[Deps], market: Literal["brent", "wti", "oman", "rb
     """Futures curve on the latest date: each contract month (M1 = front), M1 minus M2, M1 minus the last month,
     and whether the curve is in backwardation or contango, with the slope a week earlier. Twelve months each for
     Brent, WTI, Oman (the Middle East sour crude benchmark), RBOB gasoline and heating oil."""
-    ctx.deps.emit("get_curve", {"market": market})
+    _emit(ctx, "get_curve", {"market": market})
     return _keep(ctx, readings.curve(ctx.deps.source, market), f"No complete {market} curve in the last 60 days.")
 
 
@@ -277,7 +293,7 @@ def get_futures_spread(ctx: RunContext[Deps]) -> Reading:
     means by 'the Brent-WTI spread'; use get_spread on the two spot series only when spot is asked for.
     Its context also gives the spot spread on the latest date spot prices exist and where the difference
     between the two comes from, so one call answers 'why do spot and futures disagree'."""
-    ctx.deps.emit("get_futures_spread", {})
+    _emit(ctx, "get_futures_spread", {})
     return _keep(ctx, readings.futures_spread(ctx.deps.source), "No recent futures for both Brent and WTI.")
 
 
@@ -286,7 +302,7 @@ def get_futures_crack(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", 
     """A crack spread on NYMEX futures of one delivery month (WTI, RBOB, heating oil), in dollars per barrel,
     with its percentile and whether it is unusual. Use when futures or forward margins are asked for;
     get_crack_spread is the same from spot prices."""
-    ctx.deps.emit("get_futures_crack", {"kind": kind})
+    _emit(ctx, "get_futures_crack", {"kind": kind})
     return _keep(ctx, readings.futures_crack(ctx.deps.source, kind), "No recent futures for the three legs.")
 
 
@@ -294,14 +310,14 @@ def get_futures_crack(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", 
 def get_crack_spread(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline", "distillate"]) -> Reading:
     """Refining margin in dollars per barrel from spot prices: products (Gulf Coast gasoline, New York Harbor
     heating oil, converted from gallons) minus WTI crude."""
-    ctx.deps.emit("get_crack_spread", {"kind": kind})
+    _emit(ctx, "get_crack_spread", {"kind": kind})
     return _keep(ctx, readings.crack(ctx.deps.source, kind), "The three spot prices share no date in the last 60 days.")
 
 
 def _server(ctx: RunContext[Deps], tool: str, args: dict, build) -> Reading:
     """Run one server-backed reading: progress, the server's refusal as a retry the model can act on, and the
     reading kept for the validator."""
-    ctx.deps.emit(tool, args)
+    _emit(ctx, tool, args)
     try:
         reading = build()
     except ServerError as e:
@@ -323,7 +339,7 @@ def get_seasonal(ctx: RunContext[Deps], series_id: str, years: int = 5) -> Readi
 def get_positioning(ctx: RunContext[Deps], market: Literal["wti", "brent", "gasoil", "natural_gas", "gasoline"]) -> Reading:
     """Managed-money (fund) futures positioning from the weekly commitments of traders report: net, long, short,
     change on the week, open interest, and where the net position ranks against the last three years."""
-    ctx.deps.emit("get_positioning", {"market": market})
+    _emit(ctx, "get_positioning", {"market": market})
     return _keep(ctx, readings.positioning(ctx.deps.source, market), f"No positioning data for {market}.")
 
 
@@ -528,7 +544,7 @@ def get_surprises(ctx: RunContext[Deps], window: Literal["week", "month"] = "wee
     runs, production, gas storage, rigs, freight and fund positioning, ranked by z-score against each series'
     own two-year history. Use for 'any surprises', 'what moved', 'what changed', 'what is new'. The data has no
     consensus forecasts: say that a surprise here means an unusually large move."""
-    ctx.deps.emit("get_surprises", {"window": window})
+    _emit(ctx, "get_surprises", {"window": window})
     return _keep(ctx, readings.surprises(ctx.deps.source, window), "No watchlist series has recent data.")
 
 
@@ -538,7 +554,7 @@ def get_watch(ctx: RunContext[Deps], window: Literal["week", "month"] = "week") 
     changed shape, stocks outside their five-year range, and related prices that parted ways. Use for 'what
     should I pay attention to', 'what matters this week', 'give me a brief'. Its context lists the flags; report
     them as facts, in no order of importance, with no forecast."""
-    ctx.deps.emit("get_watch", {"window": window})
+    _emit(ctx, "get_watch", {"window": window})
     return _keep(ctx, readings.watch(ctx.deps.source, window), "No watchlist series has recent data.")
 
 
@@ -549,7 +565,7 @@ def get_arbitrage_scenario(ctx: RunContext[Deps], brent_change: float = 0, wti_c
     up to 50), freight in percent (up to 90). Returns the observed score and the score under the change, both
     computed in code. Hypothetical: say so. Use for 'what if freight fell 20%', 'would it open if Brent rose 5'."""
     args = {"brent_change": brent_change, "wti_change": wti_change, "freight_change_pct": freight_change_pct}
-    ctx.deps.emit("get_arbitrage_scenario", args)
+    _emit(ctx, "get_arbitrage_scenario", args)
     return _keep(ctx, readings.arbitrage_scenario(ctx.deps.source, "us_crude_to_europe", **args),
                  "Changes out of range (prices within 50 dollars, freight within 90 percent) or not enough recent data.")
 
@@ -560,7 +576,7 @@ def get_crack_scenario(ctx: RunContext[Deps], kind: Literal["3-2-1", "gasoline",
     """What if, for a crack spread: crude changes in dollars per barrel (up to 50), gasoline and distillate in
     percent (up to 90). Returns the observed crack and the crack under the change. Hypothetical: say so."""
     args = {"crude_change": crude_change, "gasoline_change_pct": gasoline_change_pct, "distillate_change_pct": distillate_change_pct}
-    ctx.deps.emit("get_crack_scenario", {"kind": kind, **args})
+    _emit(ctx, "get_crack_scenario", {"kind": kind, **args})
     return _keep(ctx, readings.crack_scenario(ctx.deps.source, kind, **args),
                  "Changes out of range (crude within 50 dollars, products within 90 percent) or not enough recent data.")
 
@@ -574,7 +590,7 @@ def get_evidence(ctx: RunContext[Deps], thesis: Literal["crude_tightness"]) -> R
     neutral against a stated threshold; six of them are scored by the server's own signals, on the same metrics
     get_signals reads, and the others say how often they have read each way in eight years. The balance counts
     groups. Use for 'is the market tight / tightening / loosening', 'what is the evidence', 'what argues against'."""
-    ctx.deps.emit("get_evidence", {"thesis": thesis})
+    _emit(ctx, "get_evidence", {"thesis": thesis})
     r = readings.evidence(ctx.deps.source, thesis)
     return _keep(ctx, r, readings.why_no_evidence(ctx.deps.source, thesis) if r is None else "")
 
@@ -586,7 +602,7 @@ def get_arbitrage(ctx: RunContext[Deps], route: Literal["us_crude_to_europe", "d
     Brent curve slope, a score from -2 to +2, and the spot spread beside the futures spread.
     distillate_us_to_europe: ICE gasoil against New York Harbor diesel in dollars per gallon, with its percentile.
     Neither includes route freight rates or physical differentials; say so."""
-    ctx.deps.emit("get_arbitrage", {"route": route})
+    _emit(ctx, "get_arbitrage", {"route": route})
     return _keep(ctx, readings.arbitrage(ctx.deps.source, route), f"Not enough recent data for {route}.")
 
 
