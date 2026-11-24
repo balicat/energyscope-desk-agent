@@ -83,6 +83,24 @@ seasonal5 = Reading(key="seasonal:PET.WCESTUS1.W:5", title="US crude stocks: lat
                                  **{f"history_by_year.{y}": "Thousand Barrels" for y in _by_year}},
                     context="Same week (week=46) in each of 5 earlier years: " + ", ".join(f"{y} {v:,.0f}" for y, v in _by_year.items()) + ".",
                     request={"tool": "seasonal", "action": "seasonal", "body": {"series": "PET.WCESTUS1.W", "lookback_years": 5}})
+# The settings sweep of 24 Nov 2026: the true sentences sent back most often, with the readings as readings.watch,
+# readings.evidence and get_change write them
+watch = Reading(key="watch:week", title="What to watch: flags from prices, stocks, the curve and positioning over a week",
+                period=dt.date(2026, 11, 23), units="each item in its own units", series_ids=["SHIP.BWET.D", "CFTC.NG.MM_Net"],
+                values={"Tanker freight proxy: change": 121.62, "Tanker freight proxy: z-score": 2.13,
+                        "Natural gas (NYMEX): fund net percentile": 1.9, "flags": 2.0},
+                context=("Flags, in no order of importance: Tanker freight proxy moved +121.62 USD (z-score +2.13, to 2026-11-23); "
+                         "funds are stretched short in Natural gas (NYMEX) (net position at the 1.9 percentile of three years, "
+                         "report of 2026-11-17)."))
+evidence = Reading(key="evidence:crude_tightness", title="Evidence for and against: crude tightness", period=dt.date(2026, 11, 23),
+                   units="percent, dollars per barrel, thousand barrels, z-scores (stated on each line)", series_ids=["PET.WCESTUS1.W"],
+                   values={"us_stocks_4w_change": 5280.0, "us_stocks_4w_usual_change": 5492.2, "us_stocks_4w_gap_pct": 0.05},
+                   context=("US crude stocks over four weeks: a build of 5,280 thousand barrels against a usual build of 5,492 "
+                            "for the time of year, a gap of 0.05% of stocks (2026-11-13; tight below -2%, loose above 2%) [neutral]."))
+stocks_yoy = SeriesFact(series_id="PET.WCESTUS1.W", name="US ending stocks excluding SPR of crude oil", units="Thousand Barrels",
+                        latest_period=dt.date(2026, 11, 13), latest_value=417797.0, lookback_days=365,
+                        base_period=dt.date(2025, 11, 7), base_value=427581.0, change_abs=-9784.0, change_pct=-2.288176,
+                        also={"million_barrels": 417.797})
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a date that differs from the code-written history sentence",
@@ -222,6 +240,17 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
      dict(readings=[seasonal5], summary="US crude stocks fell by 46 thousand barrels on the week.")),
     ("a server text's week number given as a percent",
      dict(readings=[seasonal5], summary="US crude stocks are 46 percent below their five-year average.")),
+    # 24 Nov 2026, after the sweep: "stretched" takes its side word, a usual change needs no direction word, and a
+    # fact's year-ago level and change may be written in million barrels. These keep the three doors narrow.
+    ("funds stretched long, where the percentile is low",
+     dict(readings=[watch], summary="Funds are stretched long in natural gas, at the 1.9 percentile of three years.")),
+    ("a usual build called a draw",
+     dict(readings=[evidence], summary="US crude stocks built 5,280 thousand barrels over four weeks, against a usual draw of 5,492.")),
+    ("a year-ago stock converted to million barrels but written as thousand",
+     dict(facts=[stocks_yoy], summary="US crude stocks were 427.58 thousand barrels a year earlier.")),
+    ("a fall over the year, converted to million barrels, called a rise",
+     dict(facts=[stocks_yoy], summary="US crude stocks were 417,797 thousand barrels, down 2.29% on the year, though up 9.8 million "
+                                      "barrels since the base week.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
@@ -271,6 +300,19 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(facts=[wti_up], summary="WTI spot rose 1.20 dollars a barrel, or 1.38%, to $88.10 per barrel."),
     dict(readings=[funds], summary="Managed money is net long 151,200 contracts, at the 6.8th percentile."),
     dict(readings=[signals_r], summary="The 12-month curve, M12 minus M1, is -15.26, below the -10 threshold; the OPEC call QoQ change is 0.55."),
+    # the settings sweep of 24 Nov 2026: each was sent back in most runs, and is true
+    dict(readings=[watch], summary="Fund positioning in NYMEX natural gas is stretched short, with net at the 1.9 percentile of "
+                                   "three years (report of 2026-11-17)."),
+    dict(readings=[watch], summary="Natural gas fund positioning is stretched short, at the 1.9 percentile of three years."),
+    dict(readings=[watch], summary=watch.context),
+    dict(readings=[evidence], summary="Against this, the four-week US stock build of 5,280 thousand barrels was close to its usual "
+                                      "5,492 (neutral)."),
+    dict(readings=[evidence], summary="Cushing stocks and the four-week US stock build (5,280 thousand barrels against a usual 5,492) "
+                                      "are neutral."),
+    dict(readings=[evidence], summary=evidence.context),
+    dict(facts=[stocks_yoy], summary="US commercial crude stocks were 417,797 thousand barrels on 2026-11-13, down from 427.58 million "
+                                     "barrels on 2025-11-07, a fall of 9.8 million barrels (-2.29%)."),
+    dict(facts=[stocks_yoy], summary="That is 417.8 million barrels now, against 427.6 million a year earlier, down 9.78 million."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see

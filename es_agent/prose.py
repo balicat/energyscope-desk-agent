@@ -25,7 +25,9 @@ Checked, in the summary and in every caveat the model wrote:
   sign ("rose 1.20", "+1.20"): denied by default, so an unlisted verb cannot slip through. A gap
   with "above", "below", "premium" or "discount" beside it must point the right way. A curve's shape
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
-  own word; a high percentile may not be called low.
+  own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
+  "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word, but a
+  wrong one is still wrong.
 
 Not checked, and stated as limits in the README: two true values or dates attached to the wrong
 nouns when they share a unit (Brent's price given to WTI), and claims made in words alone ("a record high", "has narrowed" where no earlier value was
@@ -207,6 +209,11 @@ def pool_of(answer: DeskAnswer) -> Pool:
         for x in (f.latest_value, f.base_value, f.change_abs):
             if x is not None:
                 p.put(x, "amount", f.units)
+                # the year-ago level and the change may be written in million barrels, as the latest may (`also`):
+                # code converts all three (24 Nov 2026; the sweep's us_crude_yoy send-back, "427.58")
+                for name, conv in also_in(f.units or "", x).items():
+                    p.put(conv, "amount", name.replace("_", " "))
+                    p.label(name)
         if f.change_pct is not None:
             p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
@@ -532,8 +539,11 @@ _LEVEL_UP, _LEVEL_DOWN = {"above", "over", "premium"}, {"below", "under", "benea
 _AVERAGE = {"average", "norm", "usual", "mean"}
 _SMALL = {"a", "an", "the", "its", "on", "of", "per", "date"}
 _NEGATION = {"not", "no", "longer", "unlike", "never", "isn", "neither", "nor", "without", "than"}
-_HIGH = {"high", "highest", "top", "upper", "elevated", "stretched", "rich"}
+_HIGH = {"high", "highest", "top", "upper", "elevated", "rich"}
 _LOW = {"low", "lowest", "bottom", "lower", "depressed", "cheap"}
+# "stretched" names either tail, as the watch's own flag does ("funds are stretched short", readings.watch): the side
+# word after it decides. It sat in _HIGH until 24 Nov 2026 and sent the watch's true sentence back in most runs.
+_STRETCHED = {"long": "high", "short": "low"}
 _SHAPES = ("backwardation", "contango")
 
 
@@ -550,6 +560,8 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
     levels: list[tuple[float, set[str], set[str]]] = []
     for f in answer.facts:
         moves += [x for x in (f.change_abs, f.change_pct) if x]
+        if f.change_abs:  # the change in million barrels (pool_of) is a change too
+            moves += list(also_in(f.units or "", f.change_abs).values())
     for s in answer.spreads:
         a, b = _words(s.name_a), _words(s.name_b)
         if s.spread:
@@ -559,7 +571,11 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
             if not v:
                 continue
             if "change" in k:
-                (quiet if k.startswith("metric.") else moves).append(v)
+                # A usual change (the norm for the time of year, readings.evidence) is a yardstick, not this period's
+                # move: "a build of 5,280 against a usual 5,492". Like a snapshot metric it needs no direction word,
+                # and a wrong one is still wrong. Loud until 24 Nov 2026: the sweep's crude_tight send-back.
+                vals = [v, *also_in(r.value_units.get(k) or "", v).values()]
+                (quiet if k.startswith("metric.") or "usual" in k else moves).extend(vals)
             elif "_minus_" in k:
                 a, b = (_words(part.replace("_", " ")) for part in k.split("_minus_", 1))
                 levels.append((v, a - b, b - a))
@@ -627,6 +643,8 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
         toks = [("num", m.group().rstrip(",")) if m.lastgroup == "num" else ("word", m.group().lower()) for m in found]
         commas = [m.start() for m in re.finditer(r",(?!\d)", sentence)]
         sentence_words = {w for k, w in toks if k == "word"}
+        seq = [w for k, w in toks if k == "word"]
+        sentence_words |= {_STRETCHED[b] for a, b in zip(seq, seq[1:]) if a == "stretched" and b in _STRETCHED}
         for i, (kind, tok) in enumerate(toks):
             if kind != "num":
                 continue
