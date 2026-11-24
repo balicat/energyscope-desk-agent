@@ -286,6 +286,15 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("week=46 as a change, beside the phrase", dict(readings=[seasonal5], summary="US crude stocks rose 46 in week 46.")),
     # (3c): a decimal parameter names nothing
     ("the whole part of a decimal parameter, as a count", dict(readings=[signals_z], summary="The crack signal has fired 3 times.")),
+    # the adversary's round 2 on aeddce6: "stretched short" must not excuse a plain high word, and week=46 is a week
+    # of the year, not a count of weeks
+    ("a low percentile called high, beside 'stretched short'",
+     dict(readings=[watch], summary="Funds are high and stretched short in natural gas at the 1.9 percentile.")),
+    ("a low percentile called elevated, beside 'stretched short'",
+     dict(readings=[funds], summary="Managed money in WTI is stretched short and elevated, at the 6.8th percentile.")),
+    ("a high percentile called stretched short", dict(readings=[freight], summary="Tanker freight is stretched short, at percentile 96 of 3 years.")),
+    ("week=46 as the 46th week of a decline", dict(readings=[seasonal5], summary="US crude stocks are in their 46th week of decline.")),
+    ("week=46 as week 46 of a decline", dict(readings=[seasonal5], summary="US crude stocks are in week 46 of their decline.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
@@ -423,6 +432,15 @@ def main() -> int:
     keys, left = uncited_holders(DeskAnswer(facts=[], summary="Brent and WTI spot have a correlation of 0.91 over three years."), pool)
     ok = keys == [corr.key] and not left
     print(f"{'named    ' if ok else 'NOT NAMED'} the correlation reading on a two-decimal value: {keys}, left {left}")
+    failed += not ok
+    # precision is the value's, not the written zeros' (the adversary's E1): an invented z-score of 2.00 must not name
+    # the signals reading for its threshold of 2.0
+    thresholds = Reading(key="signals:thresholds", title="The server's signals, live", period=D, units="as each metric",
+                         series_ids=[], values={"opec_production_gap.threshold": 2.0, "metric.brent_wti_z": -0.45},
+                         request={"tool": "signals", "action": "derived_signals", "body": {}})
+    keys, left = uncited_holders(DeskAnswer(facts=[], summary="The Brent-WTI spread z-score is 2.00."), {**pool, thresholds.key: thresholds})
+    ok = not keys and bool(left)
+    print(f"{'none     ' if ok else 'WRONGLY NAMED'} for a whole number written with zeros: {keys}, left {left}")
     failed += not ok
     for label, kw in LIMIT:
         found = problems(kw)

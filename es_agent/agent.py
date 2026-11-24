@@ -694,7 +694,8 @@ def uncited_holders(answer: DeskAnswer, available: dict[str, Reading]) -> tuple[
 
 
 def _precise(problems: list[str]) -> list[str]:
-    """The untraced numbers precise enough to name a reading by: three or more significant digits, or two decimals.
+    """The untraced numbers precise enough to name a reading by: three or more significant digits, or two decimals,
+    trailing zeros dropped.
     "decoupled on 3 occasions" (invented) named rolling_correlation on its years=3, and was accepted once cited (the
     adversary, 24 Nov 2026); so did 90. Dates (eight digits) and correlations written to two decimals still name."""
     out = []
@@ -703,6 +704,9 @@ def _precise(problems: list[str]) -> list[str]:
         if not re.fullmatch(r"\d[\d,.\-]*", tok):
             continue  # a window in words, a spelled-out number: no digits to be precise with
         digits, _, decimals = tok.replace(",", "").replace("-", "").partition(".")
+        # by the value written, not its zeros: "2.00" is the whole number 2, and named signals:live on a threshold of
+        # 2.0 for an invented z-score (the adversary's E1, 24 Nov 2026); 0.91 keeps its two decimals
+        decimals = decimals.rstrip("0")
         if len((digits + decimals).lstrip("0")) >= 3 or len(decimals) >= 2:
             out.append(b)
     return out

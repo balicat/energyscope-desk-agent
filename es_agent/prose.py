@@ -20,7 +20,7 @@ Checked, in the summary and in every caveat the model wrote:
 - a number spelled out beside a unit ("ninety-eight dollars") is rejected;
 - a figure code converted to million barrels (from thousand) is written with "million" after it; M and MM are
   read as EIA writes them (Mbbl a thousand barrels, MMbbl a million), mb/d as IEA does (a million);
-- a server text's parameter ("week=46") is written only as its phrase: "week 46", "the 46th week";
+- a server text's parameter ("week=46") is written only as its phrase: "week 46", "the 46th week of the year";
 - every date is one a tool returned, written as YYYY-MM-DD. Month names, weekday names and quarters
   are rejected, because a date written in words cannot be traced; a bare year passes only as part
   of a returned name; only code writes today's date;
@@ -479,10 +479,13 @@ def text_problems(text: str, pool: Pool) -> list[str]:
 
 
 def _in_phrase(clean: str, start: int, end: int, word: str) -> bool:
-    """Is the number at clean[start:end] written as the parameter phrase: "week 46", "week=46", "the 46th week"?"""
-    if re.search(rf"\b{re.escape(word)}\s*=?\s*$", clean[:start], re.I):
-        return True
-    return bool(re.match(rf"(?:st|nd|rd|th)\s+{re.escape(word)}\b", clean[end:], re.I))
+    """Is the number at clean[start:end] written as the parameter phrase: "week 46", "week=46", "the 46th week of the
+    year"? Not "the 46th week of decline" or "week 46 of their decline": a week of the year, not a count of weeks (the
+    adversary's G2a, 24 Nov 2026)."""
+    w = re.escape(word)
+    if re.search(rf"\b{w}\s*=?\s*$", clean[:start], re.I):
+        return not re.match(r"\s+of\s+(?!the\s+year\b)", clean[end:], re.I)
+    return bool(re.match(rf"(?:st|nd|rd|th)\s+{w}\s+of\s+the\s+year\b", clean[end:], re.I))
 
 
 def model_caveats(answer: DeskAnswer) -> list[str]:
@@ -581,6 +584,8 @@ _HIGH = {"high", "highest", "top", "upper", "elevated", "rich"}
 _LOW = {"low", "lowest", "bottom", "lower", "depressed", "cheap"}
 # "stretched" names either tail, as the watch's own flag does ("funds are stretched short", readings.watch): the side
 # word after it decides. It sat in _HIGH until 24 Nov 2026 and sent the watch's true sentence back in most runs.
+# "Stretched long" counts as a high word and "stretched short" as a low one where they are WRONG; neither excuses a
+# plain word of the other side: "high and stretched short, at the 1.9 percentile" is refused (the adversary's H2b).
 _STRETCHED = {"long": "high", "short": "low"}
 _SHAPES = ("backwardation", "contango")
 
@@ -685,7 +690,9 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
         commas = [m.start() for m in re.finditer(r",(?!\d)", sentence)]
         sentence_words = {w for k, w in toks if k == "word"}
         seq = [w for k, w in toks if k == "word"]
-        sentence_words |= {_STRETCHED[b] for a, b in zip(seq, seq[1:]) if a == "stretched" and b in _STRETCHED}
+        stretched = {_STRETCHED[b] for a, b in zip(seq, seq[1:]) if a == "stretched" and b in _STRETCHED}
+        says_high = sentence_words & _HIGH or "high" in stretched
+        says_low = sentence_words & _LOW or "low" in stretched
         for i, (kind, tok) in enumerate(toks):
             if kind != "num":
                 continue
@@ -729,8 +736,8 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
             others = [t for k, t in toks if k == "num" and t != tok and any(_rounds_to(v, *_parse(t)) for v in pool.percentiles)]
             if others:
                 ranks = []  # two percentiles in one sentence: "low" may belong to the other one
-            if ranks and all(v >= 75 for v in ranks) and sentence_words & _LOW and not sentence_words & _HIGH:
+            if ranks and all(v >= 75 for v in ranks) and says_low and not sentence_words & _HIGH:
                 problems.append(f"percentile {tok} is called low; it is high")
-            if ranks and all(v <= 25 for v in ranks) and sentence_words & _HIGH and not sentence_words & _LOW:
+            if ranks and all(v <= 25 for v in ranks) and says_high and not sentence_words & _LOW:
                 problems.append(f"percentile {tok} is called high; it is low")
     return list(dict.fromkeys(problems))
