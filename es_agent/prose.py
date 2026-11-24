@@ -62,8 +62,12 @@ _MONEY = re.compile(r"\s*(?:usd|us\$|\$|dollars?|cents?|eur|euros?|€|£|gbp)",
 _PCT = re.compile(r"\s*(?:%|percent|per cent)", re.I)
 _COUNT = re.compile(r"[\s-]*(?:days?|weeks?|years?|months?|lines?|observations?|reports?)\b", re.I)
 # The nouns a window or count of the data is written with: "5 years", "747 observations", "a 90-day window"
-_META_NOUN = re.compile(r"[\s-]*(?:trading\s+days?|data\s+points?|days?|weeks?|years?|months?|observations?|obs|"
-                        r"values?|points?|readings?|periods?|sessions?|reports?|lines?)\b", re.I)
+_META_NOUNS = (r"(?:trading\s+days?|data\s+points?|days?|weeks?|years?|months?|observations?|obs|values?|points?|"
+               r"readings?|periods?|sessions?|reports?|lines?|window|sample)")
+# after the number, with up to two describing words between: "5 years", "746 daily observations", "a 90-day window"
+_META_NOUN = re.compile(r"[\s-]*(?:(?:daily|weekly|monthly|annual|yearly|trading|rolling|consecutive|business|calendar|"
+                        r"data|price|sample|historical|earlier|previous|past|full|prior|separate|distinct)\s+){0,2}"
+                        + _META_NOUNS + r"\b", re.I)
 # Keys whose value is a window or a count of the data, not a market figure: quotable only with their noun
 _META_KEYS = {"years", "lookback_years", "years_of_history", "history_years", "observations", "obs", "n_obs", "window",
               "window_days", "n", "count", "periods", "lookback_days"}
@@ -231,7 +235,7 @@ class Pool:
     # report's own million-barrel figure has the same value as code's conversion and is not one
     converted: set[int] = field(default_factory=set)
     # entries of `tagged` that are a window or a count of the data (years, observations, a lookback): with a noun only
-    metas: set[int] = field(default_factory=set)
+    metas: dict[int, str] = field(default_factory=dict)
     units: str = ""                                 # units and labels of everything cited, normalised
     # every quotable number with its kind and its unit: the unit a tool gave it, "percent" for a percent, "1" for a
     # number with none (a z-score, a correlation), None where code does not know it (a reading of mixed units)
@@ -373,7 +377,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
             p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
             p.put(f.lookback_days, "count", None)
-            p.metas.add(len(p.tagged) - 1)
+            p.metas[len(p.tagged) - 1] = "lookback_days"
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
         for k, v in f.also.items():          # million_barrels, million_barrels_per_day
             p.put(v, "amount", k.replace("_", " "))
@@ -395,7 +399,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
         for k, v in r.values.items():
             p.add(k, v, r.value_units.get(k))   # no entry: a reading of mixed units, its unit is not known
             if k.lower().split(".")[-1] in _META_KEYS:
-                p.metas.add(len(p.tagged) - 1)
+                p.metas[len(p.tagged) - 1] = k.split(".")[-1]
             # a value in thousand barrels may be written in million barrels, as a fact's may (`also`): code converts,
             # so "about 417.8 million barrels" for 417,797 thousand is checked against 417.797 (the adversary's P11)
             for name, conv in also_in(r.value_units.get(k) or "", v).items():
@@ -405,7 +409,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
             # a window of N years may be written in months ("over 36 months", the adversary)
             if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
                 p.put(12 * v, "count", None)
-                p.metas.add(len(p.tagged) - 1)
+                p.metas[len(p.tagged) - 1] = "months"
             # a percentile point named p95 or p5 is written "the 95th percentile": its number is part of its name
             q = re.fullmatch(r"(?:.*\.)?p(\d{1,2})", k)
             if q:
@@ -640,7 +644,7 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         # A window or a count of the data (years 3, lookback_years 5, observations 747) is not a market figure: it
         # may be written only with its noun, "5 years", "747 observations" (the adversary, 24 Nov 2026: "US crude
         # stocks could fall 5 next week" passed on the seasonal reading's lookback of 5 years)
-        if all(i in pool.metas for i, _ in hits) and not _META_NOUN.match(after):
+        if all(i in pool.metas for i, _ in hits) and not _META_NOUN.match(after) and not _meta_before(clean, start, pool, hits):
             bad.append(f"{tok} (a window or count of the data, not a market figure: write it with its noun, as in "
                        f"'{tok} years' or '{tok} observations')")
             continue
@@ -665,6 +669,14 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         elif per and unit_key(per.group(1)) not in pool.units:
             bad.append(f"{tok} per {per.group(1)} (no cited series is in that unit)")
     return bad
+
+
+def _meta_before(clean: str, start: int, pool: Pool, hits: list) -> bool:
+    """Is a window or count of the data written with its noun, or its own key, right before it: "observations 747",
+    "lookback_years 5", "a window of 90", "n = 747"?"""
+    keys = {re.escape(pool.metas[i]) for i, _ in hits if pool.metas.get(i)}
+    alt = "|".join(sorted(keys) + [_META_NOUNS, "n"])
+    return bool(re.search(rf"\b(?:{alt})\s*(?:[:=]|of)?\s*$", clean[max(0, start - 48):start], re.I))
 
 
 def _in_phrase(clean: str, start: int, end: int, word: str) -> bool:
