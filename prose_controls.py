@@ -159,6 +159,8 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("LF1: the percentile window of 3 years written as a market figure",
      dict(readings=[hh_obs], summary="Henry Hub could fall 3 next week.")),
     ("LF1: the count of 747 observations written as a price", dict(readings=[hh_obs], summary="Henry Hub could reach 747 by summer.")),
+    ("LF1: a count of observations given the noun points, read as an index level",
+     dict(readings=[hh_obs], summary="Henry Hub could fall 747 points.")),
     ("LF2: a percentile written as money, the euro sign and a space", dict(readings=[hh_pct], summary="Henry Hub trades at € 65.93.")),
     ("LF2: a percentile written as money, the pound sign glued", dict(readings=[hh_pct], summary="Henry Hub trades at £65.93.")),
     ("LF2: a dollar price written in euros", dict(facts=[hh_fact], summary="Henry Hub is at EUR 3.10 per million Btu.")),
@@ -356,6 +358,7 @@ RIGHT = [  # correct prose that the rules must not reject
     # the adversary's three remaining items (242042f1): a window with its noun, each currency where it is the value's own
     dict(readings=[seasonal5], summary="US crude stocks are below their average for the week over the last 5 years."),
     dict(readings=[hh_obs], summary="Henry Hub is at the 65.93 percentile of 747 observations over 3 years."),
+    dict(readings=[hh_obs], summary="Henry Hub is at the 65.93 percentile of 747 data points over 3 years."),
     dict(readings=[hh_obs], summary="Over a 3-year window Henry Hub sits at the 65.93 percentile."),
     dict(facts=[hh_fact], summary="Henry Hub is at USD 3.10 per million Btu."),
     dict(facts=[hh_fact], summary="Henry Hub is at $3.10 per million Btu."),

@@ -61,8 +61,9 @@ _LOOSE_DATE = re.compile(
 _MONEY = re.compile(r"\s*(?:usd|us\$|\$|dollars?|cents?|eur|euros?|€|£|gbp)", re.I)
 _PCT = re.compile(r"\s*(?:%|percent|per cent)", re.I)
 _COUNT = re.compile(r"[\s-]*(?:days?|weeks?|years?|months?|lines?|observations?|reports?)\b", re.I)
-# The nouns a window or count of the data is written with: "5 years", "747 observations", "a 90-day window"
-_META_NOUNS = (r"(?:trading[\s-]+days?|data[\s-]+points?|days?|weeks?|years?|months?|observations?|obs|values?|points?|"
+# The nouns a window or count of the data is written with: "5 years", "747 observations", "a 90-day window". Not a
+# bare "points": "Henry Hub could fall 747 points" reads as an index level (the adversary, 24 Nov 2026); "data points" stays
+_META_NOUNS = (r"(?:trading[\s-]+days?|data[\s-]+points?|days?|weeks?|years?|months?|observations?|obs|values?|"
                r"readings?|periods?|sessions?|reports?|lines?|window|sample)")
 # after the number, with up to two describing words between: "5 years", "746 daily observations", "a 90-day window"
 _META_NOUN = re.compile(r"[\s-]*(?:(?:daily|weekly|monthly|annual|yearly|trading|rolling|consecutive|business|calendar|"
