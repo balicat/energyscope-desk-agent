@@ -101,6 +101,20 @@ stocks_yoy = SeriesFact(series_id="PET.WCESTUS1.W", name="US ending stocks exclu
                         latest_period=dt.date(2026, 11, 13), latest_value=417797.0, lookback_days=365,
                         base_period=dt.date(2025, 11, 7), base_value=427581.0, change_abs=-9784.0, change_pct=-2.288176,
                         also={"million_barrels": 417.797})
+# the same evidence line on a week when the usual four weeks are a draw
+evidence_draw = evidence.model_copy(update={
+    "values": {"us_stocks_4w_change": 5280.0, "us_stocks_4w_usual_change": -5492.2, "us_stocks_4w_gap_pct": 2.56},
+    "context": "US crude stocks over four weeks: a build of 5,280 thousand barrels against a usual draw of 5,492 for the time of year."})
+imports = SeriesFact(series_id="PET.WCRIMUS2.W", name="US crude imports", units="Thousand Barrels per Day",
+                     latest_period=dt.date(2026, 11, 13), latest_value=5576.0, also={"million_barrels_per_day": 5.576})
+# a server text whose parameter is a decimal (the adversary's 3c, 24 Nov 2026: x=3.41 used to name 3)
+signals_z = Reading(key="signals:z", title="The server's signals, live", period=D, units="as each metric", series_ids=[],
+                    values={"metric.crack_z": 3.81}, context="Signal firing: crack_extreme: crack_z=3.81 is above its threshold.",
+                    request={"tool": "signals", "action": "derived_signals", "body": {}})
+corr = Reading(key="rolling_correlation:PET.RBRTE.D,PET.RWTC.D:3", title="Brent and WTI spot: rolling correlation, last 3 years",
+               period=D, units="correlation", series_ids=["PET.RBRTE.D", "PET.RWTC.D"],
+               values={"latest": 0.912, "mean": 0.874, "years": 3.0},
+               request={"tool": "rolling_correlation", "action": "rolling_correlation", "body": {}})
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a date that differs from the code-written history sentence",
@@ -251,6 +265,27 @@ WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("a fall over the year, converted to million barrels, called a rise",
      dict(facts=[stocks_yoy], summary="US crude stocks were 417,797 thousand barrels, down 2.29% on the year, though up 9.8 million "
                                       "barrels since the base week.")),
+    ("a usual draw written bare beside a build, so the reader carries 'build' over",
+     dict(readings=[evidence_draw], summary="US crude stocks built 5,280 thousand barrels over four weeks, against a usual 5,492.")),
+    # the adversary's verdict on 78e1c12 (3a): in EIA's usage M is a thousand, so each of these says 417.8 thousand
+    ("a converted figure in Mbbl", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 Mbbl.")),
+    ("a converted figure in mbbl, a unit word not read", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 mbbl.")),
+    ("a converted figure in kbbl", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 kbbl.")),
+    ("a converted figure in Mb", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 Mb.")),
+    ("a converted figure glued to Mb", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8Mb.")),
+    ("a converted figure in M barrels", dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 M barrels.")),
+    ("a fact's converted year-ago level in Mbbl", dict(facts=[stocks_yoy], summary="US crude stocks were 427.6 Mbbl a year earlier.")),
+    ("a converted figure written bare beside a thousand-barrel one",
+     dict(facts=[stocks_yoy], summary="US crude stocks are 417,797 thousand barrels, against 427.6 a year earlier.")),
+    # (3b): a server text's week=46 is a phrase, never a quantity
+    ("week=46 as a count of weeks", dict(readings=[seasonal5], summary="US crude stocks have fallen for 46 weeks.")),
+    ("week=46 as a count of times", dict(readings=[seasonal5], summary="US crude stocks fell 46 times in a row.")),
+    ("week=46 as a hyphenated window", dict(readings=[seasonal5], summary="US crude stocks are at a 46-week low.")),
+    ("week=46 as a gap to the average", dict(readings=[seasonal5], summary="US crude stocks are 46 below their five-year average.")),
+    ("week=46 as a rank", dict(readings=[seasonal5], summary="US crude stocks rank 46th against the last five years.")),
+    ("week=46 as a change, beside the phrase", dict(readings=[seasonal5], summary="US crude stocks rose 46 in week 46.")),
+    # (3c): a decimal parameter names nothing
+    ("the whole part of a decimal parameter, as a count", dict(readings=[signals_z], summary="The crack signal has fired 3 times.")),
 ]
 
 RIGHT = [  # correct prose that the rules must not reject
@@ -313,6 +348,13 @@ RIGHT = [  # correct prose that the rules must not reject
     dict(facts=[stocks_yoy], summary="US commercial crude stocks were 417,797 thousand barrels on 2026-11-13, down from 427.58 million "
                                      "barrels on 2025-11-07, a fall of 9.8 million barrels (-2.29%)."),
     dict(facts=[stocks_yoy], summary="That is 417.8 million barrels now, against 427.6 million a year earlier, down 9.78 million."),
+    # units as EIA and IEA write them: MMbbl a million, Mbbl a thousand, mb/d a million a day
+    dict(readings=[seasonal5], summary="US crude stocks stand at about 417.8 MMbbl."),
+    dict(facts=[stocks_yoy], summary="US crude stocks are 417,797 Mbbl, against 427,581 Mbbl a year earlier."),
+    dict(facts=[imports], summary="Crude imports were 5.576 mb/d, or 5,576 thousand barrels a day."),
+    # a server text's parameter, as its phrase
+    dict(readings=[seasonal5], summary="In week 46, US crude stocks were 417,797 thousand barrels."),
+    dict(readings=[seasonal5], summary="In the 46th week of the year, US crude stocks were 417,797 thousand barrels."),
 ]
 
 LIMIT = [  # wrong, and still accepted: what the checks cannot see
@@ -370,6 +412,17 @@ def main() -> int:
     keys, left = uncited_holders(DeskAnswer(facts=[], summary="US crude stocks are 399,999 thousand barrels."), pool)
     ok = not keys and bool(left)
     print(f"{'none     ' if ok else 'WRONGLY NAMED'} for a number no reading holds: {keys}, left {left}")
+    failed += not ok
+    # Only precise numbers name a reading (the adversary's 1a, 24 Nov 2026): an invented short count must not be
+    # traced to rolling_correlation's years=3, while a correlation to two decimals still names it.
+    pool[corr.key] = corr
+    keys, left = uncited_holders(DeskAnswer(facts=[], summary="Brent and WTI decoupled on 3 occasions in the last three years."), pool)
+    ok = not keys and bool(left)
+    print(f"{'none     ' if ok else 'WRONGLY NAMED'} for an invented short count: {keys}, left {left}")
+    failed += not ok
+    keys, left = uncited_holders(DeskAnswer(facts=[], summary="Brent and WTI spot have a correlation of 0.91 over three years."), pool)
+    ok = keys == [corr.key] and not left
+    print(f"{'named    ' if ok else 'NOT NAMED'} the correlation reading on a two-decimal value: {keys}, left {left}")
     failed += not ok
     for label, kw in LIMIT:
         found = problems(kw)

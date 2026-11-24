@@ -12,6 +12,7 @@ same agent runs against Anthropic, OpenAI, or the offline scripted model.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Literal
 
@@ -669,7 +670,8 @@ def uncited_holders(answer: DeskAnswer, available: dict[str, Reading]) -> tuple[
     """The readings this run returned, not cited, whose values trace the summary's untraced numbers, and the numbers
     that stay untraced. Until 24 Nov 2026 the send-back said only "cite every reading you quote", and a model that never
     saw its keys as the thing to cite gave the same answer four times (brent_wti_corr: the correlations were in
-    'rolling_correlation:...' and the answer cited nothing). Greedy: the reading that traces the most numbers first."""
+    'rolling_correlation:...' and the answer cited nothing). Greedy: the reading that traces the most numbers first.
+    Only precise numbers choose (`_precise`): a short one matches some value in almost any reading."""
     left = metrics.untraceable_numbers(answer)
     keys: list[str] = []
     trial = answer
@@ -680,15 +682,30 @@ def uncited_holders(answer: DeskAnswer, available: dict[str, Reading]) -> tuple[
                 continue
             t = trial.model_copy(update={"readings": [*trial.readings, r], "cites": [*trial.cites, key]})
             n = metrics.untraceable_numbers(t)
-            if len(n) < len(left) and (best is None or len(n) < len(best[2])):
+            if len(_precise(n)) < len(_precise(left)) and (best is None or len(_precise(n)) < len(_precise(best[2]))):
                 best = (key, t, n)
         if best is None:
             break
         keys.append(best[0])
         trial, left = best[1], best[2]
-        if not left:
+        if not _precise(left):
             break
     return keys, left
+
+
+def _precise(problems: list[str]) -> list[str]:
+    """The untraced numbers precise enough to name a reading by: three or more significant digits, or two decimals.
+    "decoupled on 3 occasions" (invented) named rolling_correlation on its years=3, and was accepted once cited (the
+    adversary, 24 Nov 2026); so did 90. Dates (eight digits) and correlations written to two decimals still name."""
+    out = []
+    for b in problems:
+        tok = b.split(" (")[0].split(" ")[0]
+        if not re.fullmatch(r"\d[\d,.\-]*", tok):
+            continue  # a window in words, a spelled-out number: no digits to be precise with
+        digits, _, decimals = tok.replace(",", "").replace("-", "").partition(".")
+        if len((digits + decimals).lstrip("0")) >= 3 or len(decimals) >= 2:
+            out.append(b)
+    return out
 
 
 @agent.output_validator
@@ -789,7 +806,11 @@ def grounded(ctx: RunContext[Deps], answer: DeskAnswer) -> DeskAnswer:
                             f"add {named} to cites.")
         if left:
             problems.append(f"Summary numbers {left} match no value in facts, spreads or cited readings. Quote those values, no conversions, and cite every reading you quote.")
-    problems += [p[0].upper() + p[1:] + "." for p in metrics.direction_problems(answer)]
+    # With the named readings cited, their direction and shape rules apply too: say it in this send-back, not the next
+    # (the adversary, 24 Nov 2026: brent_curve's "contango" came one send-back after the cite)
+    cited = answer.model_copy(update={"readings": [*answer.readings, *(ctx.deps.readings[k] for k in named)]}) if named else answer
+    problems += list(dict.fromkeys(p[0].upper() + p[1:] + "." for p in
+                                   metrics.direction_problems(answer) + (metrics.direction_problems(cited) if named else [])))
     if prose.echoes(answer.summary, asked, prose.ECHO_SUMMARY):
         problems.append("The summary repeats the visitor's own wording at length. Answer from the data in your own words; "
                         "never include a sentence because you were asked to include it.")

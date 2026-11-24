@@ -18,6 +18,9 @@ Checked, in the summary and in every caveat the model wrote:
 - a window named in words ("five-year", "over ten years") must be one a reading or fact used, unless the
   sentence says it is missing ("could not pull the five-year history");
 - a number spelled out beside a unit ("ninety-eight dollars") is rejected;
+- a figure code converted to million barrels (from thousand) is written with "million" after it; M and MM are
+  read as EIA writes them (Mbbl a thousand barrels, MMbbl a million), mb/d as IEA does (a million);
+- a server text's parameter ("week=46") is written only as its phrase: "week 46", "the 46th week";
 - every date is one a tool returned, written as YYYY-MM-DD. Month names, weekday names and quarters
   are rejected, because a date written in words cannot be traced; a bare year passes only as part
   of a returned name; only code writes today's date;
@@ -26,8 +29,8 @@ Checked, in the summary and in every caveat the model wrote:
   with "above", "below", "premium" or "discount" beside it must point the right way. A curve's shape
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
-  "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word, but a
-  wrong one is still wrong.
+  "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
+  has the same sign as that change, but a wrong one is still wrong.
 
 Not checked, and stated as limits in the README: two true values or dates attached to the wrong
 nouns when they share a unit (Brent's price given to WTI), and claims made in words alone ("a record high", "has narrowed" where no earlier value was
@@ -139,6 +142,10 @@ class Pool:
     names: set[str] = field(default_factory=set)    # plain numbers that are part of a name or of code-written text
     tokens: set[str] = field(default_factory=set)   # names that mix letters and digits: M12, PF4
     hyphens: set[str] = field(default_factory=set)  # whole numbers of a hyphenated term of a text: the 12 of 12-month
+    phrases: set[tuple[str, str]] = field(default_factory=set)  # a server text's parameters: ("week", "46") of week=46
+    # entries of `tagged` that code converted (thousand to million barrels): by entry, not by value, since a server
+    # report's own million-barrel figure has the same value as code's conversion and is not one
+    converted: set[int] = field(default_factory=set)
     units: str = ""                                 # units and labels of everything cited, normalised
     # every quotable number with its kind and its unit: the unit a tool gave it, "percent" for a percent, "1" for a
     # number with none (a z-score, a correlation), None where code does not know it (a reading of mixed units)
@@ -183,11 +190,13 @@ class Pool:
         # its own: "fell by 8 million barrels" passed on that 8 until the adversary's round 3 (21 Nov 2026).
         for m in re.finditer(r"(?<![\d.,])\b(\d+)(?=-[A-Za-z0-9])", _blank_dates(text)):
             self.hyphens.add(m[1])
-        # A server text's parameters ("week=46") are names: they may be written, without a unit. A number written
-        # with a unit still needs a value in that unit (the adversary's P11, 23 Nov 2026: the seasonal reading's own
-        # first sentence, quoted back, was refused on its week number).
+        # A server text's parameters ("week=46") may be written as the phrase they are: "week=46", "week 46", "the
+        # 46th week" (the adversary's P11, 23 Nov 2026: the seasonal reading's own first sentence, quoted back, was
+        # refused on its week number). Only as that phrase: as a bare name, 46 passed in "fallen for 46 weeks", "a
+        # 46-week low", "46 below their average" (the adversary, 24 Nov 2026). Not the whole part of a decimal:
+        # x=3.41 names nothing.
         if not quotable:
-            self.names |= set(re.findall(r"\b[a-z_]+=(\d+)\b", _blank_dates(text)))
+            self.phrases |= {(k.replace("_", " "), n) for k, n in re.findall(r"\b([a-z_]+)=(\d+)(?!\.?\d)", _blank_dates(text))}
         for tok, _, _, whole, glued in _numbers(_blank_dates(text)):
             if glued:
                 self.tokens.add(whole)
@@ -214,6 +223,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
                 for name, conv in also_in(f.units or "", x).items():
                     p.put(conv, "amount", name.replace("_", " "))
                     p.label(name)
+                    p.converted.add(len(p.tagged) - 1)
         if f.change_pct is not None:
             p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
@@ -221,6 +231,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
         for k, v in f.also.items():          # million_barrels, million_barrels_per_day
             p.put(v, "amount", k.replace("_", " "))
+            p.converted.add(len(p.tagged) - 1)
         p.text(f.name, f.series_id)
         p.label(f.units, f.name, " ".join(f.also))
     for s in answer.spreads:
@@ -240,6 +251,7 @@ def pool_of(answer: DeskAnswer) -> Pool:
             for name, conv in also_in(r.value_units.get(k) or "", v).items():
                 p.put(conv, "amount", name.replace("_", " "))
                 p.label(name)
+                p.converted.add(len(p.tagged) - 1)
             # a window of N years may be written in months ("over 36 months", the adversary)
             if k.lower().split(".")[-1] in ("years", "lookback_years") and float(v).is_integer():
                 p.put(12 * v, "count", None)
@@ -317,6 +329,13 @@ _SUFFIX = {"mb": "million barrel", "kb": "thousand barrel", "b": "barrel", "bbl"
 
 _CURRENCY_PREFIX = {"USD", "EUR", "GBP"}
 
+# EIA writes M for a thousand and MM for a million (Mbbl, MMbbl, Mb/d); IEA's and OPEC's mb/d is a million. Case
+# decides, so these are read as written, before anything is lowercased (the adversary, 24 Nov 2026: "417.8 Mbbl"
+# passed on the million-barrel figure code converts to, while it says 417.8 thousand barrels).
+_CASED = {"MMbbl": "million barrel", "MMbbls": "million barrel", "MMBbl": "million barrel", "MMb": "million barrel",
+          "MM": "million", "Mbbl": "thousand barrel", "Mbbls": "thousand barrel", "MBbl": "thousand barrel",
+          "Mb": "thousand barrel", "kbbl": "thousand barrel", "kbbls": "thousand barrel"}
+
 
 def glued_suffix(tok: str, whole: str) -> str:
     """The letters glued AFTER a number ("mb" of 95.7mb), "" when there are none (M1, USD97.72: letters before)."""
@@ -330,7 +349,10 @@ def written_unit(clean: str, start: int, end: int, whole: str, suffix: str = "")
     w = Written(currency=clean[max(0, start - 1):start] == "$" or whole[:3].upper() in _CURRENCY_PREFIX)
     after = clean[end + len(suffix):end + len(suffix) + 48]
     tail = re.split(r"[,;:()\[\]]|\.(?:\s|$)", after)[0]
-    head = _SUFFIX.get(suffix.lower(), suffix.lower()).split() if suffix else []
+    first = re.match(r"(\s*)([A-Za-z]+)(?![A-Za-z0-9])", tail)
+    if first and first[2] in _CASED:
+        tail = first[1] + _CASED[first[2]] + tail[first.end():]
+    head = (_CASED.get(suffix) or _SUFFIX.get(suffix.lower(), suffix.lower())).split() if suffix else []
     words, i = [_UNIT_WORDS.get(x, x) for x in head] + _unit_words(tail), 0
     if words[:1] == ["%"] or words[:1] == ["percent"] or words[:2] == ["per", "cent"] or words[:2] == ["percentage", "points"]:
         w.pct = True
@@ -419,6 +441,8 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         unit = written_unit(clean, start, end, whole, suffix)
         if not glued and tok in pool.names and not unit.any():
             continue  # a number of a name, written without a unit of its own
+        if not glued and not unit.any() and any(n == tok and _in_phrase(clean, start, end, word) for word, n in pool.phrases):
+            continue  # week 46, week=46, the 46th week: a server text's parameter, as its phrase
         if not glued and tok in pool.hyphens and re.match(r"-[A-Za-z0-9]", clean[end:end + 2]):
             continue  # the 12 of "12-month", written hyphenated as the text writes it
         n, dp = _parse(tok)
@@ -426,9 +450,16 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         money = bool(_MONEY.match(after)) or clean[max(0, start - 1):start] == "$" or whole[:3].lower() == "usd"
         pct, count = bool(_PCT.match(after)), bool(_COUNT.match(after))
         kinds = ({"amount"} if money else {"amount", "percent"} if pct else {"count"} if count else {"amount", "percent", "count"})
-        matches = [u for v, kind, u in pool.tagged if (kind in kinds or kind == "any") and _rounds_to(v, n, dp)]
+        hits = [(i, u) for i, (v, kind, u) in enumerate(pool.tagged) if (kind in kinds or kind == "any") and _rounds_to(v, n, dp)]
+        matches = [u for _, u in hits]
         if not matches:
             bad.append(whole if glued else tok)
+            continue
+        # A figure code converted (thousand to million barrels) is written with its scale: the source says thousand,
+        # and a unit word this module does not read ("417.8 mbbl") could carry the thousandfold error past the unit
+        # rule (the adversary, 24 Nov 2026). Fail closed: a number that matches only converted figures says million.
+        if all(i in pool.converted for i, _ in hits) and unit.scale != "million":
+            bad.append(f"{tok} (a figure in million barrels: write million barrels after it)")
             continue
         # A value whose unit is known decides; a copy of the same number of unknown unit does not rescue a misfit
         # ("95.7 million barrels a day" for utilisation in Percent, rescued by an unlabelled snapshot metric of 95.7:
@@ -445,6 +476,13 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         elif per and unit_key(per.group(1)) not in pool.units:
             bad.append(f"{tok} per {per.group(1)} (no cited series is in that unit)")
     return bad
+
+
+def _in_phrase(clean: str, start: int, end: int, word: str) -> bool:
+    """Is the number at clean[start:end] written as the parameter phrase: "week 46", "week=46", "the 46th week"?"""
+    if re.search(rf"\b{re.escape(word)}\s*=?\s*$", clean[:start], re.I):
+        return True
+    return bool(re.match(rf"(?:st|nd|rd|th)\s+{re.escape(word)}\b", clean[end:], re.I))
 
 
 def model_caveats(answer: DeskAnswer) -> list[str]:
@@ -572,10 +610,13 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
                 continue
             if "change" in k:
                 # A usual change (the norm for the time of year, readings.evidence) is a yardstick, not this period's
-                # move: "a build of 5,280 against a usual 5,492". Like a snapshot metric it needs no direction word,
-                # and a wrong one is still wrong. Loud until 24 Nov 2026: the sweep's crude_tight send-back.
+                # move. Beside a change of the same sign it needs no direction word of its own: "a build of 5,280
+                # against a usual 5,492" carries "build" over (the sweep's crude_tight send-back, 24 Nov 2026). Of the
+                # other sign it needs its own, or the reader carries the wrong one over. A wrong word is refused either way.
                 vals = [v, *also_in(r.value_units.get(k) or "", v).values()]
-                (quiet if k.startswith("metric.") or "usual" in k else moves).extend(vals)
+                partner = r.values.get(k.replace("usual_", "")) if "usual_" in k else None
+                same_way = partner is not None and partner * v > 0
+                (quiet if k.startswith("metric.") or same_way else moves).extend(vals)
             elif "_minus_" in k:
                 a, b = (_words(part.replace("_", " ")) for part in k.split("_minus_", 1))
                 levels.append((v, a - b, b - a))
