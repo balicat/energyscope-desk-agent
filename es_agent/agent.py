@@ -144,13 +144,21 @@ CACHING = {
     "anthropic_cache": True,                    # then the conversation as it grows: the server moves this one forward
 }
 
+# A ceiling on what one model request may write (thinking included: Anthropic counts it as output). Normal
+# requests write a median of 243 tokens and at most 2,562 (908 requests, the lab's parity run, 24 Nov 2026); the
+# model's own ceiling is 128,000, and one runaway answer in that run wrote all of it: about 8 minutes at ~270 tokens
+# a second, past the proxy's 90 s, while the one-at-a-time lock in serve.py held every other visitor. At 8,000 a
+# runaway stops in about 30 s; Pydantic AI then ends the question (OutputTokenLimitExceeded) and serve.py shows the
+# tool results as tables. TheLibrarian/max-tokens-cap.md has the measurements.
+MAX_TOKENS = 8000
+
 agent = Agent(
     deps_type=Deps,
     output_type=DeskAnswer,
     instructions=INSTRUCTIONS,
     retries=3,  # the prose rules are strict; a third attempt is cheaper than an answer that cannot be shown
     name="energyscope-desk",
-    model_settings=CACHING,
+    model_settings={**CACHING, "max_tokens": MAX_TOKENS},
 )
 
 
