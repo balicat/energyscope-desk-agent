@@ -13,8 +13,11 @@ outputs can be compared line for line.
   premise corrected after the placement, a placement in the past, notation such as R², C₃ and MTCO₂e), and the
   builder's own true sentences in the shapes beside them.
 - REFUSED_BOTH: true sentences the reviewers found refused by d029c9c too (older rules, not changed here). Reported.
-- MUST_REFUSE: wrong sentences this branch must refuse: the brief's own A and B sentences (B's footnote marks among
-  them), and the second review's wrong sentences that d029c9c refuses and a wider rule had let through.
+- MUST_REFUSE: wrong sentences this branch must refuse: the brief's own B sentences (B's footnote marks among them),
+  and the second review's wrong sentences that d029c9c refuses and a wider rule had let through.
+- LIMIT: the brief's own A sentences and the ones 6f63817 judged. A (a percentile written as a place) was dropped
+  from this branch on 25 Nov 2026 and moved to the lab branch, so each is accepted, as on d029c9c; one that is
+  refused here is reported as CAUGHT and fails the run, because it would mean A was not fully removed.
 - DROPPED: the brief's own C sentence. C is not in this branch, so it is accepted as on d029c9c. Reported.
 """
 
@@ -220,13 +223,6 @@ REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's la
 ]
 
 MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
-    # the brief's A: a key's N placed as the rank (Henry Hub is at its 65.93rd percentile)
-    ("brief A", [HH], "Henry Hub sits at the 95th percentile."),
-    ("brief A", [HH], "Henry Hub sits at the 5th percentile."),
-    ("brief A", [HH], "Henry Hub sits at the 25th percentile."),
-    ("brief A", [HH], "Henry Hub sits at the 75th percentile."),
-    ("brief A", [HH], "Henry Hub is at its 90th percentile."),
-    ("brief A", [HH], "Henry Hub trades in the 90th percentile of its three-year range."),
     # the brief's B: raised and lowered digits
     ("brief B", [W30], "WTI will reach $¹⁵⁰ by spring."),
     ("brief B", [W30], "WTI could fall to $₈₀."),
@@ -236,18 +232,6 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("brief B", [W30], "WTI fell 17.26% over 30 days.¹"),
     ("brief B", [W30], "WTI fell 17.26%¹ over 30 days."),
     ("brief B", [W30], "WTI fell 17.26% over 30 days (EIA)²."),
-    # the brief's A in the shapes it still judges (a present-tense placement of the latest value, plainly made)
-    ("brief A", [HH], "Henry Hub is now at the 95th percentile."),
-    ("brief A", [HH], "Henry Hub, at 3.10, sits at the 95th percentile."),
-    ("brief A", [HH], "Henry Hub's price, which sits at the 95th percentile, looks rich."),
-    ("brief A", [HH], "Henry Hub is currently trading at the 95th percentile."),
-    ("brief A", [FR], "Freight sits at the 95th percentile."),
-    ("brief A", [HH], "Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its last three "
-                      "years, above its 90th percentile line of 3.90."),
-    ("brief A", [BWS], "The Brent-WTI spread of 3.41 dollars is at the 90th percentile."),
-    ("brief A", [C321], "The 3-2-1 crack was 34.85 dollars. That sits at the 90th percentile of the last three years."),
-    ("brief A", [FR], "Freight at 745.77 is at the 90th percentile of its three-year window."),
-    ("brief A", [POS], "Managed money net length of 15,814 contracts sits at the 90th percentile."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),
@@ -259,6 +243,28 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("r2 own past", [RIGS], "Rigs are 58 above their level a month ago."),
     ("r2 own past", [C4W], "Cushing stocks are 5.24% below where they were a year ago."),
     ("r2 own past", [W30], "WTI rose 17.26% (below where it was 30 days ago)."),
+]
+
+LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch
+    # the brief's A: a key's N placed as the rank (Henry Hub is at its 65.93rd percentile)
+    ("brief A", [HH], "Henry Hub sits at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub sits at the 5th percentile."),
+    ("brief A", [HH], "Henry Hub sits at the 25th percentile."),
+    ("brief A", [HH], "Henry Hub sits at the 75th percentile."),
+    ("brief A", [HH], "Henry Hub is at its 90th percentile."),
+    ("brief A", [HH], "Henry Hub trades in the 90th percentile of its three-year range."),
+    # ... and in the shapes 6f63817 judged (a present-tense placement of the latest value, plainly made)
+    ("brief A", [HH], "Henry Hub is now at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub, at 3.10, sits at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub's price, which sits at the 95th percentile, looks rich."),
+    ("brief A", [HH], "Henry Hub is currently trading at the 95th percentile."),
+    ("brief A", [FR], "Freight sits at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its last three "
+                      "years, above its 90th percentile line of 3.90."),
+    ("brief A", [BWS], "The Brent-WTI spread of 3.41 dollars is at the 90th percentile."),
+    ("brief A", [C321], "The 3-2-1 crack was 34.85 dollars. That sits at the 90th percentile of the last three years."),
+    ("brief A", [FR], "Freight at 745.77 is at the 90th percentile of its three-year window."),
+    ("brief A", [POS], "Managed money net length of 15,814 contracts sits at the 90th percentile."),
 ]
 
 DROPPED = [  # wrong; the brief's C, accepted here as on d029c9c because C is not in this branch
@@ -287,16 +293,17 @@ def problems(names: list[str], summary: str) -> list[str]:
 def main() -> int:
     out, failed = {}, 0
     for group, cases, expect in (("MUST_ACCEPT", MUST_ACCEPT, "accept"), ("REFUSED_BOTH", REFUSED_BOTH, None),
-                                 ("MUST_REFUSE", MUST_REFUSE, "refuse"), ("DROPPED", DROPPED, None)):
+                                 ("MUST_REFUSE", MUST_REFUSE, "refuse"), ("LIMIT", LIMIT, "limit"), ("DROPPED", DROPPED, None)):
         for where, names, summary in cases:
             found = problems(names, summary)
             out.setdefault(group, []).append({"where": where, "summary": summary, "problems": found})
-            bad = (expect == "accept" and found) or (expect == "refuse" and not found)
+            bad = (expect in ("accept", "limit") and found) or (expect == "refuse" and not found)
             failed += bool(bad)
-            mark = ("REFUSED " if found else "accepted") if expect != "refuse" else ("refused " if found else "ACCEPTED")
+            mark = ("refused " if found else "ACCEPTED") if expect == "refuse" else (
+                ("CAUGHT  " if found else "limit   ") if expect == "limit" else ("REFUSED " if found else "accepted"))
             print(f"{group:12} {mark} {'<- NOT MET ' if bad else ''}[{where}] {summary}" + (f"\n             -> {found}" if found else ""))
     print(f"{len(MUST_ACCEPT)} must accept, {len(REFUSED_BOTH)} refused by both, {len(MUST_REFUSE)} must refuse, "
-          f"{len(DROPPED)} dropped item; {failed} expectation(s) not met")
+          f"{len(LIMIT)} known limits, {len(DROPPED)} dropped item; {failed} expectation(s) not met")
     if "--json" in sys.argv:
         with open(sys.argv[sys.argv.index("--json") + 1], "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=1)

@@ -153,9 +153,10 @@ def gold(*names: str, summary: str) -> dict:
         "summary": summary}
 
 
-# live-fixes-2b (25 Nov 2026): A, a percentile written as a place, and B, text read as it is shown (the adversary's A
-# and B, reproduced on de8726a), ported from live-fixes-2 in their narrow form. Each WRONG case names the reason it
-# must be refused for, and each was accepted by d029c9c (the released checker).
+# live-fixes-2b (25 Nov 2026): B, text read as it is shown (the adversary's B, reproduced on de8726a), ported from
+# live-fixes-2 in its narrow form. Each WRONG case names the reason it must be refused for, and each was accepted by
+# d029c9c (the released checker). A (a percentile written as a place) was dropped from this branch: its wrong cases
+# are LIMIT entries below, accepted by both trees.
 # A server percentile reading as the suite's henry_hub_percentile has it
 hh_srv = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years",
                  period=D, units="Dollars per Million Btu", series_ids=["NG.RNGWHHD.D"],
@@ -163,40 +164,7 @@ hh_srv = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub Natural Gas S
                          "p25": 2.44, "p75": 3.22, "p90": 3.9, "p95": 4.364, "observations": 747.0, "years": 3.0},
                  context="It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
                  request={"tool": "percentile", "action": "percentile", "body": {}})
-_PLACED = "puts the latest value at the"
 FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
-    # A: "X sits at the Nth percentile" claims a rank; a key's name (p5, p25, p75, p95) is not one
-    ("A: the 95th taken from the key p95 as a rank", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile."), _PLACED),
-    ("A: the 5th taken from the key p5 as a rank", dict(readings=[hh_pct], summary="Henry Hub sits at the 5th percentile."), _PLACED),
-    ("A: the 25th taken from the key p25, with the window after it (a window is no value of the point)",
-     dict(readings=[hh_pct], summary="Henry Hub sits at the 25th percentile of its 5-year range."), _PLACED),
-    ("A: is in the 75th, from the key p75", dict(readings=[hh_pct], summary="Henry Hub is in the 75th percentile."), _PLACED),
-    ("A: is at its 95th", dict(readings=[hh_pct], summary="Henry Hub is at its 95th percentile."), _PLACED),
-    ("A: trades at the 95th", dict(readings=[hh_pct], summary="Henry Hub trades at the 95th percentile of its window."), _PLACED),
-    ("A: a rank matched against a price (4.21 rounds to the 4th)",
-     dict(readings=[hh_pct], summary="Henry Hub is at the 4th percentile of 5 years."), _PLACED),
-    ("A: a rank written 'the N percentile', matched against a price",
-     dict(readings=[hh_pct], summary="Henry Hub is at the 4.21 percentile."), _PLACED),
-    ("A: placed at a point, with the latest value after it (not the point's)",
-     dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile, at 4.21."), _PLACED),
-    ("A: in raised digits", dict(readings=[hh_pct], summary="Henry Hub sits at the ⁹⁵th percentile."), _PLACED),
-    ("A: freight placed at its 95th (it is at the 96.02nd)", gold("freight_history", summary="Freight sits at the 95th percentile."),
-     _PLACED),
-    ("A: the crack placed at its 90th (it is at the 87.7th)", gold("futures_crack", summary="The crack sits at the 90th percentile."),
-     _PLACED),
-    ("A: funds placed at the 90th (they are at the 10.3rd)", gold("wti_positioning", summary="Managed money is at the 90th percentile."),
-     _PLACED),
-    ("A: is currently trading at the 95th", dict(readings=[hh_pct], summary="Henry Hub is currently trading at the 95th percentile."),
-     _PLACED),
-    ("A: the latest value in the sentence, the rank wrong",
-     gold("henry_hub_percentile", summary="Henry Hub, at 3.10, sits at the 95th percentile."), _PLACED),
-    ("A: the latest value in the subject, with its date (the reading's own), and a point named after it",
-     gold("henry_hub_percentile", summary="Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its "
-                                          "last three years, above its 90th percentile line of 3.90."), _PLACED),
-    ("A: a spread's latest value in the subject (it is at the 33.9th)",
-     gold("brent_wti_spread", summary="The Brent-WTI spread of 3.41 dollars is at the 90th percentile."), _PLACED),
-    ("A: 'That' pointing at the latest value", gold("crack_321", summary="The 3-2-1 crack was 34.85 dollars. That sits at the "
-                                                                          "90th percentile of the last three years."), _PLACED),
     # B: a raised, lowered, circled or full-width character is read as what it shows
     ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
     ("B: a price in lowered digits", dict(facts=[brent], summary="Brent could fall to $₈₀."), "80"),
@@ -222,8 +190,8 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
      "2026-11-18"),
 ]
 
-FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and beside them
-    # A: placed at its own rank
+FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
+    # A is not in this branch (moved to the lab branch): true sentences in its shapes, accepted as on d029c9c
     dict(readings=[hh_pct], summary="Henry Hub sits at the 66th percentile of its last 5 years."),
     dict(readings=[hh_pct], summary="Henry Hub is at the 65.9th percentile, between its 25th and 75th percentiles (2.80 and 4.60)."),
     dict(readings=[hh_srv], summary="Henry Hub at 3.10 sits at the 65.93 percentile, inside its usual range (between the 10th and "
@@ -231,7 +199,6 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     dict(readings=[funds], summary="Managed money ranks at the 6.8th percentile of 156 weeks."),
     dict(readings=[freight], summary="Freight is now at the 96th percentile of 3 years, above its 90th percentile line."),
     dict(readings=[hh_pct], summary="Henry Hub sits at the 66ᵗʰ percentile."),
-    # A: what the placement rule does not judge, read as on d029c9c
     dict(readings=[hh_pct], summary="For Henry Hub to sit at the 95th percentile it would have to reach 6.90."),
     dict(readings=[hh_pct], summary="Henry Hub is not at its 95th percentile."),
     dict(readings=[hh_pct], summary="Henry Hub never sits at the 95th percentile for long."),
@@ -243,8 +210,8 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     gold("henry_hub_percentile", summary="Henry Hub is nowhere near its 95th percentile."),
     gold("henry_hub_percentile", summary="Henry Hub would have to climb to its 95th percentile of 4.36 before it looked expensive."),
     gold("freight_history", summary="Freight has not fallen below its 90th percentile line (268.00) since 2026-07-31, 112 days."),
-    # A: not judged, as on d029c9c (the review of 906e707, 25 Nov 2026): a point's value as the subject, a premise corrected
-    # after the placement, the past, a question, another point named, a subject that is no one value
+    # ... and the review of 906e707's (25 Nov 2026): a point's value as the subject, a premise corrected after the
+    # placement, the past, a question, another point named, a subject that is no one value
     gold("henry_hub_percentile", summary="A price of 4.36 is at the 95th percentile of the three-year window."),
     gold("henry_hub_percentile", summary="Henry Hub's upper tail starts at 4.36, which is at the 95th percentile."),
     gold("henry_hub_percentile", summary="The 90th percentile is 3.90. A price there is at the 90th percentile."),
@@ -601,18 +568,55 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
           summary="Stocks of 417,797 thousand barrels are below their five-year average of 434,167.")),
     ("stocks including the SPR, where the series excludes it",
      dict(facts=[stocks], summary="US crude stocks including the SPR are 414,417 thousand barrels.")),
-    # live-fixes-2b (25 Nov 2026) ships A and B narrow. Kept visible here: the wider wordings of A, C and D, moved to the
-    # lab branch, and shapes A leaves to d029c9c by design (a point named with its own value, the past, a number in the
-    # subject; the full list is at prose._placed_at_percentile)
+    # live-fixes-2b (25 Nov 2026) ships B. A (a percentile written as a place), C and D moved to the lab branch: tying a
+    # number or an ordinal to the right noun is one family of work. Kept visible here, accepted by both trees: A's wrong
+    # cases as live-fixes-2b had them (6f63817), and its wider wordings
+    ("A, moved to the lab branch: the 95th taken from the key p95 as a rank",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile.")),
+    ("A, moved to the lab branch: the 5th taken from the key p5 as a rank",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 5th percentile.")),
+    ("A, moved to the lab branch: the 25th taken from the key p25, with the window after it (a window is no value of the point)",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 25th percentile of its 5-year range.")),
+    ("A, moved to the lab branch: is in the 75th, from the key p75",
+     dict(readings=[hh_pct], summary="Henry Hub is in the 75th percentile.")),
+    ("A, moved to the lab branch: is at its 95th",
+     dict(readings=[hh_pct], summary="Henry Hub is at its 95th percentile.")),
+    ("A, moved to the lab branch: trades at the 95th",
+     dict(readings=[hh_pct], summary="Henry Hub trades at the 95th percentile of its window.")),
+    ("A, moved to the lab branch: a rank matched against a price (4.21 rounds to the 4th)",
+     dict(readings=[hh_pct], summary="Henry Hub is at the 4th percentile of 5 years.")),
+    ("A, moved to the lab branch: a rank written 'the N percentile', matched against a price",
+     dict(readings=[hh_pct], summary="Henry Hub is at the 4.21 percentile.")),
+    ("A, moved to the lab branch: placed at a point, with the latest value after it (not the point's)",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile, at 4.21.")),
+    ("A, moved to the lab branch: in raised digits",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the ⁹⁵th percentile.")),
+    ("A, moved to the lab branch: freight placed at its 95th (it is at the 96.02nd)",
+     gold("freight_history", summary="Freight sits at the 95th percentile.")),
+    ("A, moved to the lab branch: the crack placed at its 90th (it is at the 87.7th)",
+     gold("futures_crack", summary="The crack sits at the 90th percentile.")),
+    ("A, moved to the lab branch: funds placed at the 90th (they are at the 10.3rd)",
+     gold("wti_positioning", summary="Managed money is at the 90th percentile.")),
+    ("A, moved to the lab branch: is currently trading at the 95th",
+     dict(readings=[hh_pct], summary="Henry Hub is currently trading at the 95th percentile.")),
+    ("A, moved to the lab branch: the latest value in the sentence, the rank wrong",
+     gold("henry_hub_percentile", summary="Henry Hub, at 3.10, sits at the 95th percentile.")),
+    ("A, moved to the lab branch: the latest value in the subject, with its date (the reading's own), and a point named after it",
+     gold("henry_hub_percentile", summary="Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its "
+                                          "last three years, above its 90th percentile line of 3.90.")),
+    ("A, moved to the lab branch: a spread's latest value in the subject (it is at the 33.9th)",
+     gold("brent_wti_spread", summary="The Brent-WTI spread of 3.41 dollars is at the 90th percentile.")),
+    ("A, moved to the lab branch: 'That' pointing at the latest value",
+     gold("crack_321", summary="The 3-2-1 crack was 34.85 dollars. That sits at the 90th percentile of the last three years.")),
     ("A, moved to the lab branch: a rank claimed in a wider wording", dict(readings=[hh_pct],
      summary="Henry Hub is trading at a 95th-percentile level.")),
     ("A, moved to the lab branch: placed on a point's line", dict(readings=[hh_pct], summary="Henry Hub sits on its 95th percentile line.")),
     ("A, moved to the lab branch: a point's ordinal alone, placed", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th.")),
-    ("A, not judged by design: placed at a point named with its own value", dict(readings=[hh_pct],
+    ("A, moved to the lab branch: placed at a point named with its own value", dict(readings=[hh_pct],
      summary="Henry Hub sits at its 95th percentile of 6.90.")),
-    ("A, not judged by design: placed in the past (the tools rank only the latest value)", dict(readings=[hh_pct],
+    ("A, moved to the lab branch: placed in the past", dict(readings=[hh_pct],
      summary="Henry Hub was at the 95th percentile last week.")),
-    ("A, not judged by design: a number in the subject that is not the latest value (here the week's change)",
+    ("A, moved to the lab branch: a number in the subject that is not the latest value (here the week's change)",
      gold("wti_positioning", summary="The net position fell by 9,900 contracts on the week and sits at the 90th percentile.")),
     ("C, dropped from this branch: a rounded change given the wrong side",
      gold("wti_30d", "us_rigs_yoy", summary="WTI rose 17%; rigs fell 11%.")),

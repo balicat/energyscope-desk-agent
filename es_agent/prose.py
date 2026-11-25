@@ -30,14 +30,7 @@ Checked, in the summary and in every caveat the model wrote:
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
   "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
-  has the same sign as that change, but a wrong one is still wrong;
-- a percentile written as a place (25 Nov 2026). A plain present-tense sentence that puts the subject AT the Nth
-  percentile ("X is at / sits at / trades at / is in the Nth percentile", "X is at its Nth percentile") claims the
-  latest value's rank: N must be a cited rank, rounded as written, never the N of a key (p95). Not judged, and read as
-  before: a text that names that point's value; a subject with a number other than the latest value, another point,
-  no one value, or a pronoun for a point named before; a sentence that negates, corrects, reports or conditions
-  anything, asks, or speaks of the past or of another date (the list is at `_placed_at_percentile`); any other use of
-  "the Nth percentile".
+  has the same sign as that change, but a wrong one is still wrong.
 
 Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
 on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂), notation (R², C₃, MTCO₂e) and the
@@ -337,16 +330,7 @@ class Pool:
     percents: list[float] = field(default_factory=list)
     counts: list[float] = field(default_factory=list)
     percentiles: list[float] = field(default_factory=list)  # a subset of percents: ranks, for the high/low rule
-    # every value that is a percentile rank (percentile, net_percentile, crack_percentile, the server's *_pctl): what a
-    # sentence placing the value "at the Nth percentile" must match; and the percentile points (p5, p95) by their N,
-    # with their values (a point named with its own value is not a placement)
-    ranks: list[float] = field(default_factory=list)
-    points: dict[str, list[float]] = field(default_factory=dict)
     dates: set[dt.date] = field(default_factory=set)
-    latest_dates: set[dt.date] = field(default_factory=set)   # the as-of dates of the cited values (no base period)
-    # the latest values of the readings and spreads that carry a rank: a subject written with one of them is the value
-    # the rank is of ("Henry Hub at 3.10 sits at ..."); any other number in a subject is a level of its own
-    ranked_latest: list[float] = field(default_factory=list)
     names: set[str] = field(default_factory=set)    # plain numbers that are part of a name or of code-written text
     # ... and the words beside each in the text it came from: a name's number may be written only beside one of them
     # ("S&P 500", "No. 2 heating oil"), never on its own ("Brent could fall to 500": the adversary's L1, 24 Nov 2026)
@@ -382,11 +366,6 @@ class Pool:
         self.put(value, kind, unit)
         if kind == "percent" and "percentile" in key:
             self.percentiles.append(value)
-        point = re.fullmatch(r"(?:.*[._])?p(\d{1,2})", key)   # p95, segments.p95, spread_p10, net_p90
-        if point:
-            self.points.setdefault(point[1], []).append(value)
-        elif kind != "count" and re.search(r"percentile|pctl", key.lower()):
-            self.ranks.append(value)
 
     def text(self, *parts: str) -> None:
         joined = " ".join(parts)
@@ -495,13 +474,6 @@ class Pool:
         self.units += " " + unit_key(text) + " " + " ".join(_unit_words(text))
 
 
-_RANK_KEY = re.compile(r"percentile|pctl")
-# the keys that hold a ranked reading's latest value (the percentile, seasonal, describe, crack, positioning, spread
-# statistics and report readings); a reading of mixed values (arbitrage, evidence, signals, watch) names none
-_LATEST_KEYS = {"target_value", "current_value", "value", "latest", "latest_value", "current", "crack", "current_spread",
-                "managed_money_net"}
-
-
 def pool_of(answer: DeskAnswer) -> Pool:
     answer = _normal_answer(answer)
     p = Pool()
@@ -521,8 +493,6 @@ def pool_of(answer: DeskAnswer) -> Pool:
             p.put(f.lookback_days, "count", None)
             p.metas[len(p.tagged) - 1] = "lookback_days"
         p.dates |= {d for d in (f.latest_period, f.base_period) if d is not None}
-        if f.latest_period is not None:
-            p.latest_dates.add(f.latest_period)
         for k, v in f.also.items():          # million_barrels, million_barrels_per_day
             p.put(v, "amount", k.replace("_", " "))
             p.converted.add(len(p.tagged) - 1)
@@ -534,17 +504,12 @@ def pool_of(answer: DeskAnswer) -> Pool:
             p.put(x, "amount", s.units)
         for k, v in s.extras.items():
             p.add(k, v, s.units)
-        if any(_RANK_KEY.search(k.lower()) for k in s.extras):
-            p.ranked_latest.append(s.spread)
         p.dates.add(s.period)
-        p.latest_dates.add(s.period)
         p.text(s.name_a, s.name_b, s.note)
         p.ids(s.series_a, s.series_b)
         p.context(s.context)
         p.label(s.units, s.name_a, s.name_b)
     for r in answer.readings:
-        if any(_RANK_KEY.search(k.lower()) and _kind(k) != "count" for k in r.values):
-            p.ranked_latest += [v for k, v in r.values.items() if k.lower().split(".")[-1] in _LATEST_KEYS]
         for k, v in r.values.items():
             p.add(k, v, r.value_units.get(k))   # no entry: a reading of mixed units, its unit is not known
             if k.lower().split(".")[-1] in _META_KEYS:
@@ -564,7 +529,6 @@ def pool_of(answer: DeskAnswer) -> Pool:
             if q:
                 p.pctl_names.add(q[1])
         p.dates.add(r.period)
-        p.latest_dates.add(r.period)
         p.text(r.title, r.note, r.counter)
         p.ids(r.key, " ".join(r.series_ids), " ".join(r.values))
         p.context(r.context, quotable=r.request is None)
@@ -762,11 +726,6 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         if not clean[:m.start()].rstrip()[-1:].isdigit():  # "414,417 thousand barrels" is a unit, not a spelled number
             bad.append(f"{m.group()} (write the number in digits, from a tool result)")
     for tok, start, end, whole, glued in _numbers(clean):
-        if not glued and _placed_at_percentile(clean, text, start, end, tok, pool):
-            problem = _rank_problem(tok, whole, pool)
-            if problem:   # "Henry Hub sits at the 95th percentile" at the 65.93rd: a key's N is not a rank
-                bad.append(problem)
-                continue
         if glued and whole in pool.tokens:
             continue  # M12, PF4: a name a tool returned
         suffix = glued_suffix(tok, whole) if glued else ""
@@ -827,174 +786,6 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         elif per and unit_key(per.group(1)) not in pool.units:
             bad.append(f"{tok} per {per.group(1)} (no cited series is in that unit)")
     return bad
-
-
-# ---- a percentile written as a place --------------------------------------------------------------------------------
-# "X sits at the Nth percentile" claims a rank. Until 25 Nov 2026 the N of a reading's keys p5, p25, p75, p95 passed
-# there as a name, so with Henry Hub at its 65.93rd percentile "Henry Hub sits at the 95th percentile" passed (the
-# adversary's A), and a rank was matched against any value ("is at the 3rd percentile" on a price of 3.10). Now, in
-# the plain shape only, N must be a cited rank, rounded as written: a present-tense verb that puts the subject there
-# (is, are, is trading, sits, trades, stands, ranks; at or in), then "the", "its", "their" or nothing, then N with or
-# without its ordinal, then the word "percentile".
-# Read as before (not judged here), so a wider rule cannot refuse a true sentence (the reviewers of live-fixes-2 and
-# of 906e707, 25 Nov 2026):
-#   - a value of that percentile point anywhere in the text ("A price of 4.36 is at the 95th percentile", "Henry
-#     Hub's upper tail starts at 4.36, which is at the 95th percentile", "The 90th percentile line is 3.90: a price
-#     there is at the 90th percentile"), and a number in the subject's clause that is not the latest value of a
-#     ranked reading ("The 3.22 mark is at the 75th percentile"; "Henry Hub at 3.10 sits at ..." is judged, 3.10
-#     being the latest);
-#   - a point word in the sentence before the verb (median, mean, quartile, line, band, threshold, top, high, low,
-#     p95, another ordinal or percentile: "The upper quartile is at the 75th percentile") and one right after it
-#     ("the 90th percentile line", "or above", "at most"); a hyphenated form. A point word later in the sentence
-#     describes where the latest value sits ("..., above its 90th percentile line of 3.90"), and is judged;
-#   - a negation, a correction or a reported claim anywhere in the sentence, before or after it ("The premise that
-#     Henry Hub is at its 95th percentile does not hold", "... is wrong", "You suggest ...", "... only in the
-#     question"), and a "that" before it ("It is false that ...", "The premise that ..."; a "That" that opens its
-#     clause only with a second verb after the placement, "That Henry Hub is at its 95th percentile is a stretch":
-#     "That sits at the 87th percentile" and "That level sits at ..." are the latest value, and are judged);
-#   - a condition anywhere in the sentence ("would", "if", "need to", "to sit at"); a question ("... percentile?");
-#   - the past ("was", "stood": the tools rank only the latest value) and a time anywhere in the sentence: a date
-#     that is not the as-of date of a cited value ("on 2026-07-31"; the latest one, "at 3.10 on 2026-11-17", is the
-#     latest value's), a year standing alone ("in 2025"; not the 2027 of "the 2027-01 contract"), "last week", "ago";
-#   - a subject that names no one value ("a", "any", "every", "such": "A stretched market is in the 90th percentile"),
-#     and a pronoun after the same point was named earlier in the text ("Freight crossed its 90th percentile line on
-#     2026-07-31. That sits at the 90th percentile.");
-#   - every other use of "the Nth percentile" ("the 95th percentile of the window is 4.36", "well short of its 95th
-#     percentile").
-_PLACING = re.compile(r"\b(?P<to>to\s+)?(?:(?:is|are)\s+(?:(?:now|currently|still)\s+)?trading|is|are|sits?|trades?|"
-                      r"stands?|ranks?)\s+(?:(?:now|currently|still|already|right|just|squarely)\s+)?(?:at|in)\s+"
-                      r"(?:(?:the|its|their)\s+)?$", re.I)
-_PCTL_NEXT = re.compile(r"(?:st|nd|rd|th)?\s+percentile\b(?![-’'])", re.I)
-_POINT_AFTER = re.compile(r"[\s-]+(?:lines?|bands?|ranges?|marks?|levels?|thresholds?|cut-?offs?|points?|values?|prices?|"
-                          r"figures?|bounds?|boundar(?:y|ies)|zones?|areas?|territory|regions?|buckets?|tails?|deciles?|"
-                          r"quartiles?|quintiles?|terciles?|tiers?|brackets?|groups?|clubs?|cohorts?|classes?|ends?|sides?)\b"
-                          r"|\s+(?:or|and)\s+(?:above|higher|over|more|beyond|below|lower|under|less|up|down|better|worse)\b"
-                          r"|\s+(?:at\s+(?:most|least|best|worst)|or\s+so|plus)\b|\s*\+", re.I)
-_SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
-_PLACE_NEGATED = re.compile(r"\b(?:not|never|no|nor|neither|nowhere|none|nothing|without|hardly|barely)\b|n['’]t\b",
-                            re.I)
-_PLACE_DOUBTED = re.compile(
-    r"\b(?:wrong(?:ly)?|false(?:ly)?|incorrect(?:ly)?|untrue|mistaken(?:ly)?|mistakes?|errors?|erroneous(?:ly)?|"
-    r"inaccurate(?:ly)?|misread\w*|misconceptions?|myths?|contrary|rather|instead|premises?|claim\w*|ideas?|notions?|"
-    r"suggest\w*|assert\w*|says?|said|ask\w*|questions?|visitors?|you|your|yours|supposed(?:ly)?|alleged(?:ly)?|"
-    r"reported(?:ly)?|rumou?r\w*|believ\w*|think\w*|thought|assum\w*|appears?|seems?|apparently|only|disagree\w*|"
-    r"differ\w*|contradict\w*|disput\w*|doubt\w*|unsupported|match\w*|according|as\s+per|per\s+(?:the|your|their)|"
-    r"brokers?|analysts?|traders?|consensus|headlines?|"
-    # an approximation: "at the 95th percentile, roughly" for the 96.02nd is not a claim to the unit
-    r"roughly|approximately|approx|about|around|nearly|almost|close\s+to|circa|give\s+or\s+take|near\s+enough|"
-    r"more\s+or\s+less|broadly|loosely|effectively|essentially|practically|virtually)\b", re.I)
-_PLACE_CONDITION = re.compile(r"\b(?:if|unless|whether|would|could|should|might|may|must|can|cannot|need(?:s|ed)?|"
-                              r"ha(?:s|ve|d)\s+to|ought|when|whenever|once|until|unlikely|likely|possibly|perhaps|"
-                              r"expect(?:s|ed)?|suppose|supposing|assuming|imagine|hypothetical(?:ly)?|scenarios?|cases?|"
-                              r"upside|downside|stress(?:ed)?|bull(?:ish)?|bear(?:ish)?|forecast\w*|project(?:ed|ion|ions)|"
-                              r"outlook|targets?)\b", re.I)
-_PLACE_TIME = re.compile(
-    r"\b(?:ago|yesterday|earlier|previously|formerly|historically|then|before|after|since|during|back\s+in|"
-    r"at\s+the\s+time|(?:last|previous|prior)\s+(?:week|month|year|quarter|time|session|close|day|summer|winter|spring|"
-    r"autumn|fall)|(?<![\d-])(?:19|20)\d\d(?![\d-])|(?:19|20)\d\d\s*[-–]\s*(?:19|20)\d\d|january|february|march|april|june|july|august|september|october|november|december|"
-    r"jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
-    r"winters?|summers?|autumns?|seasons?|seasonally)\b", re.I)
-_OTHER_POINT = re.compile(r"\b(?:median|mean|average|quartiles?|deciles?|quintiles?|terciles?|tails?|[pP]\d{1,2}|"
-                          r"\d+(?:\.\d+)?(?:st|nd|rd|th)|percentiles?|lines?|bands?|thresholds?|cut-?offs?|triggers?|bounds?|"
-                          r"boundar(?:y|ies)|zones?|territory|buckets?|marks?|levels?|top|bottom|upper|lower|max(?:imum)?|"
-                          r"min(?:imum)?|peaks?|troughs?|highs?|lows?|highest|lowest|records?|extremes?)\b", re.I)
-_NO_ONE_VALUE = re.compile(r"\s*(?:a|an|any|every|each|such|some|one)\b", re.I)
-_PRONOUN = re.compile(r"\s*(?:that|this|it|which|these|those|they)\b", re.I)
-_SECOND_VERB = re.compile(r"\b(?:is|are|was|were|isn['’]t|aren['’]t|wasn['’]t|does|doesn['’]t|do|don['’]t|did|"
-                          r"didn['’]t|seems?|remains?|would|will|can|cannot|holds?|matches|stands?|looks?)\b", re.I)
-
-
-def _complement_that(clean: str, s0: int, at: int, after: int, s1: int) -> bool:
-    """Is there a "that" before the placement that makes it a reported or a supposed claim ("It is false that ...",
-    "The premise that ...")? A "That" that opens its clause is one only with a second verb after the placement ("That
-    Henry Hub is at its 95th percentile is a stretch"); without one it points at the latest value ("That sits at ...",
-    "That level sits at ...")."""
-    for m in re.finditer(r"\bthat\b", clean[s0:at], re.I):
-        opens = not re.search(r"\w", re.split(r"[,;:](?!\d)", clean[s0:s0 + m.start()])[-1])
-        if not opens or _SECOND_VERB.search(clean, after, s1):
-            return True
-    return False
-
-
-_HYPHENATED = re.compile(r"\d+(?:-\d+)+|\d+-[A-Za-z]+")
-
-
-def _level_subject(clean: str, a: int, b: int, pool: Pool) -> bool:
-    """Does clean[a:b] (the subject's clause) hold a number that is not the latest value of a ranked reading? A
-    number of a hyphenated term ("the 3-2-1 crack", "the 2027-01 contract", "30-day") names, and does not count; a
-    thousands number ("15,814 contracts") is a number."""
-    terms = [m.span() for m in _HYPHENATED.finditer(clean, a, b)]
-    for m in _DIGITS.finditer(clean, a, b):
-        x = m.group().rstrip(",")
-        if any(c <= m.start() < d for c, d in terms):
-            continue
-        if not any(_quotes(v, *_parse(x)) for v in pool.ranked_latest):
-            return True
-    return False
-
-
-def _another_time(text: str, s0: int, s1: int, pool: Pool) -> bool:
-    """A time other than the latest value's in text[s0:s1] (see above)."""
-    if _PLACE_TIME.search(text, s0, s1):
-        return True
-    for d in _ISO.findall(text, s0, s1):
-        try:
-            if dt.date.fromisoformat(d) not in pool.latest_dates:
-                return True
-        except ValueError:
-            return True
-    return False
-
-
-def _placed_at_percentile(clean: str, text: str, start: int, end: int, tok: str, pool: Pool) -> bool:
-    """Does the sentence put its subject, the latest value, at the percentile written at clean[start:end] (see above)?
-    Then the number is a rank. `text` is `clean` with its dates (blanked in `clean`) still in it."""
-    lead = _PLACING.search(clean, max(0, start - 60), start)
-    after = _PCTL_NEXT.match(clean, end)
-    if not lead or lead["to"] or not after or _POINT_AFTER.match(clean, after.end()):
-        return False
-    at = lead.start()
-    s0 = max([m.end() for m in _SENTENCE_END.finditer(clean[:at])], default=0)
-    stop = _SENTENCE_END.search(clean, after.end())
-    s1 = stop.start() + 1 if stop else len(clean)
-    sentence = clean[s0:s1]
-    if sentence.rstrip().endswith("?"):
-        return False   # a question places nothing
-    if (_PLACE_NEGATED.search(sentence) or _PLACE_DOUBTED.search(sentence) or _PLACE_CONDITION.search(sentence)
-            or _another_time(text, s0, s1, pool) or _complement_that(clean, s0, at, after.end(), s1)):
-        return False
-    if _OTHER_POINT.search(clean, s0, at):
-        return False   # the subject may be another point ("The upper quartile is at the 75th percentile")
-    clause = max([s0] + [s0 + m.end() for m in re.finditer(r"[,;:](?!\d)", clean[s0:at])])   # not 15,814
-    if _NO_ONE_VALUE.match(clean, clause) or _level_subject(clean, clause, at, pool):
-        return False   # no one value ("a stretched market"), or a level of its own ("A price of 4.36")
-    n = _parse(tok)[0]
-    if _PRONOUN.match(clean, clause) and re.search(rf"\b(?:{re.escape(tok)}(?:st|nd|rd|th)|p{re.escape(tok)})\b",
-                                                   clean[:clause], re.I):
-        return False   # "That" may be the point named before it
-    # a value of that point anywhere in the text ("4.36 sits at the 95th percentile", "its 95th percentile of 4.36"). A
-    # window or count ("of its 5-year range", "over 3 years") is no value of the point.
-    values = pool.points.get(f"{n:g}", []) if n.is_integer() else []
-    for m in _DIGITS.finditer(clean):
-        x = m.group().rstrip(",")
-        e = m.start() + len(x)
-        if m.start() == start or _META_NOUN.match(clean, e) or re.match(r"-[A-Za-z]", clean[e:]):
-            continue
-        if any(_quotes(v, *_parse(x)) for v in values):
-            return False
-    return True
-
-
-def _rank_problem(tok: str, whole: str, pool: Pool) -> str | None:
-    """None when `tok` is a cited rank, rounded as written; else the reason, in plain words. It starts with the number
-    as written, so the validator can name an uncited reading that holds it (`agent.uncited_holders`)."""
-    n, dp = _parse(tok)
-    if any(_rounds_to(v, n, dp) for v in pool.ranks):
-        return None
-    shown = ", ".join(f"{v:g}" for v in sorted(set(round(v, 2) for v in pool.ranks)))
-    has = f"the cited ranks are {shown}" if shown else "no cited value is a percentile rank"
-    return (f"{tok} (the sentence puts the latest value at the {whole} percentile, and {has}. Write the value's own "
-            "percentile, or name a percentile point with its value, as in 'its 95th percentile is 4.36')")
 
 
 def _meta_before(clean: str, start: int, pool: Pool, hits: list) -> bool:

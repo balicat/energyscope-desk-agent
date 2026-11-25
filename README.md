@@ -85,28 +85,16 @@ cites it, and does not speculate.
     explicit sign, right beside it (`rose 1.20`, `+1.20`), so an unlisted verb cannot slip through. A gap with
     `above`, `below`, `premium` or `discount` must point the right way, read up to the next comma. A curve's shape
     word must be the reading's own and not negated. A high percentile may not be called low.
-  - a percentile written as a place, in the plain present tense ("Henry Hub sits at the 95th percentile", "is in the
-    90th percentile of its three-year range", "is at its 90th percentile"), must be the latest value's own rank,
-    rounded as written (since 25 Nov 2026: until then the 95 of the reading's key p95 passed there as a name, with
-    Henry Hub at its 66th percentile). The subject may carry the latest value and its date ("Henry Hub at 3.10 on
-    2026-11-17 sits at ...", "That sits at ..."), and the sentence may go on to name other points ("..., above its
-    90th percentile line of 3.90"). Read as before, because each can be true with another N: a text that names that
-    point's value anywhere ("A price of 4.36 is at the 95th percentile"); a subject with a number that is not the
-    latest value, or that names another point (median, quartile, line, band, another percentile) or no one value
-    ("a stretched market"), or a pronoun after that point was named; a sentence that negates, corrects or reports a
-    claim anywhere in it ("The premise that Henry Hub is at its 95th percentile does not hold"), states a condition,
-    or asks; the past, another date or a time word ("Freight was in the 90th percentile on 2026-07-31"); and every
-    other use of "the Nth percentile". Wider wordings ("at a 95th-percentile level", "on its 95th percentile line")
-    are not read yet.
   - text is read as it is shown (since 25 Nov 2026): raised, lowered, full-width and circled digits are the digits
     they show, in the prose and in every text a tool returned, so "$¹⁵⁰" is checked as 150. Unit glyphs (m², CO₂),
     notation (R², σ², C₃, MTCO₂e: a lowered digit after a letter, a raised one after a single letter), °C, ‰ and the
     ellipsis keep their meaning; a fraction sign, a direction control character or a footnote digit (after a word,
     a digit or a stop: "WTI²", "days.¹") is refused with the way to write it.
-  Not yet checked, and tried on 25 Nov 2026 (branch live-fixes-2): the side of a change quoted rounded ("rose 17%"
-  for a fall of 17.26% passes, "rose 17.26%" does not), and a window word given to the wrong change ("fell 17.26%
-  over the week" for a 30-day change). The wider rules for both refused true sentences a reviewer wrote, so they
-  were not released.
+  Not yet checked, and tried on 25 Nov 2026 (branches live-fixes-2 and live-fixes-2b): a percentile written as a
+  place ("Henry Hub sits at the 95th percentile" with Henry Hub at its 66th: the 95 of the reading's key p95 passes
+  as a name), the side of a change quoted rounded ("rose 17%" for a fall of 17.26% passes, "rose 17.26%" does not),
+  and a window word given to the wrong change ("fell 17.26% over the week" for a 30-day change). Each rule tried
+  for them refused true sentences a reviewer wrote, so none was released.
   A caveat that fails is removed by code. `prose_controls.py` plants 36 such errors and must reject every one, and
   must pass 14 correct sentences and every recorded answer; it runs in CI and in the release gate.
 - **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
