@@ -51,7 +51,7 @@ def audit(name: str, d: dict | None, reading: dict) -> None:
               str([s for s in named if s not in ids]))
         check(not any("{" in s for s in strings(ld)), f"{name}: step {ld['step']} has no unfilled slot")
         check(call_text(ld) in d["for_your_agent"], f"{name}: for_your_agent holds step {ld['step']}'s call")
-    check(d["for_your_agent"].startswith("Needs the EnergyScope data tools (MCP server). A free key: https://energyscope.io/signup\n"),
+    check(d["for_your_agent"].startswith("Needs the EnergyScope data tools (MCP server energyscope-mcp 2.16.0 or later). A free key: https://energyscope.io/signup\n"),
           f"{name}: for_your_agent starts with the key line")
     check("proposed" not in d["for_your_agent"] and all(x["tool"] + "(" not in d["for_your_agent"] for x in d["planned"]),
           f"{name}: planned tools are not shown as calls")
@@ -95,12 +95,14 @@ check(d is not None and {ld["args"].get("series_b") for ld in d["leads"] if ld["
       "brent-wti: each spot price against its own future (continuous series)")
 check(d is not None and not any("2027" in json.dumps(ld["args"]) for ld in d["leads"] if ld["tool"] == "spread"),
       "brent-wti: history leads never name a dated contract")
-check(d is not None and {x["tool"] for x in d["planned"]} == {"gap_breakpoints", "jumps"}, "brent-wti: planned tools kept as data")
+check(d is not None and d["planned"] == [] and {ld["tool"] for ld in d["leads"]} == {"spread", "gap_breakpoints", "jumps", "get_data"}, "brent-wti: no planned tools, the two new tools are real leads")
 check(d is not None and any("2027-01" in json.dumps(ld["args"]) for ld in d["leads"] if ld["tool"] == "get_data"),
       "brent-wti: the short-window lead keeps the dated contracts")
 for dated, cont in [("ICE.BRENT.2027-01.D", "ICE.BRENT.M1.D"), ("NYMEX.WTI.2027-01.D", "NYMEX.WTI.FRONT.D"),
                     ("GME.OMAN.2027-01.D", "GME.OMAN.M1.D"), ("PET.RWTC.D", "PET.RWTC.D"), ("ICE.BRENT.M1.D", "ICE.BRENT.M1.D")]:
     check(continuous(dated) == cont, f"continuous({dated}) = {cont}")
+check(d is not None and sorted((ld["args"]["series_id"], ld["args"].get("series_b") or "") for ld in d["leads"] if ld["tool"] == "jumps") == [("PET.RBRTE.D", ""), ("PET.RBRTE.D", "ICE.BRENT.M1.D"), ("PET.RWTC.D", ""), ("PET.RWTC.D", "NYMEX.WTI.FRONT.D")], "brent-wti: jumps on each spot series and on each spot-against-front gap")
+check([x["tool"] for x in deeper(ANSWERS["what-changed-this-week"])["planned"]] == ["consensus_expectations"], "what-changed: consensus_expectations stays planned")
 if d and "--show" in sys.argv:
     print(json.dumps(d, indent=1)); print(d["for_your_agent"])
 

@@ -55,6 +55,7 @@ def slots(reading) -> dict:
     if not pairs and len(ids) >= 2:  # no spot against future: the first two measures against each other
         pairs = [{"a": ids[0], "b": ids[1]}]
     s["pairs"] = pairs
+    s["spots"] = list(dict.fromkeys(continuous(p["a"]) for p in pairs))
     s["pairs_long"] = [{"a": continuous(p["a"]), "b": continuous(p["b"])} for p in pairs]
     return s
 
@@ -131,7 +132,7 @@ def call_text(ld: dict) -> str:
 
 def brief(d: dict, answer: dict, question: str | None) -> str:
     """A plain-text block to paste into the reader's own agent."""
-    L = ["Needs the EnergyScope data tools (MCP server). A free key: https://energyscope.io/signup"]
+    L = ["Needs the EnergyScope data tools (MCP server energyscope-mcp 2.16.0 or later). A free key: https://energyscope.io/signup"]
     if question:
         L.append(f"QUESTION: {question}")
     L.append(f"FAST ANSWER (checked by code against the data): {answer.get('summary', '')}")

@@ -48,15 +48,16 @@ PLAYBOOKS: list[dict] = [
         "leads": [
             {"step": 3, "each": "pairs_long", "why": "How unusual is the distance of {a} from {b} against its history?",
              "tool": "spread", "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_long}"}},
-            {"step": 4, "covers": [4, 5],
-             "why": "The recent daily values of all four series. Look for: the dates where the gap steps to a new level; one-day jumps that reverse the next day; the same value several days running.",
+            {"step": 4, "each": "pairs_long", "why": "When did the gap of {a} from {b} step to a new level, or drift?",
+             "tool": "gap_breakpoints", "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_recent}"}},
+            {"step": 5, "each": "spots", "why": "Any one-day jump in {id} that reverses the next day?",
+             "tool": "jumps", "args": {"series_id": "{id}", "start": "{start_recent}"}},
+            {"step": 5, "each": "pairs_long", "why": "Is the gap of {a} from {b} the same value several days running?",
+             "tool": "jumps", "args": {"series_id": "{a}", "series_b": "{b}", "start": "{start_recent}"}},
+            {"step": 4, "covers": [4, 5], "why": "The daily values, to read what the two tools find.",
              "tool": "get_data", "args": {"series_ids": "{ids}", "start": "{start_recent}"}},
         ],
-        # tools the routine wants that the server does not have yet: shown as one line, never as calls
-        "planned": [
-            {"tool": "gap_breakpoints", "step": 4, "why": "break detection on the gap between two series"},
-            {"tool": "jumps", "step": 5, "why": "one-day jumps that reverse"},
-        ],
+        "planned": [],
     },
     {
         "id": "high-or-low-for-the-season",
@@ -146,6 +147,8 @@ MCP_TOOLS: dict[str, set[str]] = {
     "term_structure": {"prefix", "n_maturities"},
     "report": {"series_ids", "sections", "preset", "lookback_days", "forecast_horizon", "start", "end", "watchlist",
                "curve_prefix", "positioning_series"},
+    "gap_breakpoints": {"series_a", "series_b", "start", "end", "min_shift", "min_size"},
+    "jumps": {"series_id", "series_b", "start", "end", "k"},
     "stats": {"series_id", "start", "end"},
     "latest": {"series_ids", "include_coverage", "watchlist"},
 }
