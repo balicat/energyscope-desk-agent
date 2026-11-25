@@ -210,6 +210,11 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("fix B", [W30], "WTI fell 17.26% over 30 days; no χ² test is run."),
     ("fix B", [W30], "WTI fell 17.26% over 30 days; C₂+ liquids are not covered."),
     ("fix B", [W30], "WTI is at $⁸⁹.⁵³ after falling ¹⁷.²⁶% over 30 days."),
+    # review of 6f63817 (25 Nov 2026), minor (B): notation must still pass once a lowered digit after a currency code
+    # or a plain word is read as a number
+    ("r4 B", [W30], "WTI fell 17.26% over 30 days; CO₂, C₃, MTCO₂e and lbCO₂ are not covered."),
+    ("r4 B", [W30], "WTI fell 17.26% over 30 days; As₂O₃, In₂O₃, Na₂CO₃ and H₂SO₄ are not energy series."),
+    ("r4 B", [W30], "WTI fell 17.26% over 30 days; no regression on x₁ or log₁₀ of the price is run."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -232,6 +237,9 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("brief B", [W30], "WTI fell 17.26% over 30 days.¹"),
     ("brief B", [W30], "WTI fell 17.26%¹ over 30 days."),
     ("brief B", [W30], "WTI fell 17.26% over 30 days (EIA)²."),
+    # review of 6f63817, minor (B): a lowered digit after a currency code or a plain word is a number
+    ("r4 B", [W30], "WTI could fall to USD₈₀."),
+    ("r4 B", [W30], "WTI could fall to₈₀ dollars."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),

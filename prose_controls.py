@@ -180,6 +180,9 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
                                                                                "settlement³."), "footnote"),
     ("B: a footnote mark after a full stop", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.¹"), "footnote"),
     ("B: a footnote mark after a percent sign", gold("wti_30d", summary="WTI fell 17.26%¹ over 30 days."), "footnote"),
+    # a lowered digit after a currency code or a plain word is a number, not a formula's index (the reviewer of 6f63817)
+    ("B: a price in lowered digits after a currency code", gold("wti_30d", summary="WTI could fall to USD₈₀."), "footnote"),
+    ("B: a price in lowered digits glued to a plain word", gold("wti_30d", summary="WTI could fall to₈₀ dollars."), "footnote"),
     ("B: a direction control character", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl\u202e."), "direction control"),
     ("B: a window in a ligature ('ﬁve-year' for a three-year average)",
      dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a ﬁve-year average of 434,167."),
@@ -240,6 +243,9 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     gold("wti_30d", summary="Propane (C₃) and condensate (C₅+) are not covered; WTI fell 17.26% over 30 days."),
     gold("wti_30d", summary="Emissions in MTCO₂e or lbCO₂ are not covered; WTI fell 17.26% over 30 days."),
     gold("wti_30d", summary="WTI fell 17.26% over 30 days; the variance σ² is not shown, nor gas in Gm³."),
+    # ... and a lowered digit after a chemical symbol that looks like a plain word, or after one letter (an index)
+    gold("wti_30d", summary="WTI fell 17.26% over 30 days; As₂O₃, In₂O₃, Na₂CO₃ and H₂SO₄ are not energy series."),
+    gold("wti_30d", summary="WTI fell 17.26% over 30 days; no regression on x₁ or log₁₀ of the price is run."),
     # the ellipsis stays one character: NFKC writes it as three full stops, which ended the sentence before the number
     # and took the change's verb from it (the reviewer of live-fixes-2, 25 Nov 2026)
     gold("wti_30d", summary="WTI fell… 17.26% over 30 days, to 89.53 dollars."),

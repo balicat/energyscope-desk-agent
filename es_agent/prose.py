@@ -86,15 +86,23 @@ _RAISED_LOWERED = re.compile("[⁰¹²³⁴-⁹₀-₉]")
 _RAISED = re.compile("[⁰¹²³⁴-⁹]+")
 _LOWERED = re.compile("[₀-₉]+")
 _CLOSING = set(".,;:!?)]}%\"'\u2019\u201d\u00bb")
+# A lowered digit after one of these is a number, not notation: a currency code or a plain lowercase word never takes a
+# formula's index ("USD₈₀", "to₈₀": the reviewer of 6f63817, 25 Nov 2026). Matched as written, so a chemical symbol
+# that looks like one ("As₂O₃", "In₂O₃") stays notation.
+_NOT_NOTATION = {"USD", "EUR", "GBP", "usd", "eur", "gbp", "to", "of", "at", "in", "on", "by", "for", "and", "or", "from",
+                 "with", "is", "was", "are", "be", "as", "up", "down", "over", "under", "than", "per", "its", "it", "the",
+                 "an", "near", "about", "around", "above", "below"}
 
 
 def _kept(text: str) -> list[tuple[int, int]]:
     """The spans `normal` keeps as written, in order: the unit and formula glyphs, the ellipsis, and notation (a lowered
-    digit after a letter, a raised digit after a single letter; `str.isalpha`, so a digit is never the letter)."""
+    digit after a letter, not after a currency code or a plain word; a raised digit after a single letter; `str.isalpha`,
+    so a digit is never the letter)."""
     spans = [m.span() for m in _PROTECTED.finditer(text)]
     for m in _LOWERED.finditer(text):
         if m.start() and text[m.start() - 1].isalpha():
-            spans.append(m.span())
+            if re.search(r"[^\W\d_]+$", text[:m.start()])[0] not in _NOT_NOTATION:
+                spans.append(m.span())
     for m in _RAISED.finditer(text):
         i = m.start()
         if i and text[i - 1].isalpha() and (i == 1 or not (text[i - 2].isalpha() or text[i - 2] in "'\u2019-")):
