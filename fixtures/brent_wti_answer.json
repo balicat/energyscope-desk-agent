@@ -1,0 +1,134 @@
+{
+ "facts": [
+  {
+   "series_id": "ICE.BRENT.2027-01.D",
+   "name": "Brent futures 2027-01 (NYMEX BZ, settles on ICE Brent)",
+   "units": "USD/bbl",
+   "latest_period": "2026-11-24",
+   "latest_value": 91.07,
+   "lookback_days": null,
+   "base_period": null,
+   "base_value": null,
+   "change_abs": null,
+   "change_pct": null,
+   "also": {}
+  },
+  {
+   "series_id": "NYMEX.WTI.2027-01.D",
+   "name": "WTI crude oil futures 2027-01 (NYMEX CL)",
+   "units": "USD/bbl",
+   "latest_period": "2026-11-24",
+   "latest_value": 81.69,
+   "lookback_days": null,
+   "base_period": null,
+   "base_value": null,
+   "change_abs": null,
+   "change_pct": null,
+   "also": {}
+  },
+  {
+   "series_id": "PET.RBRTE.D",
+   "name": "Europe Brent Spot Price FOB, Daily",
+   "units": "Dollars per Barrel",
+   "latest_period": "2026-11-17",
+   "latest_value": 92.94,
+   "lookback_days": null,
+   "base_period": null,
+   "base_value": null,
+   "change_abs": null,
+   "change_pct": null,
+   "also": {}
+  },
+  {
+   "series_id": "PET.RWTC.D",
+   "name": "Cushing, OK WTI Spot Price FOB, Daily",
+   "units": "Dollars per Barrel",
+   "latest_period": "2026-11-17",
+   "latest_value": 89.53,
+   "lookback_days": null,
+   "base_period": null,
+   "base_value": null,
+   "change_abs": null,
+   "change_pct": null,
+   "also": {}
+  }
+ ],
+ "spreads": [],
+ "cites": [
+  "fspread:brent_wti"
+ ],
+ "readings": [
+  {
+   "key": "fspread:brent_wti",
+   "title": "Brent minus WTI on futures, 2027-01 delivery",
+   "period": "2026-11-24",
+   "units": "USD/bbl",
+   "series_ids": [
+    "ICE.BRENT.2027-01.D",
+    "NYMEX.WTI.2027-01.D",
+    "PET.RBRTE.D",
+    "PET.RWTC.D"
+   ],
+   "values": {
+    "brent": 91.07,
+    "wti": 81.69,
+    "brent_minus_wti": 9.38,
+    "spread_percentile": 97.1,
+    "observations": 754.0,
+    "spread_p10": 3.61,
+    "spread_p90": 6.84,
+    "spread_spell_days": 76.0,
+    "spread_previous_spell_days": 26.0,
+    "spread_previous_spell_extreme": 8.3,
+    "spread_days_since_previous_spell": 189.0,
+    "spot_brent": 92.94,
+    "spot_wti": 89.53,
+    "spot_brent_minus_wti": 3.41,
+    "spot_spread_percentile": 34.1,
+    "futures_spread_on_spot_date": 8.49,
+    "spot_minus_futures_spread": -5.08,
+    "spot_brent_minus_its_future": -0.2,
+    "spot_wti_minus_its_future": 4.88
+   },
+   "note": "Both legs are the 2027-01 delivery contract, the nearest month both still trade, so the spread compares like with like. The percentile ranks today against this contract pair's own history (up to three years). Brent is NYMEX BZ, which settles against ICE Brent.",
+   "context": "The futures spread has been above the 90th percentile line (6.84) since 2026-09-09, 76 days, allowing for brief dips back. The previous spell was from 2026-04-23 to 2026-05-19 (26 days), reaching 8.30. Spot prices are published days later than futures. On 2026-11-17, the latest date with both, spot Brent minus spot WTI was 3.41 (percentile 34.1 of its last three years) while the 2027-01 futures spread was 8.49. The 5.08 difference is the gap between spot and futures in each market: spot Brent stood 0.20 below its 2027-01 future and spot WTI 4.88 above its own.",
+   "hypothetical": false,
+   "counter": "",
+   "request": null,
+   "value_units": {
+    "brent": "USD/bbl",
+    "wti": "USD/bbl",
+    "brent_minus_wti": "USD/bbl",
+    "spread_p10": "USD/bbl",
+    "spread_p90": "USD/bbl",
+    "spread_previous_spell_extreme": "USD/bbl",
+    "spot_brent": "USD/bbl",
+    "spot_wti": "USD/bbl",
+    "spot_brent_minus_wti": "USD/bbl",
+    "futures_spread_on_spot_date": "USD/bbl",
+    "spot_minus_futures_spread": "USD/bbl",
+    "spot_brent_minus_its_future": "USD/bbl",
+    "spot_wti_minus_its_future": "USD/bbl"
+   },
+   "table": []
+  }
+ ],
+ "summary": "The two spreads disagree because they are measured on different dates and in different markets. The futures Brent-WTI spread on the 2027-01 contract was 9.38 USD/bbl on 2026-11-24, while the spot spread on 2026-11-17 was 3.41 USD/bbl. On the same date, 2026-11-17, the futures spread was 8.49, so the 5.08 gap comes from spot prices sitting far from their own 2027-01 futures: spot Brent was 0.20 below its future and spot WTI was 4.88 above its future.",
+ "caveats": [
+  "Spot prices are published several days later than futures, so the spot and futures figures in this answer are for different dates (2026-11-17 for spot, 2026-11-24 for futures).",
+  "The futures spread is at the 97.1 percentile of its contract-pair history and has been above the 90th percentile line since 2026-09-09, while the spot spread sits at the 34.1 percentile of its last three years.",
+  "Spot prices are for the prompt cargo or barrel; the futures figures are for delivery in 2027-01, so the comparison mixes timing as well as market.",
+  "Not current as of 2026-11-25: PET.RBRTE.D, PET.RWTC.D end on 2026-11-17 (8 days ago)."
+ ],
+ "id": "31100f141589",
+ "checked": true,
+ "check_problems": [],
+ "retries": 0,
+ "follow_up": false,
+ "model": "anthropic:claude-haiku-5-5",
+ "seconds": 5.98,
+ "tokens": 30559,
+ "degraded": false,
+ "degraded_reason": null,
+ "usd": 0.00085
+}
