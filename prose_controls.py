@@ -246,6 +246,11 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("1: a dod", dict(readings=[period_rep], summary="WTI fell 0.42 dollars on the day."), _SIDE),
     ("1: a chg", dict(readings=[period_rep], summary="WTI fell 1.37 dollars."), _SIDE),
     ("1: a yoy_pct", dict(readings=[period_rep], summary="US crude stocks are up 2.29% on the year."), _SIDE),
+    # ... and, since the review of bb2c261 (25 Nov 2026, the rule now reads only a plain statement), the shapes it reads
+    ("1: the side word after a long unit, in the present tense, with the change's own period",
+     gold("eia_weekly_brief", summary="Crude imports are 1,122 thousand barrels per day higher on the week."), _SIDE),
+    ("1: a wrong side before a sentence that opens with 'No' and takes nothing back",
+     gold("regime_signals", summary="Cushing stocks rose 4.0% on the week. No other hub built as much."), _SIDE),
     # live item 2: a comparative on the wrong side of a spread between two named series (Brent - WTI = +3.41; on futures,
     # the reading's brent_minus_wti = +8.94); d029c9c read only above, below, over, under, premium and discount
     ("2: 'lower than' with the spread's first series as subject",
@@ -259,6 +264,8 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("2: 'less expensive than'", gold("brent_wti_spread", summary="Brent is 3.41 dollars a barrel less expensive than WTI."),
      "points the wrong way"),
     ("2: a reading's a_minus_b gap (futures)", gold("futures_spread", summary="Brent futures are 8.94 dollars cheaper than WTI futures."),
+     "points the wrong way"),
+    ("2: the other series named after a verb", gold("brent_wti_spread", summary="The gap leaves WTI 3.41 dollars dearer than Brent."),
      "points the wrong way"),
     # live item 3: a change's base value written beside another value's date (d029c9c traced the number and the date
     # each on its own); the sandbox reviewer's break cases among them
@@ -276,6 +283,54 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("3: a 30-day base given the latest date", gold("wti_30d", summary="As of 2026-11-17, WTI spot was $108.21 a barrel."), _BASE),
     ("3: a year-ago base in code's million barrels, given the latest date",
      gold("us_crude_yoy", summary="US crude stocks were 427.58 million barrels on 2026-11-13."), _BASE),
+    ("3: ... as the 'spot price', the plain dated level", dict(facts=[wti_far], summary="As of 2026-11-17, WTI spot price was $139.69 "
+                                                                                       "a barrel."), _BASE),
+]
+
+# The review of bb2c261's evidence (25 Nov 2026), and the builder's sentences beside it: true, accepted by d029c9c,
+# refused by bb2c261. Item 1: a period change looked back on (the side word after a past tense describes the earlier
+# level), supposed, asked or corrected; item 2: a comparative denied, asked, supposed or corrected; item 3: a base
+# value in a premise corrected, or placed in another time by a word no list holds.
+RIGHT_BB2C261 = [
+    gold("eia_weekly_brief", summary="Brent's year-ago price was 28.08 dollars lower."),
+    gold("eia_weekly_brief", summary="A year ago, Brent was 28.08 dollars lower."),
+    gold("eia_weekly_brief", summary="Year-ago Cushing stocks were 4.33 million barrels lower."),
+    gold("eia_weekly_brief", summary="Cushing stocks were 1.21 million barrels higher a week ago."),
+    gold("eia_weekly_brief", summary="Last week, Cushing stocks stood 1.21 million barrels higher."),
+    gold("eia_weekly_brief", summary="Week-ago Cushing stocks were 1.21 million barrels higher."),
+    gold("eia_weekly_brief", summary="A year ago, US crude stocks were 6.36 million barrels higher."),
+    gold("eia_weekly_brief", summary="Gasoline stocks rose 5.19 million barrels; a week ago they were 5.19 million barrels lower."),
+    gold("eia_weekly_brief", summary="Last week's Cushing stocks were 1.21 million barrels higher than this week's."),
+    gold("eia_weekly_brief", summary="Cushing stocks would have to rise 1.21 million barrels to get back to last week's level."),
+    gold("eia_weekly_brief", summary="To get back to last week's level, Cushing stocks would need to rise 1,209 thousand barrels."),
+    gold("regime_signals", summary="The claim that Cushing stocks rose 4.05% on the week is wrong; they fell 4.05%."),
+    gold("regime_signals", summary="You suggest Cushing stocks rose 4.05% this week; the data show they fell 4.05%."),
+    gold("regime_signals", summary="Did Cushing stocks rise 4.05% on the week? No: they fell 4.05%."),
+    gold("eia_weekly_brief", summary="Is Cushing up 1.21 million barrels on the week? No: it is down 1.21 million."),
+    gold("regime_signals", summary="Cushing stocks rose 4.05% on the week. In fact they fell 4.05%."),
+    gold("regime_signals", summary="Undoing the week's draw takes a rise of 4.05%."),
+    gold("regime_signals", summary="Cushing stocks ended up 4.05% lower on the week."),
+    gold("regime_signals", summary="Cushing's weekly change has been as large as +4.05% this year."),
+    gold("regime_signals", summary="Cushing stocks swung from +4.05% to -4.05% over two weeks."),
+    gold("brent_wti_spread", summary="Brent is not 3.41 dollars cheaper than WTI."),
+    gold("brent_wti_spread", summary="WTI isn't 3.41 dollars dearer than Brent."),
+    gold("brent_wti_spread", summary="No, WTI is not 3.41 dollars higher than Brent."),
+    gold("brent_wti_spread", summary="Contrary to the question, WTI is not 3.41 dollars dearer than Brent."),
+    gold("brent_wti_spread", summary="WTI is not $3.41 dearer than Brent; it is $3.41 cheaper."),
+    gold("brent_wti_spread", summary="Brent is not 3.41 dollars cheaper than WTI, it is 3.41 dollars dearer."),
+    gold("brent_wti_spread", summary="The claim that WTI is 3.41 dollars dearer than Brent is wrong: Brent is the dearer."),
+    gold("brent_wti_spread", summary="Is WTI 3.41 dollars dearer than Brent? No: Brent is 3.41 dollars dearer than WTI."),
+    gold("brent_wti_spread", summary="If WTI were 3.41 dollars dearer than Brent, the arbitrage would run the other way."),
+    gold("futures_spread", summary="Brent futures are not 8.94 dollars cheaper than WTI futures."),
+    gold("futures_spread", summary="WTI futures are not 8.94 dollars higher than Brent futures."),
+    gold("brent_wti_spread", summary="WTI is 3.41 dollars dearer than Brent. In fact, Brent is."),
+    gold("brent_wti_spread", summary="WTI is 3.41 dollars higher than Brent was a year ago, by one account."),
+    dict(facts=[wti_far], summary="It is false that WTI was $139.69 on 2026-11-17: it was 89.53 dollars."),
+    dict(facts=[wti_far], summary="The claim that WTI was $139.69 on 2026-11-17 is wrong; that was its price on 2008-06-27."),
+    dict(facts=[wti_far], summary="You suggest WTI spot was $139.69 a barrel on 2026-11-17; the data put it at 89.53."),
+    dict(facts=[wti_far], summary="As of 2026-11-17, WTI's pre-crisis price was 139.69."),
+    dict(facts=[wti_far], summary="WTI spot was $139.69 a barrel at the far end of the window that ends on 2026-11-17."),
+    dict(facts=[wti_far], summary="WTI's spot price on 2008-06-27, as of 2026-11-17, was $139.69."),
 ]
 
 FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
@@ -392,6 +447,9 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     gold("us_crude_yoy", summary="US crude stocks were 427.58 million barrels on 2025-11-07 and 417.8 million on 2026-11-13."),
     dict(facts=[wti_far], summary="Eighteen years before 2026-11-17, WTI was 139.69."),
     gold("us_crude_yoy", summary="A year before 2026-11-13, US crude stocks were 427,581 thousand barrels."),
+    # the review of bb2c261 (25 Nov 2026): true sentences each live rule refused there, accepted by d029c9c; the rules
+    # now judge only a plain statement (es_agent/prose.py _plainly_stated). Each is also kept as a caveat (main).
+    *RIGHT_BB2C261,
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
@@ -768,6 +826,20 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
     ("C, dropped from this branch: a rounded change given the wrong side",
      gold("wti_30d", "us_rigs_yoy", summary="WTI rose 17%; rigs fell 11%.")),
     ("D, moved to the lab branch: a 30-day change called the week's", gold("wti_30d", summary="WTI fell 17.26% over the week.")),
+    # the live rules of 25 Nov 2026 judge only a plain statement (the review of bb2c261): wrong sentences they leave
+    # unread, accepted by both trees
+    ("live 1, narrow on purpose: a sentence that names another period",
+     gold("regime_signals", summary="Cushing stocks are 4.05% higher on the week, but down on the month.")),
+    ("live 1, narrow on purpose: a sentence that speaks to the visitor",
+     gold("regime_signals", summary="You asked about Cushing: stocks rose 4.05% on the week.")),
+    ("live 1, narrow on purpose: the side word after a past tense (it may describe the earlier level)",
+     gold("eia_weekly_brief", summary="Cushing stocks were 1.21 million barrels higher on the week.")),
+    ("live 2, narrow on purpose: a comparative before the number",
+     gold("brent_wti_spread", summary="Brent is cheaper than WTI by 3.41 dollars.")),
+    ("live 2, narrow on purpose: a negation anywhere in the sentence",
+     gold("brent_wti_spread", summary="WTI is 3.41 dollars dearer than Brent, not cheaper.")),
+    ("live 3, narrow on purpose: any word beyond the plain dated level",
+     dict(facts=[wti_far], summary="As of 2026-11-17, WTI spot was still $139.69 a barrel.")),
 ]
 
 
@@ -810,6 +882,15 @@ def main() -> int:
     ok = kept == ["Cushing stocks are 4.05% lower on the week."]
     print(f"{'dropped  ' if ok else 'KEPT     '} a model caveat giving the 7-day change the wrong side: kept {kept}")
     failed += not ok
+    # the review of bb2c261: its true sentences written as model caveats are kept (bb2c261 dropped them)
+    for kw in RIGHT_BB2C261:
+        body = dict(kw)
+        line = body.pop("summary")
+        a = DeskAnswer(**body, summary="", caveats=[line])
+        kept = prose.clean_caveats(a)
+        if kept != [line]:
+            print(f"DROPPED  a true caveat: {line}")
+        failed += kept != [line]
     for kw in RIGHT:
         found = problems(kw)
         if found:
@@ -860,8 +941,9 @@ def main() -> int:
         if found:
             print(f"REJECTED the recorded answer {name}: {found}")
         failed += bool(found)
-    print(f"{len(WRONG) + len(FIXES_LF2B)} wrong answers, {len(RIGHT) + len(FIXES_LF2B_RIGHT)} right answers, {len(golden)} "
-          f"recorded answers, {len(LIMIT)} known limits; {failed} expectation(s) not met")
+    print(f"{len(WRONG) + len(FIXES_LF2B)} wrong answers, {len(RIGHT) + len(FIXES_LF2B_RIGHT)} right answers "
+          f"({len(RIGHT_BB2C261)} of them also as caveats), {len(golden)} recorded answers, {len(LIMIT)} known limits; "
+          f"{failed} expectation(s) not met")
     return 1 if failed else 0
 
 
