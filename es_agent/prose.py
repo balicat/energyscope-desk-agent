@@ -357,6 +357,9 @@ class Pool:
     converted: set[int] = field(default_factory=set)
     # entries of `tagged` that are a window or a count of the data (years, observations, a lookback): with a noun only
     metas: dict[int, str] = field(default_factory=dict)
+    # entries of `tagged` that are a change's base value (a fact's base_value and code's million-barrel figure of it),
+    # with its own date: quotable with that date or none (`_base_problem`)
+    bases: dict[int, set[dt.date]] = field(default_factory=dict)
     units: str = ""                                 # units and labels of everything cited, normalised
     # every quotable number with its kind and its unit: the unit a tool gave it, "percent" for a percent, "1" for a
     # number with none (a z-score, a correlation), None where code does not know it (a reading of mixed units)
@@ -486,15 +489,19 @@ def pool_of(answer: DeskAnswer) -> Pool:
     answer = _normal_answer(answer)
     p = Pool()
     for f in answer.facts:
-        for x in (f.latest_value, f.base_value, f.change_abs):
+        for which, x in (("latest", f.latest_value), ("base", f.base_value), ("change", f.change_abs)):
             if x is not None:
                 p.put(x, "amount", f.units)
+                if which == "base" and f.base_period is not None:
+                    p.bases.setdefault(len(p.tagged) - 1, set()).add(f.base_period)
                 # the year-ago level and the change may be written in million barrels, as the latest may (`also`):
                 # code converts all three (24 Nov 2026; the sweep's us_crude_yoy send-back, "427.58")
                 for name, conv in also_in(f.units or "", x).items():
                     p.put(conv, "amount", name.replace("_", " "))
                     p.label(name)
                     p.converted.add(len(p.tagged) - 1)
+                    if which == "base" and f.base_period is not None:
+                        p.bases.setdefault(len(p.tagged) - 1, set()).add(f.base_period)
         if f.change_pct is not None:
             p.put(f.change_pct, "percent", None)
         if f.lookback_days is not None:
@@ -793,7 +800,80 @@ def text_problems(text: str, pool: Pool) -> list[str]:
             bad.append(f"{tok} {scale.group(1)} (no cited series is in that unit)")
         elif per and unit_key(per.group(1)) not in pool.units:
             bad.append(f"{tok} per {per.group(1)} (no cited series is in that unit)")
+        if all(i in pool.bases for i, _ in hits):
+            problem = _base_problem(text, clean, start, end, tok, set().union(*(pool.bases[i] for i, _ in hits)))
+            if problem:
+                bad.append(problem)
     return bad
+
+
+# ---- a base value beside another value's date (live item 3, 25 Nov 2026) --------------------------------------------
+# A change's base value is quotable with its own date or with none. Until then any returned date could stand beside it:
+# with get_change at a lookback of 6717 days (WTI's base 139.69 on 2008-06-27 in the frozen data), "As of 2026-11-17,
+# WTI spot was $139.69 a barrel." passed (the adversary's 6.D, found on the sandbox, reproduced on d029c9c). Now a
+# number that quotes nothing but base values, written as a level ("was $139.69", "traded at 139.69", "a price of",
+# ": 139.69"), with a date of its own that is not the base's date, is sent back. Its date is the first date after it in
+# the sentence (to a full stop or semicolon) with no other number between ("139.69 on 2026-11-17", "139.69 a barrel,
+# on 2026-11-17", "USD139.69 ... (2026-11-17)"), else a date before it with no number before or after it up to the
+# base ("As of 2026-11-17, WTI spot was ...", "WTI spot, from the 2026-11-17 data, was ...", "WTI's
+# 2026-11-17-dated price was"): a date written after another number is that number's.
+# Only the base's own data date is its own: never another value's, and never a date a tool was asked for.
+# Read as before (not judged): a base written as where a move started or as a comparison ("from 139.69", "against",
+# "versus", "than"), a clause that places it in another time or names it as a base ("earlier", "ago", "before",
+# "then", "back", "at the time", "last month", "first", "start", "opening", "base", a year standing alone ...: any of
+# these in its clause, up to the nearest comma), and a level written with any other word before it.
+_BASE_LEVEL = re.compile(r"(?:\b(?:was|is|were|are|at|of|stood|stands|traded|trades|closed|closes|settled|settles|printed|"
+                         r"prints|sat|sits|reached|reaches|hit|hits|fetched|fetches|cost|costs|priced|quoted)|[:=(,])\s*"
+                         r"(?:usd|us\$|eur|gbp|[$\u20ac\u00a3])?\s*$", re.I)
+_BASE_CUE = re.compile(
+    r"\b(?:from|since|against|versus|vs|than|compared|comparison|relative|base|baseline|reference|first|earliest|oldest|"
+    r"start|starts|started|starting|began|begin|begins|beginning|opening|opened|opens|initial|initially|earlier|previous|"
+    r"previously|prior|old|original|originally|former|formerly|then|ago|before|back|once|used|when|while|high|highs|low|"
+    r"lows|peak|peaked|trough|record|max|maximum|min|minimum|lookback|history|historical|historically|past|"
+    r"at\s+the\s+time|(?:last|that|the\s+previous|the\s+prior)\s+(?:week|month|quarter|year|time|summer|winter|spring|autumn))\b"
+    r"|(?<!\d)(?:19|20)\d\d(?!\d)", re.I)
+
+
+# a joining word between a base and a date starts another clause, which the date belongs to ("WTI was 139.69, and on
+# 2026-11-17 it was 89.53"); a date written after a determiner qualifies what follows it ("... and its 2026-11-17
+# price 89.53")
+_JOINED = re.compile(r"\b(?:and|but|while|whilst|whereas|yet|or|nor|so|though|although|because|after|before|since|"
+                     r"until|when|then)\b", re.I)
+_DATE_OF_NEXT = re.compile(r"(?:\b(?:its|their|the|a|an|this|that)|['’]s)\s*$", re.I)
+
+
+def _base_problem(text: str, clean: str, start: int, end: int, tok: str, own: set[dt.date]) -> str | None:
+    """The reason the base value written at clean[start:end] is sent back, or None (see above). `text` is `clean` with
+    its dates, which `clean` blanks."""
+    if not _BASE_LEVEL.search(clean[max(0, start - 24):start]):
+        return None
+    lo = max([m.end() for m in re.finditer(r"[;:()\[\]]|,(?!\d)", clean[:start])], default=0)
+    hi = next((lo2.start() + end for lo2 in re.finditer(r"[;:()\[\]]|,(?!\d)|[.!?](?:\s|$)", clean[end:])), len(clean))
+    if _BASE_CUE.search(clean, lo, hi):
+        return None
+    s0 = max([m.end() for m in re.finditer(r"[.!?;](?:\s|$)", text[:start])], default=0)
+    stop = re.search(r"[.!?;](?:\s|$)", text[end:])
+    s1 = end + stop.start() if stop else len(text)
+    dates = [m for m in _ISO.finditer(text, s0, s1)]
+    later = next((m for m in dates if m.start() >= end), None)
+    earlier = next((m for m in reversed(dates) if m.end() <= start), None)
+    if (later is not None and not _DIGITS.search(clean, end, later.start()) and not _JOINED.search(clean, end, later.start())
+            and not _DATE_OF_NEXT.search(clean[:later.start()])):
+        beside = later
+    elif (earlier is not None and not _DIGITS.search(clean, earlier.end(), start) and not _DIGITS.search(clean, s0, earlier.start())
+          and not _JOINED.search(clean, earlier.end(), start)):
+        beside = earlier   # a date that follows another number is that number's ("26,147 on 2026-11-13 (27,594)")
+    else:
+        return None
+    try:
+        day = dt.date.fromisoformat(beside.group())
+    except ValueError:
+        return None
+    if day in own:
+        return None
+    mine = ", ".join(sorted(d.isoformat() for d in own))
+    return (f"{tok} (a base value, of {mine}, written beside {beside.group()}, another value's date: write it with its "
+            f"own date, {mine}, or with none)")
 
 
 def _meta_before(clean: str, start: int, pool: Pool, hits: list) -> bool:

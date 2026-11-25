@@ -39,6 +39,19 @@ WTI_7 = {"series_id": "PET.RWTC.D", "name": "Cushing, OK WTI Spot Price FOB, Dai
          "latest_period": "2026-11-17", "latest_value": 89.53, "lookback_days": 7, "base_period": "2026-11-10",
          "base_value": 89.62, "change_abs": -0.09, "change_pct": -0.100424}
 
+# live item 3: get_change at a lookback of 6717 days, as it returns from the frozen data (WTI's and Brent's base of
+# 2008-06-27), and the adversary's figure for the same hole (44.60 at the end of 2008)
+WTI_FAR = {"series_id": "PET.RWTC.D", "name": "Cushing, OK WTI Spot Price FOB, Daily", "units": "Dollars per Barrel",
+           "latest_period": "2026-11-17", "latest_value": 89.53, "lookback_days": 6717, "base_period": "2008-06-27",
+           "base_value": 139.69, "change_abs": -50.16, "change_pct": -35.908082}
+BRENT_FAR = {"series_id": "PET.RBRTE.D", "name": "Europe Brent Spot Price FOB, Daily", "units": "Dollars per Barrel",
+             "latest_period": "2026-11-17", "latest_value": 92.94, "lookback_days": 6717, "base_period": "2008-06-27",
+             "base_value": 139.38, "change_abs": -46.44, "change_pct": -33.318984}
+WTI_FAR44 = {"series_id": "PET.RWTC.D", "name": "Cushing, OK WTI Spot Price FOB, Daily", "units": "Dollars per Barrel",
+             "latest_period": "2026-11-17", "latest_value": 89.53, "lookback_days": 6530, "base_period": "2008-12-31",
+             "base_value": 44.60, "change_abs": 44.93, "change_pct": 100.73991}
+FACTS = {"wti_7": WTI_7, "wti_far": WTI_FAR, "brent_far": BRENT_FAR, "wti_far44": WTI_FAR44}
+
 HH, FR, FC = "henry_hub_percentile", "freight_history", "futures_crack"
 BWS, POS, C321 = "brent_wti_spread", "wti_positioning", "crack_321"
 W30, RIGS, C4W, CYOY, W5, SURP = "wti_30d", "us_rigs_yoy", "cushing_4w", "us_crude_yoy", "wti_five_years", "week_surprises"
@@ -327,6 +340,63 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("live 2", [SREV], "Brent is 3.41 dollars higher than WTI, below its 5.56 mean."),
     ("live 2", [FSP], "WTI futures are 8.94 dollars lower than Brent futures for 2027-01 delivery."),
     ("live 2", [BWS, W30], "The Brent-WTI spread of 3.41 dollars is lower than WTI's 30-day fall of 18.68 dollars."),
+    # live item 3 (25 Nov 2026): a change's base value with its own date, with none, or written as where a move started
+    ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel on 2008-06-27."),
+    ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel."),
+    ("live 3", ["wti_far"], "WTI spot was $89.53 a barrel on 2026-11-17, down 50.16 (35.91%) from $139.69 on 2008-06-27, 6717 days earlier."),
+    ("live 3", ["wti_far"], "WTI fell from $139.69 to $89.53 on 2026-11-17."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI had fallen from 139.69 to 89.53."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI was 89.53, against 139.69 on 2008-06-27."),
+    ("live 3", ["wti_far"], "WTI was 139.69 and is now 89.53 as of 2026-11-17."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI's base value was 139.69."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, the 6717-day change runs from 139.69."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, the window's first value was 139.69."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, the starting level was 139.69."),
+    ("live 3", ["wti_far"], "Eighteen years earlier, on 2008-06-27, WTI was 139.69."),
+    ("live 3", ["wti_far"], "WTI has fallen 50.16 dollars since 2008-06-27, when it was 139.69."),
+    ("live 3", ["wti_far"], "WTI is 89.53 on 2026-11-17, compared with 139.69 on 2008-06-27."),
+    ("live 3", ["wti_far"], "WTI is 89.53 on 2026-11-17 versus 139.69."),
+    ("live 3", ["wti_far"], "WTI was 139.69 at the start of the window and 89.53 on 2026-11-17."),
+    ("live 3", ["wti_far"], "At the time, on 2008-06-27, WTI was 139.69."),
+    ("live 3", [W30], "WTI was 89.53 on 2026-11-17, down 18.68 (17.26%) from 108.21 on 2026-10-16, 30 days earlier."),
+    ("live 3", [W30], "WTI fell 17.26% to 89.53 on 2026-11-17 from 108.21 thirty days earlier."),
+    ("live 3", [W30], "WTI was down 17.26% from 108.21 on 2026-11-17."),
+    ("live 3", [W30], "On 2026-11-17 WTI was 89.53, down from 108.21."),
+    ("live 3", [W30], "As of 2026-11-17, WTI was down 17.26% from 108.21."),
+    ("live 3", [W30], "As of 2026-11-17, WTI was 89.53, and 30 days earlier it was 108.21."),
+    ("live 3", [W30], "As of 2026-11-17, WTI was 89.53 and the month-ago price 108.21."),
+    ("live 3", [W30], "As of 2026-11-17, WTI was 89.53, a month after it stood at 108.21."),
+    ("live 3", [W30], "WTI was 108.21 on 2026-10-16 and 89.53 on 2026-11-17."),
+    ("live 3", [W30], "WTI stood at 108.21 a month before 2026-11-17."),
+    ("live 3", [W30], "As of 2026-11-17, WTI was 108.21 last month and 89.53 now."),
+    ("live 3", [CYOY], "US crude stocks were 417,797 thousand barrels on 2026-11-13, against 427,581 a year earlier."),
+    ("live 3", [CYOY], "US crude stocks were 427,581 thousand barrels a year before 2026-11-13."),
+    ("live 3", [CYOY], "US crude stocks were 427.58 million barrels on 2025-11-07 and 417.8 million on 2026-11-13."),
+    ("live 3", [CYOY], "As of 2026-11-13, US crude stocks were 417,797 thousand barrels, down from 427,581 a year earlier."),
+    ("live 3", ["wti_far", "brent_far"], "As of 2026-11-17, Brent was 92.94 and WTI 89.53; on 2008-06-27 they were 139.38 and 139.69."),
+    ("live 3", [C4W], "Cushing stocks fell to 26,147 thousand barrels on 2026-11-13 (27,594)."),
+    ("live 3", [C4W], "Cushing stocks were 26,147 thousand barrels on 2026-11-13, 27,594 on 2026-10-16."),
+    ("live 3", [C4W], "Cushing stocks were 26,147 thousand barrels on 2026-11-13 (27,594 four weeks earlier)."),
+    ("live 3", [C4W], "Over the four weeks to 2026-11-13, Cushing stocks fell from 27,594 to 26,147 thousand barrels."),
+    ("live 3", [C4W], "Cushing stocks were 26,147 thousand barrels on 2026-11-13; on 2026-10-16 they were 27,594."),
+    ("live 3", [C4W], "On 2026-10-16 Cushing stocks were 27,594 thousand barrels."),
+    ("live 3", ["wti_far"], "WTI was 89.53 dollars on 2026-11-17 and 139.69 dollars on 2008-06-27."),
+    ("live 3", ["wti_far"], "WTI spot was $89.53 a barrel on 2026-11-17 ($139.69 on 2008-06-27)."),
+    ("live 3", ["wti_far"], "WTI spot, at 89.53 on 2026-11-17, is far below 139.69."),
+    ("live 3", ["wti_far"], "The 6717-day change to 2026-11-17 starts at 139.69."),
+    ("live 3", ["wti_far"], "WTI's change to 2026-11-17 is measured against 139.69."),
+    ("live 3", ["wti_far"], "WTI spot was $89.53 on 2026-11-17: the lookback value is $139.69."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, the base of the comparison is $139.69."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI is 89.53, down 50.16 from 139.69."),
+    ("live 3", ["wti_far", W30], "As of 2026-11-17, WTI was 89.53; 30 days earlier it was 108.21 and 6717 days earlier 139.69."),
+    ("live 3", ["wti_far"], "WTI's 2008-06-27 price was 139.69 and its 2026-11-17 price 89.53."),
+    ("live 3", ["wti_far"], "WTI was 139.69, and on 2026-11-17 it was 89.53."),
+    ("live 3", ["wti_far"], "WTI was 139.69 but on 2026-11-17 it was 89.53."),
+    ("live 3", ["wti_far"], "WTI peaked at 139.69, and on 2026-11-17 it was 89.53."),
+    ("live 3", ["wti_far"], "WTI was 139.69 a barrel while the 2026-11-17 price is 89.53."),
+    ("live 3", ["wti_far"], "WTI was 139.69; on 2026-11-17 it was 89.53."),
+    ("live 3", ["wti_far"], "WTI was 139.69 against a 2026-11-17 close of 89.53."),
+    ("live 3", ["wti_far", "brent_far"], "Brent was 139.38 and WTI 139.69 on 2008-06-27; on 2026-11-17 they were 92.94 and 89.53."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -340,6 +410,18 @@ REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's la
     # live item 2's probes: true, and refused by both on d029c9c's rule that a quoted change needs rose or fell
     ("live 2 old rule", [BWS, W30], "The 3.41 spread is less than WTI's 30-day move of 18.68 dollars."),
     ("live 2 old rule", [BWS, W30], "Brent's 3.41 premium is smaller than WTI's 18.68 fall over 30 days."),
+    # live item 3's probes, true, and refused by both trees on older rules (a bare year, a short count, a quoted change
+    # with no rose or fell)
+    ("live 3 old rules", ["wti_far"], "Back in 2008, WTI was 139.69; as of 2026-11-17 it is 89.53."),
+    ("live 3 old rules", ["wti_far"], "In 2008 WTI was 139.69, against 89.53 on 2026-11-17."),
+    ("live 3 old rules", ["wti_far"], "WTI was 139.69 in 2008 and is 89.53 on 2026-11-17."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI is 89.53; it was 139.69 about 18 years ago."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI is 50.16 dollars below its 2008-06-27 level of 139.69."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was down 35.91% on its 2008 level of 139.69."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was 50.16 dollars below its level of 139.69."),
+    ("live 3 old rules", ["wti_far"], "On 2026-11-17 WTI was 89.53 dollars, 50.16 below the 139.69 it fetched on 2008-06-27."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was 89.53, half the 139.69 of mid-2008."),
+    ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was 89.53 dollars, well under its 2008 peak of 139.69."),
 ]
 
 MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
@@ -397,6 +479,31 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("live 2", [FSP], "WTI futures are 8.94 dollars higher than Brent."),
     ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent spot."),
     ("live 2", [BWS], "Brent spot is 3.41 dollars lower than WTI spot on the day."),
+    # live item 3: a change's base value written beside another value's date
+    ("live 3", ["wti_far44"], "As of 2026-11-17, WTI spot was $44.60 a barrel."),
+    ("live 3", ["wti_far44"], "WTI spot was $44.60 a barrel on 2026-11-17."),
+    ("live 3", ["wti_far44"], "WTI spot was $44.60 a barrel, on 2026-11-17."),
+    ("live 3", ["wti_far44"], "WTI spot, from the 2026-11-17 data, was $44.60 a barrel."),
+    ("live 3", ["wti_far44"], "WTI spot was USD44.60 a barrel on 2026-11-17."),
+    ("live 3", ["wti_far44"], "WTI's 2026-11-17-dated spot price was $44.60 a barrel."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI spot was $139.69 a barrel."),
+    ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel, on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI spot, from the 2026-11-17 data, was $139.69 a barrel."),
+    ("live 3", ["wti_far"], "WTI spot was USD139.69 a barrel on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI's 2026-11-17-dated spot price was $139.69 a barrel."),
+    ("live 3", ["wti_far"], "On 2026-11-17 WTI spot traded at 139.69 dollars."),
+    ("live 3", ["wti_far"], "WTI spot: $139.69 (2026-11-17)."),
+    ("live 3", [W30], "As of 2026-11-17, WTI spot was $108.21 a barrel."),
+    ("live 3", [CYOY], "As of 2026-11-13, US crude stocks were 427,581 thousand barrels."),
+    ("live 3", [CYOY], "US crude stocks were 427.58 million barrels on 2026-11-13."),
+    ("live 3", ["wti_far", "brent_far"], "As of 2026-11-17, Brent spot was $139.38 a barrel."),
+    ("live 3", [C4W], "As of 2026-11-13, Cushing stocks were 27,594 thousand barrels."),
+    ("live 3", [C4W], "Cushing stocks were 27,594 thousand barrels on 2026-11-13."),
+    ("live 3", ["wti_far"], "WTI spot stood at $139.69 a barrel on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI spot closed at $139.69 on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI spot printed $139.69 on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel as of 2026-11-17."),
 ]
 
 LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch
@@ -429,8 +536,8 @@ DROPPED = [  # wrong; the brief's C, accepted here as on d029c9c because C is no
 def answer(names: list[str], summary: str) -> DeskAnswer:
     body = {"facts": [], "spreads": [], "readings": [], "summary": summary}
     for n in names:
-        if n == "wti_7":
-            body["facts"].append(WTI_7)
+        if n in FACTS:
+            body["facts"].append(FACTS[n])
             continue
         for part in ("facts", "spreads", "readings"):
             body[part] += G[n].get(part, [])

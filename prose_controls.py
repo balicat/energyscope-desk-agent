@@ -183,6 +183,15 @@ period_rep = Reading(key="report:periods", title="A weekly report", period=D,
                                   "WTI, Cushing.dod": "Dollars per Barrel", "wti_price_chg": "Dollars per Barrel"},
                      request={"tool": "report", "action": "report", "body": {}})
 _SIDE = "is described as a"
+# Live item 3 (25 Nov 2026): a change's base value from far back. get_change on the frozen data at a lookback of 6717
+# days gives WTI's 139.69 of 2008-06-27; wti_far44 is the adversary's figure (44.60 at the end of 2008)
+wti_far = SeriesFact(series_id="PET.RWTC.D", name="Cushing, OK WTI Spot Price FOB, Daily", units="Dollars per Barrel",
+                     latest_period=D, latest_value=89.53, lookback_days=6717, base_period=dt.date(2008, 6, 27),
+                     base_value=139.69, change_abs=-50.16, change_pct=-35.908082)
+wti_far44 = SeriesFact(series_id="PET.RWTC.D", name="Cushing, OK WTI Spot Price FOB, Daily", units="Dollars per Barrel",
+                       latest_period=D, latest_value=89.53, lookback_days=6530, base_period=dt.date(2008, 12, 31),
+                       base_value=44.60, change_abs=44.93, change_pct=100.73991)
+_BASE = "a base value"
 FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     # B: a raised, lowered, circled or full-width character is read as what it shows
     ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
@@ -251,6 +260,22 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
      "points the wrong way"),
     ("2: a reading's a_minus_b gap (futures)", gold("futures_spread", summary="Brent futures are 8.94 dollars cheaper than WTI futures."),
      "points the wrong way"),
+    # live item 3: a change's base value written beside another value's date (d029c9c traced the number and the date
+    # each on its own); the sandbox reviewer's break cases among them
+    ("3: the base value beside the latest date, in another clause",
+     dict(facts=[wti_far44], summary="As of 2026-11-17, WTI spot was $44.60 a barrel."), _BASE),
+    ("3: ... in the same clause", dict(facts=[wti_far44], summary="WTI spot was $44.60 a barrel on 2026-11-17."), _BASE),
+    ("3: ... after a comma", dict(facts=[wti_far44], summary="WTI spot was $44.60 a barrel, on 2026-11-17."), _BASE),
+    ("3: ... with 'from' before the date", dict(facts=[wti_far44], summary="WTI spot, from the 2026-11-17 data, was $44.60 a barrel."),
+     _BASE),
+    ("3: ... with USD glued to the number", dict(facts=[wti_far44], summary="WTI spot was USD44.60 a barrel on 2026-11-17."), _BASE),
+    ("3: ... with a hyphen after the date", dict(facts=[wti_far44], summary="WTI's 2026-11-17-dated spot price was $44.60 a barrel."),
+     _BASE),
+    ("3: the frozen data's own 6717-day base", dict(facts=[wti_far], summary="As of 2026-11-17, WTI spot was $139.69 a barrel."), _BASE),
+    ("3: ... in brackets after its number", dict(facts=[wti_far], summary="WTI spot: $139.69 (2026-11-17)."), _BASE),
+    ("3: a 30-day base given the latest date", gold("wti_30d", summary="As of 2026-11-17, WTI spot was $108.21 a barrel."), _BASE),
+    ("3: a year-ago base in code's million barrels, given the latest date",
+     gold("us_crude_yoy", summary="US crude stocks were 427.58 million barrels on 2026-11-13."), _BASE),
 ]
 
 FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
@@ -351,6 +376,20 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     gold("brent_wti_spread", summary="Brent's premium over WTI narrowed to 3.41 dollars, lower than a year ago."),
     gold("brent_wti_spread", summary="WTI is lower than Brent by 3.41 dollars."),
     gold("futures_spread", summary="WTI futures are 8.94 dollars lower than Brent futures for 2027-01 delivery."),
+    # live item 3: a base value with its own date, with none, or written as where a move started
+    dict(facts=[wti_far], summary="WTI spot was $139.69 a barrel on 2008-06-27."),
+    dict(facts=[wti_far], summary="WTI spot was $89.53 a barrel on 2026-11-17, down 50.16 (35.91%) from $139.69 on 2008-06-27, "
+                                  "6717 days earlier."),
+    dict(facts=[wti_far], summary="As of 2026-11-17, WTI had fallen from 139.69 to 89.53."),
+    dict(facts=[wti_far], summary="WTI is 89.53 on 2026-11-17, compared with 139.69 on 2008-06-27."),
+    dict(facts=[wti_far], summary="WTI was 139.69, and on 2026-11-17 it was 89.53."),
+    dict(facts=[wti_far], summary="WTI's 2008-06-27 price was 139.69 and its 2026-11-17 price 89.53."),
+    dict(facts=[wti_far], summary="As of 2026-11-17, the starting level was 139.69."),
+    dict(facts=[wti_far44], summary="WTI spot was $44.60 a barrel."),
+    gold("wti_30d", summary="As of 2026-11-17, WTI was 89.53, and 30 days earlier it was 108.21."),
+    gold("wti_30d", summary="As of 2026-11-17, WTI was 108.21 last month and 89.53 now."),
+    gold("cushing_4w", summary="Cushing stocks fell to 26,147 thousand barrels on 2026-11-13 (27,594)."),
+    gold("us_crude_yoy", summary="US crude stocks were 427.58 million barrels on 2025-11-07 and 417.8 million on 2026-11-13."),
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
