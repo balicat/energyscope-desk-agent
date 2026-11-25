@@ -31,14 +31,17 @@ Checked, in the summary and in every caveat the model wrote:
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
   "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
   has the same sign as that change, but a wrong one is still wrong;
-- a percentile written as a place (25 Nov 2026). A sentence that puts the subject AT the Nth percentile ("X is at /
-  sits at / trades at / is in the Nth percentile", "X is at its Nth percentile"), with no value of that percentile
-  point after it, claims a rank: N must be a cited rank, rounded as written, never the N of a key (p95). Any other
-  use of "the Nth percentile" is read as before.
+- a percentile written as a place (25 Nov 2026). A plain present-tense sentence that puts the subject AT the Nth
+  percentile ("X is at / sits at / trades at / is in the Nth percentile", "X is at its Nth percentile") claims the
+  latest value's rank: N must be a cited rank, rounded as written, never the N of a key (p95). Not judged, and read as
+  before: a sentence that names that point's value anywhere in the text, has a number in its subject, names another
+  point, negates, corrects, reports or conditions anything, asks, or speaks of the past or of a date (the list is at
+  `_placed_at_percentile`); any other use of "the Nth percentile".
 
 Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
-on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂) and the ellipsis stay as written; a
-fraction sign, a direction control or a footnote digit glued to a word is refused with the way to write it.
+on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂), notation (R², C₃, MTCO₂e) and the
+ellipsis stay as written; a fraction sign, a direction control or a footnote digit (after a word, a digit or a stop)
+is refused with the way to write it.
 
 Not checked, and stated as limits in the README: two true values or dates attached to the wrong
 nouns when they share a unit (Brent's price given to WTI), and claims made in words alone ("a record high", "has narrowed" where no earlier value was
@@ -71,30 +74,56 @@ CODE_CAVEATS = ("Not current as of ", "Against the balance of the evidence: ", "
 # squared unit signs (㎡), and the ellipsis (NFKC writes "…" as three full stops, which would end the sentence there:
 # "WTI fell… 17.26% over 30 days" would lose its verb; the reviewer, 25 Nov 2026); °C and ‰ have no digit. Refused
 # with a plain message (`_glyph_problems`): a fraction sign (½, or the fraction slash NFKC writes for it: "1½" would
-# read as 11⁄2), a direction control (it can reorder what is shown), and a raised or lowered digit glued to a letter
-# or a digit (a footnote mark, "WTI²", "1.20¹"). Zero-width characters are dropped: "1\u200b50" shows as 150 and is
-# read as 150. Ported from live-fixes-2 (2064ff0) with the ellipsis kept whole.
+# read as 11⁄2), a direction control (it can reorder what is shown), and a raised digit that reads as a footnote mark:
+# glued to a word of two or more letters ("WTI²", "settlement³"), to a digit ("1.20¹") or to closing punctuation
+# ("days.¹"). Notation is kept as written, as d029c9c read it (no number; the reviewer of 906e707, 25 Nov 2026: "R²",
+# "σ²", "C₃", "MTCO₂e" and "lbCO₂" were refused as footnotes): a lowered digit after a letter (a formula or an index:
+# CO₂, C₅+, MTCO₂e) and a raised digit after a single letter (an exponent: R², σ², x²). Zero-width characters are
+# dropped: "1\u200b50" shows as 150 and is read as 150. Ported from live-fixes-2 (2064ff0) with the ellipsis kept whole.
 _SQUARES = "".join(chr(c) for c in range(0x3300, 0x3400) if unicodedata.decomposition(chr(c)).startswith("<square>"))
 _PROTECTED = re.compile(
-    r"(?<![A-Za-z])(?:Nm|Sm|km|cm|mm|dm|Mm|MMm|m|ft|in|yd|mi)[²³](?![A-Za-z0-9²³⁰¹⁴-⁹])"
-    r"|(?<![A-Za-z0-9])(?:t|kt|Mt|Gt|kg|g)?(?:CO₂(?:eq|e)?|CH₄|N₂O|SO₂|NO₂|H₂S|H₂O|H₂|O₂|O₃|N₂|NH₃|C₂H₆|C₃H₈|C₄H₁₀|C₂H₄|C₃H₆)"
-    r"(?![A-Za-z0-9₀-₉])"
+    r"(?<![A-Za-z])(?:Nm|Sm|km|cm|mm|dm|dam|hm|Mm|MMm|Gm|Tm|m|ft|in|yd|mi)[²³](?![A-Za-z0-9²³⁰¹⁴-⁹])"
+    r"|(?<![A-Za-z0-9])(?:t|kt|Mt|Gt|kg|g)?(?:CO[₂²](?:eq|e)?|CH₄|N₂O|SO₂|NO₂|H₂S|H₂O|H₂|O₂|O₃|N₂|NH₃|C₂H₆|C₃H₈|C₄H₁₀|C₂H₄|"
+    r"C₃H₆)(?![A-Za-z0-9₀-₉])"
     rf"|[\u2025\u2026\ufe19{_SQUARES}]+")
 _INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad\u180e"))
 _BIDI = re.compile("[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _RAISED_LOWERED = re.compile("[⁰¹²³⁴-⁹₀-₉]")
+_RAISED = re.compile("[⁰¹²³⁴-⁹]+")
+_LOWERED = re.compile("[₀-₉]+")
+_CLOSING = set(".,;:!?)]}%\"'\u2019\u201d\u00bb")
+
+
+def _kept(text: str) -> list[tuple[int, int]]:
+    """The spans `normal` keeps as written, in order: the unit and formula glyphs, the ellipsis, and notation (a lowered
+    digit after a letter, a raised digit after a single letter; `str.isalpha`, so a digit is never the letter)."""
+    spans = [m.span() for m in _PROTECTED.finditer(text)]
+    for m in _LOWERED.finditer(text):
+        if m.start() and text[m.start() - 1].isalpha():
+            spans.append(m.span())
+    for m in _RAISED.finditer(text):
+        i = m.start()
+        if i and text[i - 1].isalpha() and (i == 1 or not (text[i - 2].isalpha() or text[i - 2] in "'\u2019-")):
+            spans.append(m.span())
+    out: list[tuple[int, int]] = []
+    for a, b in sorted(spans):
+        if out and a < out[-1][1]:
+            out[-1] = (out[-1][0], max(b, out[-1][1]))
+        else:
+            out.append((a, b))
+    return out
 
 
 def normal(text: str) -> str:
-    """`text` as the checks read it: NFKC, zero-width characters dropped, the unit glyphs and the ellipsis kept (see
-    above). An all-ASCII text comes back unchanged."""
+    """`text` as the checks read it: NFKC, zero-width characters dropped, the unit glyphs, notation and the ellipsis
+    kept (see above). An all-ASCII text comes back unchanged."""
     if text.isascii():
         return text
     text = text.translate(_INVISIBLE)
     out, at = [], 0
-    for m in _PROTECTED.finditer(text):
-        out += [unicodedata.normalize("NFKC", text[at:m.start()]), m.group()]
-        at = m.end()
+    for a, b in _kept(text):
+        out += [unicodedata.normalize("NFKC", text[at:a]), text[a:b]]
+        at = b
     return "".join(out) + unicodedata.normalize("NFKC", text[at:])
 
 
@@ -107,16 +136,18 @@ def _glyph_problems(text: str) -> list[str]:
            for m in _BIDI.finditer(text)]
     bad += [f"{ch} (write the number in digits, as a decimal)" for ch in dict.fromkeys(text)
             if "⁄" in unicodedata.normalize("NFKC", ch)]
-    kept = [m.span() for m in _PROTECTED.finditer(text)]
+    kept = _kept(text)
     for m in _RAISED_LOWERED.finditer(text):
         i = m.start()
-        if any(a <= i < b for a, b in kept) or i == 0:
+        if any(a <= i < b for a, b in kept) or i == 0 or _RAISED_LOWERED.match(text[i - 1]):
             continue
         before = unicodedata.normalize("NFKC", text[i - 1])
-        if before.isalnum() and not _RAISED_LOWERED.match(text[i - 1]):
+        decimal = before in ".," and i > 1 and normal(text[i - 2]).isdigit()
+        stop = before in _CLOSING and _RAISED.match(text, i) and not decimal
+        if before.isalnum() or stop:   # "1.20¹", "WTI²", "days.¹"; not the decimal point of "⁸⁸.¹⁰" or "88.¹⁰"
             word = re.search(r"\S*$", text[:i + 1])[0][-12:]   # the word it is glued to, as written
-            bad.append(f"{word} (a raised or lowered digit after a letter or a digit reads as a footnote mark or part of "
-                       "the number: write numbers in plain digits, apart from words)")
+            bad.append(f"{word} (a raised or lowered digit after a word, a digit or a stop reads as a footnote mark or "
+                       "part of the number: write numbers in plain digits, apart from words)")
     return list(dict.fromkeys(bad))
 
 
@@ -711,7 +742,7 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         if not clean[:m.start()].rstrip()[-1:].isdigit():  # "414,417 thousand barrels" is a unit, not a spelled number
             bad.append(f"{m.group()} (write the number in digits, from a tool result)")
     for tok, start, end, whole, glued in _numbers(clean):
-        if not glued and _placed_at_percentile(clean, start, end, tok, pool):
+        if not glued and _placed_at_percentile(clean, text, start, end, tok, pool):
             problem = _rank_problem(tok, whole, pool)
             if problem:   # "Henry Hub sits at the 95th percentile" at the 65.93rd: a key's N is not a rank
                 bad.append(problem)
@@ -782,51 +813,88 @@ def text_problems(text: str, pool: Pool) -> list[str]:
 # "X sits at the Nth percentile" claims a rank. Until 25 Nov 2026 the N of a reading's keys p5, p25, p75, p95 passed
 # there as a name, so with Henry Hub at its 65.93rd percentile "Henry Hub sits at the 95th percentile" passed (the
 # adversary's A), and a rank was matched against any value ("is at the 3rd percentile" on a price of 3.10). Now, in
-# these shapes only, N must be the value's own rank, rounded as written: a verb that puts the subject there (is, are,
-# was, were, sits, trades, stands, ranks; at or in), then "the", "its", "their" or nothing, then N with or without its
-# ordinal, then the word "percentile". Read as before (not judged here), so a wider rule cannot refuse a true sentence
-# (the reviewers of live-fixes-2, 25 Nov 2026): a point named with its own value after it ("sits at its 95th
-# percentile of 4.36"); a point noun after it ("the 90th percentile line"), "or above", a hyphenated form ("a
-# 95th-percentile level"); a negation in its clause ("is not at", "never sits at"); a condition in its sentence
-# ("would", "if", "need to", "to sit at"); a clause whose subject is another point ("its median sits at the 50th
-# percentile"); and every other use of "the Nth percentile" ("the 95th percentile of the window is 4.36", "well short
-# of its 95th percentile").
-_PLACING = re.compile(r"\b(?P<to>to\s+)?(?:is|are|was|were|sits?|sat|trades?|traded|trading|stands?|stood|ranks?|ranked)\s+"
-                      r"(?:(?:now|currently|still|already|right|just|squarely)\s+)?(?:at|in)\s+(?:(?:the|its|their)\s+)?$", re.I)
+# the plain shape only, N must be a cited rank, rounded as written: a present-tense verb that puts the subject there
+# (is, are, is trading, sits, trades, stands, ranks; at or in), then "the", "its", "their" or nothing, then N with or
+# without its ordinal, then the word "percentile".
+# Read as before (not judged here), so a wider rule cannot refuse a true sentence (the reviewers of live-fixes-2 and
+# of 906e707, 25 Nov 2026):
+#   - a value of that percentile point anywhere in the text ("A price of 4.36 is at the 95th percentile", "Henry
+#     Hub's upper tail starts at 4.36, which is at the 95th percentile", "The 90th percentile line is 3.90: a price
+#     there is at the 90th percentile"), and any number in the subject ("The 3.22 mark is at the 75th percentile");
+#   - a point word anywhere else in the sentence (median, quartile, line, band, threshold, top, p95, another ordinal
+#     or percentile) and one right after it ("the 90th percentile line", "or above"); a hyphenated form;
+#   - a negation, a correction or a reported claim anywhere in the sentence, before or after it ("The premise that
+#     Henry Hub is at its 95th percentile does not hold", "... is wrong", "You suggest ...", "... only in the
+#     question"), and a "that" before it ("It is false that ...");
+#   - a condition anywhere in the sentence ("would", "if", "need to", "to sit at"); a question ("... percentile?");
+#   - the past ("was", "stood": the tools rank only the latest value) and a date or a time anywhere in the sentence
+#     ("on 2026-07-31", "last week", "a year ago");
+#   - a subject that names no one value ("a", "any", "every", "such": "A stretched market is in the 90th percentile");
+#   - every other use of "the Nth percentile" ("the 95th percentile of the window is 4.36", "well short of its 95th
+#     percentile").
+_PLACING = re.compile(r"\b(?P<to>to\s+)?(?:(?:is|are)\s+(?:(?:now|currently|still)\s+)?trading|is|are|sits?|trades?|"
+                      r"stands?|ranks?)\s+(?:(?:now|currently|still|already|right|just|squarely)\s+)?(?:at|in)\s+"
+                      r"(?:(?:the|its|their)\s+)?$", re.I)
 _PCTL_NEXT = re.compile(r"(?:st|nd|rd|th)?\s+percentile\b(?![-’'])", re.I)
 _POINT_AFTER = re.compile(r"[\s-]+(?:lines?|bands?|ranges?|marks?|levels?|thresholds?|cut-?offs?|points?|values?|prices?|"
                           r"figures?|bounds?|boundar(?:y|ies)|zones?|areas?|territory|regions?|buckets?)\b"
                           r"|\s+(?:or|and)\s+(?:above|higher|over|more|beyond|below|lower|under|less|up|down|better|worse)\b",
                           re.I)
-_PLACE_NEGATED = re.compile(r"\b(?:not|never|no|nor|neither|nowhere|hardly|barely)\b|n['’]t\b", re.I)
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
+_PLACE_NEGATED = re.compile(r"\b(?:not|never|no|nor|neither|nowhere|none|nothing|without|hardly|barely)\b|n['’]t\b",
+                            re.I)
+_PLACE_DOUBTED = re.compile(
+    r"\b(?:wrong(?:ly)?|false(?:ly)?|incorrect(?:ly)?|untrue|mistaken(?:ly)?|mistakes?|errors?|erroneous(?:ly)?|"
+    r"inaccurate(?:ly)?|misread\w*|misconceptions?|myths?|contrary|rather|instead|premises?|claim\w*|ideas?|notions?|"
+    r"suggest\w*|assert\w*|says?|said|ask\w*|questions?|visitors?|you|your|yours|supposed(?:ly)?|alleged(?:ly)?|"
+    r"reported(?:ly)?|rumou?r\w*|believ\w*|think\w*|thought|assum\w*|appears?|seems?|apparently|only|disagree\w*|"
+    r"differ\w*|contradict\w*|disput\w*|doubt\w*|unsupported|match\w*)\b", re.I)
 _PLACE_CONDITION = re.compile(r"\b(?:if|unless|whether|would|could|should|might|may|must|can|cannot|need(?:s|ed)?|"
                               r"ha(?:s|ve|d)\s+to|ought|when|whenever|once|until|unlikely|likely|possibly|perhaps|"
                               r"expect(?:s|ed)?|suppose|supposing|assuming|imagine|hypothetical(?:ly)?|scenario)\b", re.I)
-_OTHER_POINT = re.compile(r"\bmedian\b|\b[pP]\d{1,2}\b|\d(?:st|nd|rd|th)\b|\bpercentile\b|\blines?\b|\bbands?\b", re.I)
+_PLACE_TIME = re.compile(
+    r"\b(?:ago|yesterday|earlier|previously|formerly|historically|then|before|after|since|during|back\s+in|"
+    r"at\s+the\s+time|(?:last|previous|prior)\s+(?:week|month|year|quarter|time|session|close|day|summer|winter|spring|"
+    r"autumn|fall)|(?:19|20)\d\d|january|february|march|april|june|july|august|september|october|november|december|"
+    r"jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.I)
+_OTHER_POINT = re.compile(r"\b(?:median|mean|average|quartiles?|deciles?|quintiles?|terciles?|tails?|[pP]\d{1,2}|"
+                          r"\d+(?:\.\d+)?(?:st|nd|rd|th)|percentiles?|lines?|bands?|thresholds?|cut-?offs?|triggers?|bounds?|"
+                          r"boundar(?:y|ies)|zones?|territory|buckets?|marks?|levels?|top|bottom|upper|lower|max(?:imum)?|"
+                          r"min(?:imum)?|peaks?|troughs?|highs?|lows?|extremes?)\b", re.I)
+_NO_ONE_VALUE = re.compile(r"\s*(?:a|an|any|every|each|such|some|one)\b", re.I)
 
 
-def _placed_at_percentile(clean: str, start: int, end: int, tok: str, pool: Pool) -> bool:
-    """Does the sentence put its subject at the percentile written at clean[start:end], with no value of that point
-    after it (see above)? Then the number is a rank."""
+def _placed_at_percentile(clean: str, text: str, start: int, end: int, tok: str, pool: Pool) -> bool:
+    """Does the sentence put its subject, the latest value, at the percentile written at clean[start:end] (see above)?
+    Then the number is a rank. `text` is `clean` with its dates (blanked in `clean`) still in it."""
     lead = _PLACING.search(clean, max(0, start - 60), start)
     after = _PCTL_NEXT.match(clean, end)
     if not lead or lead["to"] or not after or _POINT_AFTER.match(clean, after.end()):
         return False
     at = lead.start()
-    sentence = max([m.end() for m in re.finditer(r"[.;!?](?:\s|$)", clean[:at])], default=0)
-    clause = max([sentence] + [sentence + m.end() for m in re.finditer(r"[,;:]", clean[sentence:at])])
-    if _PLACE_CONDITION.search(clean, sentence, at) or _PLACE_NEGATED.search(clean, clause, at) \
-            or _OTHER_POINT.search(clean, clause, at):
+    s0 = max([m.end() for m in _SENTENCE_END.finditer(clean[:at])], default=0)
+    stop = _SENTENCE_END.search(clean, after.end())
+    s1 = stop.start() + 1 if stop else len(clean)
+    sentence = clean[s0:s1]
+    if sentence.rstrip().endswith("?"):
+        return False   # a question places nothing
+    if (_PLACE_NEGATED.search(sentence) or _PLACE_DOUBTED.search(sentence) or _PLACE_CONDITION.search(sentence)
+            or _PLACE_TIME.search(text, s0, s1) or re.search(r"\bthat\b", clean[s0:at], re.I)):
         return False
-    # a value of that point after it in the sentence ("sits at its 95th percentile of 4.36"): read as before. A
+    # the sentence without the placement itself: another point there means more than one level is in play
+    if _OTHER_POINT.search(clean[s0:at] + " " + clean[after.end():s1]):
+        return False
+    clause = max([s0] + [s0 + m.end() for m in re.finditer(r"[,;:]", clean[s0:at])])
+    if re.search(r"\d", clean[clause:at]) or _NO_ONE_VALUE.match(clean, clause):
+        return False   # the subject is a level of its own ("A price of 4.36"), or no one value ("a stretched market")
+    # a value of that point anywhere in the text ("4.36 sits at the 95th percentile", "its 95th percentile of 4.36"). A
     # window or count ("of its 5-year range", "over 3 years") is no value of the point.
-    stop = re.search(r"[.;!?](?:\s|$)", clean[after.end():])
-    rest = clean[after.end():after.end() + stop.start() if stop else len(clean)]
     n = _parse(tok)[0]
     values = pool.points.get(f"{n:g}", []) if n.is_integer() else []
-    for m in _DIGITS.finditer(rest):
+    for m in _DIGITS.finditer(clean):
         x = m.group().rstrip(",")
-        if _META_NOUN.match(rest, m.start() + len(x)) or re.match(r"-[A-Za-z]", rest[m.start() + len(x):]):
+        e = m.start() + len(x)
+        if m.start() == start or _META_NOUN.match(clean, e) or re.match(r"-[A-Za-z]", clean[e:]):
             continue
         if any(_quotes(v, *_parse(x)) for v in values):
             return False
@@ -834,13 +902,14 @@ def _placed_at_percentile(clean: str, start: int, end: int, tok: str, pool: Pool
 
 
 def _rank_problem(tok: str, whole: str, pool: Pool) -> str | None:
-    """None when `tok` is a cited rank, rounded as written; else the reason, in plain words."""
+    """None when `tok` is a cited rank, rounded as written; else the reason, in plain words. It starts with the number
+    as written, so the validator can name an uncited reading that holds it (`agent.uncited_holders`)."""
     n, dp = _parse(tok)
     if any(_rounds_to(v, n, dp) for v in pool.ranks):
         return None
     shown = ", ".join(f"{v:g}" for v in sorted(set(round(v, 2) for v in pool.ranks)))
     has = f"the cited ranks are {shown}" if shown else "no cited value is a percentile rank"
-    return (f"{whole} percentile (the sentence puts the value at the {whole} percentile, and {has}. Write the value's own "
+    return (f"{tok} (the sentence puts the latest value at the {whole} percentile, and {has}. Write the value's own "
             "percentile, or name a percentile point with its value, as in 'its 95th percentile is 4.36')")
 
 

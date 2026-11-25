@@ -85,16 +85,21 @@ cites it, and does not speculate.
     explicit sign, right beside it (`rose 1.20`, `+1.20`), so an unlisted verb cannot slip through. A gap with
     `above`, `below`, `premium` or `discount` must point the right way, read up to the next comma. A curve's shape
     word must be the reading's own and not negated. A high percentile may not be called low.
-  - a percentile written as a place ("Henry Hub sits at the 95th percentile", "is in the 90th percentile", with no
-    value of that percentile point after it) must be the value's own rank, rounded as written (since 25 Nov 2026:
-    until then the 95 of the reading's key p95 passed there as a name, with Henry Hub at its 66th percentile). Every
-    other use of "the Nth percentile" is read as before, and so are a negation, a condition and a point named with
-    its own value ("its 95th percentile is 4.36"). Wider wordings ("at a 95th-percentile level", "on its 95th
+  - a percentile written as a place, in the plain present tense ("Henry Hub sits at the 95th percentile", "is in the
+    90th percentile of its three-year range", "is at its 90th percentile"), must be the latest value's own rank,
+    rounded as written (since 25 Nov 2026: until then the 95 of the reading's key p95 passed there as a name, with
+    Henry Hub at its 66th percentile). Read as before, because each can be true with another N: a sentence that
+    names that point's value anywhere in the text ("A price of 4.36 is at the 95th percentile") or has a number in
+    its subject; one that names another point (median, quartile, line, band, another percentile); one that negates,
+    corrects or reports a claim anywhere in it ("The premise that Henry Hub is at its 95th percentile does not
+    hold"), states a condition, or asks; the past and a date ("Freight was in the 90th percentile on 2026-07-31");
+    and every other use of "the Nth percentile". Wider wordings ("at a 95th-percentile level", "on its 95th
     percentile line") are not read yet.
   - text is read as it is shown (since 25 Nov 2026): raised, lowered, full-width and circled digits are the digits
     they show, in the prose and in every text a tool returned, so "$¹⁵⁰" is checked as 150. Unit glyphs (m², CO₂),
-    °C, ‰ and the ellipsis keep their meaning; a fraction sign, a direction control character or a footnote digit
-    glued to a word is refused with the way to write it.
+    notation (R², σ², C₃, MTCO₂e: a lowered digit after a letter, a raised one after a single letter), °C, ‰ and the
+    ellipsis keep their meaning; a fraction sign, a direction control character or a footnote digit (after a word,
+    a digit or a stop: "WTI²", "days.¹") is refused with the way to write it.
   Not yet checked, and tried on 25 Nov 2026 (branch live-fixes-2): the side of a change quoted rounded ("rose 17%"
   for a fall of 17.26% passes, "rose 17.26%" does not), and a window word given to the wrong change ("fell 17.26%
   over the week" for a 30-day change). The wider rules for both refused true sentences a reviewer wrote, so they

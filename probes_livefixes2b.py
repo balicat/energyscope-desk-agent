@@ -8,10 +8,13 @@ outputs can be compared line for line.
 
 - MUST_ACCEPT: every TRUE sentence in the reviewers' evidence. Each was accepted by d029c9c, and a wider rule of
   live-fixes-2 refused it; this branch must accept every one. Plus true sentences with the glyphs the first review
-  tried (CO₂, m³, °C, an en dash, the Unicode minus, a narrow no-break space, curly quotes, ™).
+  tried (CO₂, m³, °C, an en dash, the Unicode minus, a narrow no-break space, curly quotes, ™). Plus, since the review
+  of 906e707 (25 Nov 2026), every true sentence that review found refused there (a point's value as the subject, a
+  premise corrected after the placement, a placement in the past, notation such as R², C₃ and MTCO₂e), and the
+  builder's own true sentences in the shapes beside them.
 - REFUSED_BOTH: true sentences the reviewers found refused by d029c9c too (older rules, not changed here). Reported.
-- MUST_REFUSE: wrong sentences this branch must refuse: the brief's own A and B sentences, and the second review's
-  wrong sentences that d029c9c refuses and a wider rule had let through.
+- MUST_REFUSE: wrong sentences this branch must refuse: the brief's own A and B sentences (B's footnote marks among
+  them), and the second review's wrong sentences that d029c9c refuses and a wider rule had let through.
 - DROPPED: the brief's own C sentence. C is not in this branch, so it is accepted as on d029c9c. Reported.
 """
 
@@ -32,6 +35,7 @@ WTI_7 = {"series_id": "PET.RWTC.D", "name": "Cushing, OK WTI Spot Price FOB, Dai
          "base_value": 89.62, "change_abs": -0.09, "change_pct": -0.100424}
 
 HH, FR, FC = "henry_hub_percentile", "freight_history", "futures_crack"
+BWS, POS, C321 = "brent_wti_spread", "wti_positioning", "crack_321"
 W30, RIGS, C4W, CYOY, W5, SURP = "wti_30d", "us_rigs_yoy", "cushing_4w", "us_crude_yoy", "wti_five_years", "week_surprises"
 
 MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
@@ -104,6 +108,84 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("r1 B glyphs", [W30], "WTI fell 17.26% over 30 days, to 89.53\u202fdollars."),
     ("r1 B glyphs", [W30], "WTI’s fall over 30 days was 17.26%, to “89.53” dollars."),
     ("r1 B glyphs", [W30], "WTI™ fell 17.26% over 30 days, to 89.53 dollars."),
+    # review of 906e707 (25 Nov 2026), blocker (A): a percentile point named by its own value as the subject
+    ("r3 A", [HH], "A price of 4.36 is at the 95th percentile of the three-year window."),
+    ("r3 A", [HH], "4.36 sits at the 95th percentile of Henry Hub's three-year range."),
+    ("r3 A", [HH], "A Henry Hub price of 3.90 is in the 90th percentile of the window."),
+    ("r3 A", [HH], "The 3.22 mark is at the 75th percentile."),
+    ("r3 A", [HH], "Henry Hub's upper tail starts at 4.36, which is at the 95th percentile."),
+    ("r3 A", [HH], "A value of 1.58 sits at the 5th percentile, and 4.36 sits at the 95th."),
+    ("r3 A", [HH], "Henry Hub's window runs from 1.21 to 30.72; 3.90 is at its 90th percentile."),
+    ("r3 A", [HH], "Henry Hub's 3.10 sits at the 66th percentile, while 3.22 is at the 75th percentile."),
+    ("r3 A", [HH], "Today's 3.10 is at the 66th percentile, and 3.90 is at the 90th percentile."),
+    ("r3 A", [HH], "Prices at 3.90 are at the 90th percentile of Henry Hub's three-year window."),
+    ("r3 A", [HH], "The 90th percentile line is 3.90: a price there is at the 90th percentile."),
+    ("r3 A", [FC], "A crack of 44.98 is at the 90th percentile of the window."),
+    ("r3 A", [FC], "Today's 41.13 crack is in the 88th percentile, while 44.98 is at the 90th percentile."),
+    ("r3 A", [C321], "A crack of 56.87 dollars is at the 90th percentile and one of 14.69 dollars at the 10th."),
+    ("r3 A", [BWS], "A spread of 9.71 dollars is at the 90th percentile."),
+    ("r3 A", [BWS], "The spread is at the 34th percentile; a spread of 2.03 dollars is at the 10th percentile and 9.71 "
+                    "dollars at the 90th."),
+    ("r3 A", [POS], "Net length of 15,814 contracts is in the 10th percentile, and 191,531 contracts is at the 90th "
+                    "percentile."),
+    ("r3 A", [FR], "A freight level of 268.00 is at the 90th percentile of the window; today's 745.77 is at the 96th "
+                   "percentile."),
+    # ... a premise corrected, with the negation or the correction after the placement
+    ("r3 A", [HH], "The premise that Henry Hub is at its 95th percentile does not hold: it sits at the 66th."),
+    ("r3 A", [HH], "The idea that Henry Hub trades in the 95th percentile is wrong; it is at the 66th percentile."),
+    ("r3 A", [HH], "It is false that Henry Hub is at the 95th percentile; it is at the 66th."),
+    ("r3 A", [HH], "You suggest Henry Hub is at the 95th percentile; the data puts it at the 66th."),
+    ("r3 A", [HH], "The claim that Henry Hub sits at the 95th percentile is wrong: the data put it at the 66th."),
+    ("r3 A", [HH], "That Henry Hub is at its 95th percentile isn't true; it is at its 66th."),
+    ("r3 A", [HH], "Henry Hub is at its 95th percentile only in the question; in the data it is at its 66th percentile."),
+    ("r3 A", [HH], "The visitor's figure, that Henry Hub is in the 95th percentile, does not match the data: it is in the "
+                   "66th percentile."),
+    # ... plausible, and not checkable from the tools: the past, a date, a question
+    ("r3 A", [FR], "Freight was in the 90th percentile on 2026-07-31 and is in the 96th now."),
+    ("r3 A", [FR], "On 2026-07-31 freight was at the 90th percentile; it has stayed above that line for 112 days."),
+    ("r3 A", [HH], "Henry Hub was at the 95th percentile? No: it is at the 66th percentile."),
+    # review of 906e707, minor (B): notation, not a footnote (d029c9c accepted each)
+    ("r3 B", [W30], "No R² is computed here; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "Propane (C₃) is not covered; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "Condensate (C₅+) is not covered; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "Emissions in MTCO₂e are not covered; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "Emissions in MMtCO₂e are not covered; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "Intensity in lbCO₂ per barrel is not covered; WTI fell 17.26% over 30 days."),
+    ("r3 B", [W30], "The variance σ² is not shown; WTI fell 17.26% over 30 days."),
+    # the builder's own true sentences beside those shapes (each accepted by d029c9c, and most refused by 906e707)
+    ("fix A", [HH], "The upper quartile is at the 75th percentile."),
+    ("fix A", [HH], "Henry Hub's upper quartile, 3.22, is at the 75th percentile."),
+    ("fix A", [HH], "A price of 3.90 sits at the 90th percentile, and Henry Hub at 3.10 sits at the 66th."),
+    ("fix A", [HH], "A stretched market is in the 90th percentile."),
+    ("fix A", [HH], "At 4.36, Henry Hub is at its 95th percentile."),
+    ("fix A", [HH], "Some say Henry Hub is at its 95th percentile, but it is at its 66th."),
+    ("fix A", [FR], "Today freight is in the 96th percentile; on 2026-07-31 it was in the 90th percentile."),
+    ("fix A", [HH], "Henry Hub's 4.36 upper threshold is at the 95th percentile."),
+    ("fix A", [HH], "Henry Hub trades at 3.10, and 4.36 is at the 95th percentile."),
+    ("fix A", [HH], "Henry Hub is in the 95th percentile? It is not: it is in the 66th."),
+    ("fix A", [HH], "To say Henry Hub is at the 95th percentile is wrong: it is at the 66th."),
+    ("fix A", [HH], "Henry Hub, at 3.10, is at the 66th percentile, and a price of 4.36 is at the 95th percentile."),
+    ("fix A", [POS], "A net length of 191,531 contracts is at the 90th percentile."),
+    ("fix A", [HH], "Henry Hub is at the 95th percentile in the visitor's question and at the 66th percentile in the data."),
+    ("fix A", [HH], "Henry Hub is at the 95th percentile only if the window is cut short."),
+    ("fix A", [HH], "Prices above 4.36 are in the 95th percentile."),
+    ("fix A", [HH], "The 90th percentile is 3.90. A price there is at the 90th percentile."),
+    ("fix A", [HH], "Such a price is at the 95th percentile."),
+    ("fix A", [HH], "The premise is that Henry Hub sits at the 95th percentile; it sits at the 66th."),
+    ("fix A", [HH], "The market thinks Henry Hub is at its 95th percentile; the data put it at the 66th."),
+    ("fix A", [HH], "Henry Hub is at the 95th percentile on a misreading of the window; it is at the 66th."),
+    ("fix A", [HH], "Henry Hub is instead at the 66th percentile, and it is at the 95th percentile nowhere in the data."),
+    ("fix A", [FR], "Freight was in the 90th percentile then and is in the 96th percentile now."),
+    ("fix A", [FR], "Freight was at the 90th percentile 112 days ago and is at the 96th percentile today."),
+    ("fix A", [HH], "Two levels matter: 3.90 is at the 90th percentile, and 4.36 is at the 95th percentile."),
+    ("fix A", [FC], "The crack sits at the 88th percentile; a crack of 44.98 dollars is at the 90th percentile."),
+    ("fix A", [HH], "Henry Hub is currently trading at the 66th percentile."),
+    ("fix B", [W30], "WTI fell 17.26% over 30 days, a price that leaves out the cost of CO²."),
+    ("fix B", [W30], "WTI fell 17.26% over 30 days; gas in Gm³ is not covered."),
+    ("fix B", [W30], "WTI fell 17.26% over 30 days; volumes in hm³ and dam³ are not covered."),
+    ("fix B", [W30], "WTI fell 17.26% over 30 days; no χ² test is run."),
+    ("fix B", [W30], "WTI fell 17.26% over 30 days; C₂+ liquids are not covered."),
+    ("fix B", [W30], "WTI is at $⁸⁹.⁵³ after falling ¹⁷.²⁶% over 30 days."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -128,6 +210,17 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("brief B", [W30], "WTI will reach $¹⁵⁰ by spring."),
     ("brief B", [W30], "WTI could fall to $₈₀."),
     ("brief B", [RIGS], "US rigs are up ¹⁴% on the year."),
+    # the brief's B, footnote marks: after a word, a stop or a percent sign (d029c9c read none of them)
+    ("brief B", [W30], "WTI² fell 17.26% over 30 days."),
+    ("brief B", [W30], "WTI fell 17.26% over 30 days.¹"),
+    ("brief B", [W30], "WTI fell 17.26%¹ over 30 days."),
+    ("brief B", [W30], "WTI fell 17.26% over 30 days (EIA)²."),
+    # the brief's A in the shapes it still judges (a present-tense placement of the latest value, plainly made)
+    ("brief A", [HH], "Henry Hub is now at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub, at 3.10, sits at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub's price, which sits at the 95th percentile, looks rich."),
+    ("brief A", [HH], "Henry Hub is currently trading at the 95th percentile."),
+    ("brief A", [FR], "Freight sits at the 95th percentile."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),

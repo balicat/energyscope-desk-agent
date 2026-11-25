@@ -163,7 +163,7 @@ hh_srv = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub Natural Gas S
                          "p25": 2.44, "p75": 3.22, "p90": 3.9, "p95": 4.364, "observations": 747.0, "years": 3.0},
                  context="It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
                  request={"tool": "percentile", "action": "percentile", "body": {}})
-_PLACED = "puts the value at the"
+_PLACED = "puts the latest value at the"
 FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     # A: "X sits at the Nth percentile" claims a rank; a key's name (p5, p25, p75, p95) is not one
     ("A: the 95th taken from the key p95 as a rank", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile."), _PLACED),
@@ -186,6 +186,10 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
      _PLACED),
     ("A: funds placed at the 90th (they are at the 10.3rd)", gold("wti_positioning", summary="Managed money is at the 90th percentile."),
      _PLACED),
+    ("A: is currently trading at the 95th", dict(readings=[hh_pct], summary="Henry Hub is currently trading at the 95th percentile."),
+     _PLACED),
+    ("A: the latest value in the sentence, the rank wrong",
+     gold("henry_hub_percentile", summary="Henry Hub, at 3.10, sits at the 95th percentile."), _PLACED),
     # B: a raised, lowered, circled or full-width character is read as what it shows
     ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
     ("B: a price in lowered digits", dict(facts=[brent], summary="Brent could fall to $₈₀."), "80"),
@@ -199,6 +203,8 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("B: a footnote mark glued to a word", dict(facts=[brent], summary="Brent² futures are at 93.07 USD/bbl."), "footnote"),
     ("B: a footnote mark at the end of a sentence", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl, the latest "
                                                                                "settlement³."), "footnote"),
+    ("B: a footnote mark after a full stop", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.¹"), "footnote"),
+    ("B: a footnote mark after a percent sign", gold("wti_30d", summary="WTI fell 17.26%¹ over 30 days."), "footnote"),
     ("B: a direction control character", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl\u202e."), "direction control"),
     ("B: a window in a ligature ('ﬁve-year' for a three-year average)",
      dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a ﬁve-year average of 434,167."),
@@ -230,6 +236,22 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     gold("henry_hub_percentile", summary="Henry Hub is nowhere near its 95th percentile."),
     gold("henry_hub_percentile", summary="Henry Hub would have to climb to its 95th percentile of 4.36 before it looked expensive."),
     gold("freight_history", summary="Freight has not fallen below its 90th percentile line (268.00) since 2026-07-31, 112 days."),
+    # A: not judged, as on d029c9c (the review of 906e707, 25 Nov 2026): a point's value as the subject, a premise corrected
+    # after the placement, the past, a question, another point named, a subject that is no one value
+    gold("henry_hub_percentile", summary="A price of 4.36 is at the 95th percentile of the three-year window."),
+    gold("henry_hub_percentile", summary="Henry Hub's upper tail starts at 4.36, which is at the 95th percentile."),
+    gold("henry_hub_percentile", summary="The 90th percentile is 3.90. A price there is at the 90th percentile."),
+    gold("futures_crack", summary="Today's 41.13 crack is in the 88th percentile, while 44.98 is at the 90th percentile."),
+    gold("wti_positioning", summary="Net length of 15,814 contracts is in the 10th percentile, and 191,531 contracts is at the "
+                                    "90th percentile."),
+    gold("henry_hub_percentile", summary="The premise that Henry Hub is at its 95th percentile does not hold: it sits at the 66th."),
+    gold("henry_hub_percentile", summary="You suggest Henry Hub is at the 95th percentile; the data puts it at the 66th."),
+    gold("henry_hub_percentile", summary="The visitor's figure, that Henry Hub is in the 95th percentile, does not match the data: "
+                                         "it is in the 66th percentile."),
+    gold("freight_history", summary="Freight was in the 90th percentile on 2026-07-31 and is in the 96th now."),
+    gold("henry_hub_percentile", summary="Henry Hub was at the 95th percentile? No: it is at the 66th percentile."),
+    gold("henry_hub_percentile", summary="The upper quartile is at the 75th percentile."),
+    gold("henry_hub_percentile", summary="A stretched market is in the 90th percentile."),
     # B: read as shown, and the glyphs that keep their own meaning
     dict(facts=[wti_up], summary="WTI spot is at $⁸⁸.¹⁰ after rising ¹.²⁰ on the week."),
     dict(facts=[wti], summary="WTI futures are at ８８.１０ USD/bbl."),
@@ -238,6 +260,12 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh, a price that includes the cost of CO₂ allowances."),
     dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh; no carbon price in tCO₂e or CO₂eq is cited."),
     dict(facts=[hh_fact], summary="Henry Hub is at $3.10 per million Btu; no series here is quoted per m³, per ㎡, in °C or in ‰."),
+    # notation is kept as written, as d029c9c read it (the review of 906e707): a lowered digit after a letter, a raised
+    # digit after a single letter
+    gold("wti_30d", summary="No R² is computed here; WTI fell 17.26% over 30 days."),
+    gold("wti_30d", summary="Propane (C₃) and condensate (C₅+) are not covered; WTI fell 17.26% over 30 days."),
+    gold("wti_30d", summary="Emissions in MTCO₂e or lbCO₂ are not covered; WTI fell 17.26% over 30 days."),
+    gold("wti_30d", summary="WTI fell 17.26% over 30 days; the variance σ² is not shown, nor gas in Gm³."),
     # the ellipsis stays one character: NFKC writes it as three full stops, which ended the sentence before the number
     # and took the change's verb from it (the reviewer of live-fixes-2, 25 Nov 2026)
     gold("wti_30d", summary="WTI fell… 17.26% over 30 days, to 89.53 dollars."),
@@ -567,13 +595,18 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
     ("stocks including the SPR, where the series excludes it",
      dict(facts=[stocks], summary="US crude stocks including the SPR are 414,417 thousand barrels.")),
     # live-fixes-2b (25 Nov 2026) ships A and B narrow. Kept visible here: the wider wordings of A, C and D, moved to the
-    # lab branch, and the one shape A leaves to d029c9c by design (a point named with its own value)
+    # lab branch, and shapes A leaves to d029c9c by design (a point named with its own value, the past, a number in the
+    # subject; the full list is at prose._placed_at_percentile)
     ("A, moved to the lab branch: a rank claimed in a wider wording", dict(readings=[hh_pct],
      summary="Henry Hub is trading at a 95th-percentile level.")),
     ("A, moved to the lab branch: placed on a point's line", dict(readings=[hh_pct], summary="Henry Hub sits on its 95th percentile line.")),
     ("A, moved to the lab branch: a point's ordinal alone, placed", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th.")),
     ("A, not judged by design: placed at a point named with its own value", dict(readings=[hh_pct],
      summary="Henry Hub sits at its 95th percentile of 6.90.")),
+    ("A, not judged by design: placed in the past (the tools rank only the latest value)", dict(readings=[hh_pct],
+     summary="Henry Hub was at the 95th percentile last week.")),
+    ("A, not judged by design: a number in the subject (here the latest itself)", gold("brent_wti_spread",
+     summary="The Brent-WTI spread of 3.41 dollars is at the 90th percentile.")),
     ("C, dropped from this branch: a rounded change given the wrong side",
      gold("wti_30d", "us_rigs_yoy", summary="WTI rose 17%; rigs fell 11%.")),
     ("D, moved to the lab branch: a 30-day change called the week's", gold("wti_30d", summary="WTI fell 17.26% over the week.")),
