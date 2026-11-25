@@ -30,7 +30,12 @@ Checked, in the summary and in every caveat the model wrote:
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
   "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
-  has the same sign as that change, but a wrong one is still wrong.
+  has the same sign as that change, but a wrong one is still wrong. Since 25 Nov 2026 (the live items): a reading's
+  value whose key names a change by its period (cushing_7d_pct, the report's wow and yoy) has a side too, read only
+  where the word is the number's own (`_period_changes`); "higher", "lower", "cheaper", "dearer", "less" and "more
+  expensive" than the other series set the side of a gap between two named series as above and below do (`_compared`);
+- a change's base value is written with its own date or with none: beside another value's date it is sent back
+  (`_base_problem`, 25 Nov 2026).
 
 Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
 on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂), notation (R², C₃, MTCO₂e) and the
@@ -1092,8 +1097,7 @@ def _period_changes(answer: DeskAnswer) -> list[tuple[float, str | None]]:
                 continue
             unit = "percent" if _kind(k) == "percent" else r.value_units.get(k)
             out.append((v, unit))
-            out += [(x, "million barrels" if "million" in name else None)
-                    for name, x in also_in(r.value_units.get(k) or "", v).items()]
+            out += [(x, name.replace("_", " ")) for name, x in also_in(r.value_units.get(k) or "", v).items()]   # as pool_of
     return out
 
 

@@ -88,13 +88,36 @@ cites it, and does not speculate.
   - text is read as it is shown (since 25 Nov 2026): raised, lowered, full-width and circled digits are the digits
     they show, in the prose and in every text a tool returned, so "$¹⁵⁰" is checked as 150. Unit glyphs (m², CO₂),
     notation (R², σ², C₃, MTCO₂e: a lowered digit after a letter, a raised one after a single letter), °C, ‰ and the
-    ellipsis keep their meaning; a fraction sign, a direction control character or a footnote digit (after a word,
-    a digit or a stop: "WTI²", "days.¹") is refused with the way to write it.
-  Not yet checked, and tried on 25 Nov 2026 (branches live-fixes-2 and live-fixes-2b): a percentile written as a
-  place ("Henry Hub sits at the 95th percentile" with Henry Hub at its 66th: the 95 of the reading's key p95 passes
-  as a name), the side of a change quoted rounded ("rose 17%" for a fall of 17.26% passes, "rose 17.26%" does not),
-  and a window word given to the wrong change ("fell 17.26% over the week" for a 30-day change). Each rule tried
-  for them refused true sentences a reviewer wrote, so none was released.
+    ellipsis keep their meaning; a lowered digit after a currency code or a plain word is a number ("USD₈₀" and
+    "to₈₀" are read as 80). A fraction sign, a direction control character or a footnote digit (after a word, a
+    digit or a stop: "WTI²", "days.¹") is refused with the way to write it.
+  - a change named by its period has a side (since 25 Nov 2026). A reading's value whose key names a change by its
+    period, not with the word "change" (the signals' Cushing 7-day percent change, the weekly report's
+    week-on-week and year-on-year figures, and keys of the same shapes: 3m_pct, mom, qoq, dod, chg, revision), needs
+    no direction word, but a wrong one is refused. With Cushing's 7-day change at -4.05%, "Cushing stocks rose 4.0%
+    on the week" and "are up 4% on the week" passed until then. The word is read only where it is the number's own:
+    right before it, with only words such as "by", "a further" or "more than" between; "higher", "lower", "up" or
+    "down" right after it, in its clause; or a sign. A whole number under 100 counts only with its unit ("4%", not
+    "4 weeks"); a number that also matches another value, a negation in the clause, or words before and after it
+    that disagree, leave it unjudged; "given up" is a fall.
+  - a comparative sets the side of a spread (since 25 Nov 2026). "Higher", "lower", "cheaper", "dearer", "pricier",
+    "less", "more expensive" and "less expensive" followed by "than" and one of the spread's two series read as "above" and "below" do, in both
+    subject orders: with Brent minus WTI at +3.41, "Brent is $3.41 a barrel lower than WTI" and "WTI is $3.41 a
+    barrel dearer than Brent" are refused, and "WTI is $3.41 cheaper than Brent" passes. Only for a gap between two
+    named series (a spread, or a reading's "a minus b" such as Brent minus WTI on futures), never for a gap against an
+    average; only when the other series is named before the number in its clause ("The 3.41 spread is less than
+    WTI's move" compares the spread itself, and is read as before); and where "above", "below", "premium" or
+    "discount" stands beside the number, it decides, as before.
+  - a change's base value keeps its own date (since 25 Nov 2026). The value a change is measured from is written with
+    its own date or with none: with WTI's 6717-day change (its base, 139.69, is from 2008-06-27), "As of
+    2026-11-17, WTI spot was $139.69 a barrel" passed until then, because the number and the date each traced to
+    something. A number that quotes only a base value, written as a level ("was", "at", "traded at", "a price of",
+    a colon or a bracket before it), is sent back when the date written with it is not its own: the date after it
+    with no other number or joining word between (also after a comma, or "USD139.69 ... on 2026-11-17"), or a date
+    that opens its sentence ("As of 2026-11-17, ...", "WTI spot, from the 2026-11-17 data, was ...", "WTI's
+    2026-11-17-dated price was ..."). Read as before: a base written as where a move started or as a comparison
+    ("from 139.69", "against", "than"), or in a clause that places it in another time or names it as a base
+    ("earlier", "ago", "then", "last month", "at the start", "base").
   A caveat that fails is removed by code. `prose_controls.py` plants 36 such errors and must reject every one, and
   must pass 14 correct sentences and every recorded answer; it runs in CI and in the release gate.
 - **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
@@ -109,9 +132,24 @@ cites it, and does not speculate.
 
   Each release closed the cases it had been shown; the next unseen set got through at about the same rate, and
   the false refusals rose. So the rules catch the errors they were written for and should not be read as proof
-  of the wording. Still open by design: two true values or dates of one unit attached to the wrong nouns (Brent's
-  price given to WTI), and claims made in words alone ("a record high"); such answers are kept in
-  `prose_controls.py` as known limits. The page
+  of the wording. Still open by design, and so the live site's true limits:
+  - a number attached to the wrong subject: two true values or dates of one unit given to the wrong nouns (Brent's
+    price given to WTI);
+  - claims made in words alone ("a record high"), and number words that are not digits ("doubled", "halved", "a
+    third", "the second-highest");
+  - a level quoted rounded until it matches another kind of value, a change or a count (Henry Hub's mean written as
+    "3.00" is read as the reading's 3-year window and sent back, a true sentence);
+  - three held on the lab branch, tried on 25 Nov 2026 (branches live-fixes-2 and live-fixes-2b), where every rule
+    tried refused true sentences a reviewer wrote: the Nth percentile tied to its noun ("Henry Hub sits at the 95th
+    percentile" with Henry Hub at its 66th passes, because the reading's key p95 makes "the 95th" a name, while
+    "Henry Hub's usual ceiling is at the 90th percentile" is true); the side of a change quoted rounded ("rose 17%"
+    for a fall of 17.26% passes when the facts hold changes of both signs; "rose 17.26%" does not); and window
+    words tied to their own number ("fell 17.26% over the week" for a 30-day change passes);
+  - the three rules of 25 Nov 2026 above are narrow on purpose: a period change's direction word elsewhere in its
+    clause ("Cushing stocks posted a 4.05% rise"), a comparative after other words ("WTI costs 3.41 dollars more
+    than Brent"), and a base value in a list after an opening date ("On 2026-11-17 Brent was 92.94 and WTI 139.69")
+    are not read. None of the three was dropped.
+  Such answers are kept in `prose_controls.py` as known limits. The page
   says what was checked: the sources were recomputed, every number and date in the text matches one of them,
   and the wording around the numbers is checked by rules, not proved.
   The reviewer's proposed fix is this project's own rule taken one step further, and it is the planned next
@@ -499,7 +537,7 @@ es_agent/charts.py    the series behind an answer, for the page to draw
 es_agent/memory.py    what a follow-up is allowed to remember
 librarian_mcp.py      an MCP server over the public API
 prose_controls.py     wrong sentences over true tables: the control for the prose checks
-probes_livefixes2b.py the true sentences two reviewers wrote against the frozen data: each must be accepted
+probes_livefixes2b.py the reviewers' and the live items' sentences on the frozen data: true ones accepted, wrong refused
 ops/watch_public.sh   is the public address answering? run every two minutes
 es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder; the server's actions
 es_agent/scripted.py  offline stand-in for the model (Pydantic AI FunctionModel)
