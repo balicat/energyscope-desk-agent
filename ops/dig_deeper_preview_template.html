@@ -47,7 +47,7 @@
 var ANSWER = __ANSWER__;
 var DEEPER = __DEEPER__;
 function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
-function callText(l) { return (l.tool || l.proposed_tool) + "(" + JSON.stringify(l.args).slice(1, -1).replace(/,"/g, ', "').replace(/"([a-z_]+)":/g, "$1=") + ")"; }
+function callText(l) { return l.tool + "(" + JSON.stringify(l.args).slice(1, -1).replace(/,"/g, ', "').replace(/"([a-z_]+)":/g, "$1=") + ")"; }
 (function () {
   var card = document.getElementById("card");
   card.appendChild(el("div", "label", "Question"));
@@ -57,7 +57,7 @@ function callText(l) { return (l.tool || l.proposed_tool) + "(" + JSON.stringify
   card.appendChild(el("div", "label", "Caveats"));
   var ul = el("ul", "caveats"); ANSWER.caveats.forEach(function (c) { ul.appendChild(el("li", "", c)); }); card.appendChild(ul);
   var d = DEEPER; if (!d) return;
-  var box = el("details", "deeper"); box.open = true;
+  var box = el("details", "deeper");
   box.appendChild(el("summary", "", "Dig deeper: " + d.leads.length + " calls for your own agent"));
   box.appendChild(el("p", "pbtitle", "Routine: " + d.playbook.title + " (" + d.playbook.id + ", version " + d.playbook.version + "). The answer above already did the first steps; the rest are below as calls."));
   box.appendChild(el("div", "label", "Steps"));
@@ -72,9 +72,8 @@ function callText(l) { return (l.tool || l.proposed_tool) + "(" + JSON.stringify
   box.appendChild(el("div", "label", "Calls (EnergyScope MCP server)"));
   d.leads.forEach(function (l) {
     var w = el("div", "lead" + (l.tool ? "" : " missing"));
-    var p = el("p", "why"); p.appendChild(el("span", "num", "step " + l.step)); p.appendChild(document.createTextNode(l.why)); w.appendChild(p);
+    var c = l.covers, p = el("p", "why"); p.appendChild(el("span", "num", "step " + (c && c.length > 1 ? c[0] + "-" + c[c.length - 1] : l.step))); p.appendChild(document.createTextNode(l.why)); w.appendChild(p);
     w.appendChild(el("pre", "call", callText(l)));
-    if (!l.tool) w.appendChild(el("p", "miss", "No such tool yet: " + l.proposed_tool + " is proposed, not built."));
     box.appendChild(w);
   });
   box.appendChild(el("div", "label", "Analyst notes"));
@@ -89,6 +88,7 @@ function callText(l) { return (l.tool || l.proposed_tool) + "(" + JSON.stringify
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(d.for_your_agent).then(done, fallback); else fallback();
   };
   row.appendChild(b); row.appendChild(ok); box.appendChild(row);
+  if ((d.planned || []).length) box.appendChild(el("p", "small", "Planned tools: " + d.planned.map(function (x) { return x.tool + " (" + x.why + ")"; }).join("; ") + "."));
   box.appendChild(el("p", "small", "Your agent runs the calls with its own model and key. Sending its finished text back to be checked is not built yet."));
   card.appendChild(box);
 })();

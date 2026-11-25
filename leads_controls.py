@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import sys
 
-from es_agent.leads import call_text, deeper
+from es_agent.leads import call_text, continuous, deeper
 from es_agent.playbooks import MCP_TOOLS, PLAYBOOKS
 
 FAILS: list[str] = []
@@ -41,20 +41,21 @@ def audit(name: str, d: dict | None, reading: dict) -> None:
     if not d:
         return
     check(d["leads"] != [], f"{name}: has leads")
-    ids = set(reading["series_ids"])
+    ids = set(reading["series_ids"]) | {continuous(i) for i in reading["series_ids"]}
     for ld in d["leads"]:
-        if ld["tool"]:
-            check(ld["tool"] in MCP_TOOLS, f"{name}: tool {ld['tool']} exists")
-            bad = set(ld["args"]) - MCP_TOOLS.get(ld["tool"], set())
-            check(not bad, f"{name}: {ld['tool']} args are real", str(bad))
-        else:
-            check(bool(ld.get("proposed_tool")) and ld["proposed_tool"] not in MCP_TOOLS,
-                  f"{name}: a missing tool is named as proposed ({ld.get('proposed_tool')})")
+        check(ld["tool"] in MCP_TOOLS, f"{name}: tool {ld['tool']} exists (every lead runs today)")
+        bad = set(ld["args"]) - MCP_TOOLS.get(ld["tool"], set())
+        check(not bad, f"{name}: {ld['tool']} args are real", str(bad))
         named = [s for s in strings(ld["args"]) if "." in s and not s[:4].isdigit() and not s.startswith("<")]
-        check(all(s in ids for s in named), f"{name}: step {ld['step']} {ld['tool'] or ld['proposed_tool']} names only series of the reading",
+        check(all(s in ids for s in named), f"{name}: step {ld['step']} {ld['tool']} names only series of the reading",
               str([s for s in named if s not in ids]))
         check(not any("{" in s for s in strings(ld)), f"{name}: step {ld['step']} has no unfilled slot")
         check(call_text(ld) in d["for_your_agent"], f"{name}: for_your_agent holds step {ld['step']}'s call")
+    check(d["for_your_agent"].startswith("Needs the EnergyScope data tools (MCP server). A free key: https://energyscope.io/signup\n"),
+          f"{name}: for_your_agent starts with the key line")
+    check("proposed" not in d["for_your_agent"] and all(x["tool"] + "(" not in d["for_your_agent"] for x in d["planned"]),
+          f"{name}: planned tools are not shown as calls")
+    check(all(x["tool"] not in MCP_TOOLS for x in d["planned"]), f"{name}: planned tools are ones the server lacks")
     check(all(m in d["for_your_agent"] for m in d["must_say"]), f"{name}: for_your_agent holds the must-say lines")
     check({x["step"] for x in d["done"]} | {x["step"] for x in d["left"]} == set(next(p for p in PLAYBOOKS if p["id"] == d["playbook"]["id"])["steps"]),
           f"{name}: done and left cover every step")
@@ -90,8 +91,16 @@ d = deeper(real, "Why do the two Brent-WTI spreads disagree?")
 audit("brent-wti", d, real["readings"][0])
 check(d is not None and [x["step"] for x in d["done"]] == [1, 2] and [x["step"] for x in d["left"]] == [3, 4, 5, 6],
       "brent-wti: steps 1-2 done, 3-6 left")
-check(d is not None and {ld["args"].get("series_b") for ld in d["leads"] if ld["tool"] == "spread"} == {"NYMEX.WTI.2027-01.D", "ICE.BRENT.2027-01.D"},
-      "brent-wti: each spot price against its own future")
+check(d is not None and {ld["args"].get("series_b") for ld in d["leads"] if ld["tool"] == "spread"} == {"NYMEX.WTI.FRONT.D", "ICE.BRENT.M1.D"},
+      "brent-wti: each spot price against its own future (continuous series)")
+check(d is not None and not any("2027" in json.dumps(ld["args"]) for ld in d["leads"] if ld["tool"] == "spread"),
+      "brent-wti: history leads never name a dated contract")
+check(d is not None and {x["tool"] for x in d["planned"]} == {"gap_breakpoints", "jumps"}, "brent-wti: planned tools kept as data")
+check(d is not None and any("2027-01" in json.dumps(ld["args"]) for ld in d["leads"] if ld["tool"] == "get_data"),
+      "brent-wti: the short-window lead keeps the dated contracts")
+for dated, cont in [("ICE.BRENT.2027-01.D", "ICE.BRENT.M1.D"), ("NYMEX.WTI.2027-01.D", "NYMEX.WTI.FRONT.D"),
+                    ("GME.OMAN.2027-01.D", "GME.OMAN.M1.D"), ("PET.RWTC.D", "PET.RWTC.D"), ("ICE.BRENT.M1.D", "ICE.BRENT.M1.D")]:
+    check(continuous(dated) == cont, f"continuous({dated}) = {cont}")
 if d and "--show" in sys.argv:
     print(json.dumps(d, indent=1)); print(d["for_your_agent"])
 

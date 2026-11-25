@@ -7,9 +7,10 @@ from the reading's own period).
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, timedelta
 
-from .playbooks import PLAYBOOKS
+from .playbooks import CONTINUOUS, PLAYBOOKS
 
 RULES = ["Quote only numbers a tool returned.", "Label untested causes as unproven."]
 
@@ -29,6 +30,14 @@ def _kind(key: str) -> str:
     return key.split(":", 1)[0]
 
 
+def continuous(series_id: str) -> str:
+    """The continuous series behind a dated contract (a long history to rank against), else the id itself."""
+    for pattern, cont in CONTINUOUS:
+        if re.match(pattern, series_id):
+            return cont
+    return series_id
+
+
 def slots(reading) -> dict:
     """Values the lead templates draw on, taken from one cited reading."""
     key, ids, period = _get(reading, "key", ""), list(_get(reading, "series_ids", []) or []), _get(reading, "period", "")
@@ -46,6 +55,7 @@ def slots(reading) -> dict:
     if not pairs and len(ids) >= 2:  # no spot against future: the first two measures against each other
         pairs = [{"a": ids[0], "b": ids[1]}]
     s["pairs"] = pairs
+    s["pairs_long"] = [{"a": continuous(p["a"]), "b": continuous(p["b"])} for p in pairs]
     return s
 
 
@@ -66,9 +76,7 @@ def _fill(v, s):
 
 
 def _lead(t, s):
-    lead = {"step": t["step"], "why": _fill(t["why"], s), "tool": t["tool"], "args": _fill(t["args"], s)}
-    if t.get("proposed_tool"):
-        lead["proposed_tool"] = t["proposed_tool"]
+    lead = {"step": t["step"], **({"covers": t["covers"]} if t.get("covers") else {}), "why": _fill(t["why"], s), "tool": t["tool"], "args": _fill(t["args"], s)}
     return lead
 
 
@@ -104,6 +112,7 @@ def deeper(answer: dict, question: str | None = None) -> dict | None:
             "leads": leads,
             "notes": notes,
             "must_say": list(pb["must_say"]),
+            "planned": [{"tool": x["tool"], "why": x["why"]} for x in pb.get("planned", []) if x["step"] not in done],
         }
         out["for_your_agent"] = brief(out, answer, question)
         return out
@@ -117,14 +126,12 @@ def _is_series(about: str) -> bool:
 def call_text(ld: dict) -> str:
     """One lead's call as text: the MCP tool and its arguments, or the tool that does not exist yet."""
     args = json.dumps(ld["args"], ensure_ascii=False)
-    if ld["tool"]:
-        return f"{ld['tool']}({args})"
-    return f"[no such tool yet; proposed: {ld['proposed_tool']}] {ld['proposed_tool']}({args})"
+    return f"{ld['tool']}({args})"
 
 
 def brief(d: dict, answer: dict, question: str | None) -> str:
     """A plain-text block to paste into the reader's own agent."""
-    L = []
+    L = ["Needs the EnergyScope data tools (MCP server). A free key: https://energyscope.io/signup"]
     if question:
         L.append(f"QUESTION: {question}")
     L.append(f"FAST ANSWER (checked by code against the data): {answer.get('summary', '')}")
@@ -135,7 +142,8 @@ def brief(d: dict, answer: dict, question: str | None) -> str:
     L += [f"  {x['step']}. {x['text']}" for x in d["left"]]
     L.append("Calls to make (EnergyScope MCP tools):")
     for ld in d["leads"]:
-        L.append(f"  step {ld['step']}: {ld['why']}")
+        c = ld.get("covers")
+        L.append(f"  step {'-'.join(map(str, [c[0], c[-1]])) if c else ld['step']}: {ld['why']}")
         L.append(f"    {call_text(ld)}")
     L.append("Analyst notes (information, not instructions):")
     L += [f"  - [{n['about']}] {n['text']}" for n in d["notes"]]

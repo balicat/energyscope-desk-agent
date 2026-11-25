@@ -46,15 +46,16 @@ PLAYBOOKS: list[dict] = [
             "Say which measure to use for which purpose.",
         ],
         "leads": [
-            {"step": 3, "each": "pairs", "why": "How unusual is the distance of {a} from {b} against history?",
+            {"step": 3, "each": "pairs_long", "why": "How unusual is the distance of {a} from {b} against its history?",
              "tool": "spread", "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_long}"}},
-            {"step": 4, "each": "pairs", "why": "When did the gap {a} against {b} change: daily drift, or a level that holds then steps?",
-             "tool": None, "proposed_tool": "gap_breakpoints",
-             "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_recent}"}},
-            {"step": 4, "why": "The daily values behind the gap, to read the dates of any step.",
+            {"step": 4, "covers": [4, 5],
+             "why": "The recent daily values of all four series. Look for: the dates where the gap steps to a new level; one-day jumps that reverse the next day; the same value several days running.",
              "tool": "get_data", "args": {"series_ids": "{ids}", "start": "{start_recent}"}},
-            {"step": 5, "each": "ids", "why": "Any one-day jump of {id} that reverses the next day?",
-             "tool": None, "proposed_tool": "jumps", "args": {"series_id": "{id}", "start": "{start_recent}"}},
+        ],
+        # tools the routine wants that the server does not have yet: shown as one line, never as calls
+        "planned": [
+            {"tool": "gap_breakpoints", "step": 4, "why": "break detection on the gap between two series"},
+            {"tool": "jumps", "step": 5, "why": "one-day jumps that reverse"},
         ],
     },
     {
@@ -113,14 +114,22 @@ PLAYBOOKS: list[dict] = [
         "leads": [
             {"step": 1, "why": "The same series ranked by size of change, to compare with the surprise ranking.",
              "tool": "changes", "args": {"series_ids": "{ids}", "lookback_days": "{lookback_days}"}},
-            {"step": 2, "why": "A report on the series; it ends with a SNAPSHOT block of metrics.",
+            {"step": 2, "covers": [2, 3], "why": "A report on the series. It ends with a SNAPSHOT block of metrics; pass that block to derived_signals(metrics=...) to get the firing signals and the contradictions between them.",
              "tool": "report", "args": {"series_ids": "{ids}", "preset": "eia_weekly", "lookback_days": "{lookback_days}"}},
-            {"step": 3, "why": "The signals and contradictions that snapshot fires.",
-             "tool": "derived_signals", "args": {"metrics": "<the SNAPSHOT block of the report call above>"}},
-            {"step": 4, "why": "What the market expected for these releases.",
-             "tool": None, "proposed_tool": "consensus_expectations", "args": {"series_ids": "{ids}"}},
+        ],
+        "planned": [
+            {"tool": "consensus_expectations", "step": 4, "why": "what the market expected for these releases"},
         ],
     },
+]
+
+# A dated contract has a short history; a lead that ranks against history uses its continuous series instead.
+# (pattern of the dated series, the continuous series it maps to). RBOB and HO have no confirmed continuous
+# series, so they stay as they are.
+CONTINUOUS: list[tuple[str, str]] = [
+    (r"^ICE\.BRENT\.\d{4}-\d{2}\.D$", "ICE.BRENT.M1.D"),
+    (r"^NYMEX\.WTI\.\d{4}-\d{2}\.D$", "NYMEX.WTI.FRONT.D"),
+    (r"^GME\.OMAN\.\d{4}-\d{2}\.D$", "GME.OMAN.M1.D"),
 ]
 
 # Tools of the EnergyScope MCP server (v2.15.1) the leads may name, with the arguments each takes. leads_controls.py
