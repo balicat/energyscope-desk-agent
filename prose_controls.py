@@ -164,6 +164,25 @@ hh_srv = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub Natural Gas S
                          "p25": 2.44, "p75": 3.22, "p90": 3.9, "p95": 4.364, "observations": 747.0, "years": 3.0},
                  context="It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
                  request={"tool": "percentile", "action": "percentile", "body": {}})
+# Live item 1 (25 Nov 2026): a reading's value whose key names a change by its period is a change with a side. One
+# reading per shape the scan found beyond the suite's own (the signals' metrics: cushing_7d_pct, eu_oil_imports_3m_pct,
+# opec_call_qoq, opec_world_demand_revision; the eia_weekly report's wow, yoy and their million-barrel forms), and the
+# shapes named for the next new key (mom, dod, chg, yoy_pct, an N-week percent)
+period_sig = Reading(key="signals:periods", title="The server's signals, live", period=D,
+                     units="as each metric: million barrel per day; percent", series_ids=[],
+                     values={"metric.eu_oil_imports_3m_pct": -12.3, "metric.opec_call_qoq": -0.55,
+                             "metric.opec_world_demand_revision": 0.13, "metric.henry_hub_52w_pct": 18.5},
+                     value_units={"metric.opec_call_qoq": "million barrel per day",
+                                  "metric.opec_world_demand_revision": "million barrel per day"},
+                     request={"tool": "signals", "action": "derived_signals", "body": {}})
+period_rep = Reading(key="report:periods", title="A weekly report", period=D,
+                     units="Thousand Barrels per Day; Dollars per Barrel; Percent", series_ids=[],
+                     values={"Gasoline product supplied.mom": -85.0, "WTI, Cushing.dod": 0.42, "wti_price_chg": 1.37,
+                             "US crude stocks.yoy_pct": -2.29},
+                     value_units={"Gasoline product supplied.mom": "Thousand Barrels per Day",
+                                  "WTI, Cushing.dod": "Dollars per Barrel", "wti_price_chg": "Dollars per Barrel"},
+                     request={"tool": "report", "action": "report", "body": {}})
+_SIDE = "is described as a"
 FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     # B: a raised, lowered, circled or full-width character is read as what it shows
     ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
@@ -191,6 +210,33 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
                                                                               "since Ｊｕｌｙ."), "write dates"),
     ("B: a date in raised digits that no tool returned", gold("wti_30d", summary="WTI was 89.53 dollars on ²⁰²⁶-¹¹-¹⁸."),
      "2026-11-18"),
+    # live item 1: a change named by its period, given the wrong side (d029c9c read no side for these keys)
+    ("1: the signals' 7-day percent, rounded to one decimal", gold("regime_signals", summary="Cushing stocks rose 4.0% on the week."),
+     _SIDE),
+    ("1: the 7-day percent as returned", gold("regime_signals", summary="Cushing stocks rose 4.05% over the week."), _SIDE),
+    ("1: the 7-day percent rounded to a whole number, with its sign word before it",
+     gold("regime_signals", summary="Cushing stocks are up 4% on the week."), _SIDE),
+    ("1: the 7-day percent with the side word after it",
+     gold("regime_signals", summary="Cushing inventories are 4.05% higher than a week ago."), _SIDE),
+    ("1: the report's wow, in its own unit", gold("eia_weekly_brief", summary="Cushing stocks rose 1,209 thousand barrels on the week."),
+     _SIDE),
+    ("1: the report's wow in million barrels", gold("eia_weekly_brief", summary="Cushing stocks built 1.21 million barrels on the week."),
+     _SIDE),
+    ("1: the report's metric.crude_stock_wow", gold("eia_weekly_brief", summary="US crude stocks fell 3.38 million barrels on the week."),
+     _SIDE),
+    ("1: the report's yoy, the side word after it",
+     gold("eia_weekly_brief", summary="Crude stocks are 6,358 thousand barrels higher than a year ago."), _SIDE),
+    ("1: the report's yoy of a price", gold("eia_weekly_brief", summary="Brent is down 28.08 dollars on the year."), _SIDE),
+    ("1: a 3-month percent", dict(readings=[period_sig], summary="EU oil imports rose 12.3% over three months."), _SIDE),
+    ("1: a qoq with no 'change' in its key",
+     dict(readings=[period_sig], summary="The call on OPEC crude rose 0.55 million barrels a day on the quarter."), _SIDE),
+    ("1: a revision", dict(readings=[period_sig], summary="OPEC revised its world demand estimate down by 0.13 million barrels a day."),
+     _SIDE),
+    ("1: an N-week percent", dict(readings=[period_sig], summary="Henry Hub is down 18.5%."), _SIDE),
+    ("1: a mom", dict(readings=[period_rep], summary="US gasoline demand rose 85 thousand barrels per day on the month."), _SIDE),
+    ("1: a dod", dict(readings=[period_rep], summary="WTI fell 0.42 dollars on the day."), _SIDE),
+    ("1: a chg", dict(readings=[period_rep], summary="WTI fell 1.37 dollars."), _SIDE),
+    ("1: a yoy_pct", dict(readings=[period_rep], summary="US crude stocks are up 2.29% on the year."), _SIDE),
 ]
 
 FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
@@ -251,6 +297,30 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     gold("wti_30d", summary="WTI fell… 17.26% over 30 days, to 89.53 dollars."),
     gold("wti_30d", summary="WTI fell 17.26%… over 30 days, to 89.53 dollars."),
     gold("wti_30d", summary="WTI fell 17.26% over 30 days – to 89.53\u202fdollars, a change of −18.68 dollars."),
+    # live item 1: true sentences about changes named by their period, in the shapes the rule reads and beside them
+    gold("regime_signals", summary="Cushing stocks fell 4.0% on the week."),
+    gold("regime_signals", summary="Cushing stocks are down 4% on the week, and 4.05% lower than a week ago."),
+    gold("regime_signals", summary="Cushing's 7-day change is -4.05%."),
+    gold("regime_signals", summary="Cushing stocks have given up 4.05% over the week."),
+    gold("regime_signals", summary="Cushing stocks did not rise; they fell 4.05% over the week."),
+    gold("regime_signals", summary="Cushing stocks are not up 4.05% on the week; they are down 4.05%."),
+    gold("regime_signals", summary="As refinery runs rose, Cushing stocks fell 4.05% on the week."),
+    gold("regime_signals", summary="Even after crude stocks rose, Cushing is 4.05% lower on the week."),
+    gold("regime_signals", summary="Rising runs took 4.05% off Cushing stocks on the week."),
+    gold("regime_signals", summary="Higher refinery runs pulled Cushing stocks 4.05% lower on the week."),
+    gold("regime_signals", summary="Cushing stocks posted a 4.05% weekly draw."),
+    gold("regime_signals", summary="Cushing stocks fell more than 4% on the week."),
+    gold("eia_weekly_brief", summary="Cushing stocks drew 1.21 million barrels on the week, while crude stocks rose 3.38 million."),
+    gold("eia_weekly_brief", summary="US crude stocks rose 3.38 million barrels, gasoline 5.19 million and distillate 1.57 million."),
+    gold("eia_weekly_brief", summary="Crude oil stocks were 417,797 thousand barrels, up 3,380 on the week and down 6,358 on the year."),
+    gold("eia_weekly_brief", summary="Crude imports fell 1,122 thousand barrels per day on the week, and production rose 19 thousand "
+                                     "barrels per day."),
+    gold("eia_weekly_brief", summary="Brent rose 28.08 dollars on the year to 92.94, while WTI is 28.02 dollars higher than a year ago."),
+    gold("eia_weekly_brief", summary="Regular gasoline gave up 0.19 dollars a gallon on the week."),
+    dict(readings=[period_sig], summary="EU oil imports fell 12.3% over three months; OPEC revised its demand view up by 0.13 "
+                                        "million barrels a day."),
+    dict(readings=[period_rep], summary="US gasoline demand fell 85 thousand barrels per day on the month, and WTI rose 0.42 dollars "
+                                        "on the day."),
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
@@ -662,6 +732,13 @@ def main() -> int:
     kept = prose.clean_caveats(mimic)
     print(f"{'dropped  ' if not kept else 'KEPT     '} a model caveat dressed as code's (full-width N): {kept}")
     failed += bool(kept)
+    # live item 1: a caveat that gives a period change the wrong side is dropped; the true one beside it is kept
+    sig = DeskAnswer(**gold("regime_signals", summary="Cushing stocks fell 4.05% on the week."),
+                     caveats=["Cushing stocks rose 4.05% on the week.", "Cushing stocks are 4.05% lower on the week."])
+    kept = prose.clean_caveats(sig)
+    ok = kept == ["Cushing stocks are 4.05% lower on the week."]
+    print(f"{'dropped  ' if ok else 'KEPT     '} a model caveat giving the 7-day change the wrong side: kept {kept}")
+    failed += not ok
     for kw in RIGHT:
         found = problems(kw)
         if found:

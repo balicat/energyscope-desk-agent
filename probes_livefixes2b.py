@@ -11,10 +11,12 @@ outputs can be compared line for line.
   tried (CO₂, m³, °C, an en dash, the Unicode minus, a narrow no-break space, curly quotes, ™). Plus, since the review
   of 906e707 (25 Nov 2026), every true sentence that review found refused there (a point's value as the subject, a
   premise corrected after the placement, a placement in the past, notation such as R², C₃ and MTCO₂e), and the
-  builder's own true sentences in the shapes beside them.
+  builder's own true sentences in the shapes beside them. Plus the live items' true sentences (25 Nov 2026, 'live
+  1' to 'live 3'), each accepted by d029c9c too.
 - REFUSED_BOTH: true sentences the reviewers found refused by d029c9c too (older rules, not changed here). Reported.
 - MUST_REFUSE: wrong sentences this branch must refuse: the brief's own B sentences (B's footnote marks among them),
-  and the second review's wrong sentences that d029c9c refuses and a wider rule had let through.
+  the second review's wrong sentences that d029c9c refuses and a wider rule had let through, and the live items'
+  wrong sentences (each accepted by d029c9c).
 - LIMIT: the brief's own A sentences and the ones 6f63817 judged. A (a percentile written as a place) was dropped
   from this branch on 25 Nov 2026 and moved to the lab branch, so each is accepted, as on d029c9c; one that is
   refused here is reported as CAUGHT and fails the run, because it would mean A was not fully removed.
@@ -40,6 +42,7 @@ WTI_7 = {"series_id": "PET.RWTC.D", "name": "Cushing, OK WTI Spot Price FOB, Dai
 HH, FR, FC = "henry_hub_percentile", "freight_history", "futures_crack"
 BWS, POS, C321 = "brent_wti_spread", "wti_positioning", "crack_321"
 W30, RIGS, C4W, CYOY, W5, SURP = "wti_30d", "us_rigs_yoy", "cushing_4w", "us_crude_yoy", "wti_five_years", "week_surprises"
+SIG, EIA = "regime_signals", "eia_weekly_brief"
 
 MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     # review 1, blocker 1 (D): two windows in one sentence
@@ -215,6 +218,70 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("r4 B", [W30], "WTI fell 17.26% over 30 days; CO₂, C₃, MTCO₂e and lbCO₂ are not covered."),
     ("r4 B", [W30], "WTI fell 17.26% over 30 days; As₂O₃, In₂O₃, Na₂CO₃ and H₂SO₄ are not energy series."),
     ("r4 B", [W30], "WTI fell 17.26% over 30 days; no regression on x₁ or log₁₀ of the price is run."),
+    # live item 1 (25 Nov 2026): true sentences about the signals' 7-day percent (metric.cushing_7d_pct -4.05) and the
+    # eia_weekly report's wow and yoy, in the shapes the period-change rule reads and beside them
+    ("live 1", [SIG], "Cushing stocks fell 4.0% on the week."),
+    ("live 1", [SIG], "Cushing stocks fell 4.05% over the week."),
+    ("live 1", [SIG], "Cushing stocks are down 4% on the week."),
+    ("live 1", [SIG], "Cushing stocks are 4.05% lower than a week ago."),
+    ("live 1", [SIG], "Cushing's 7-day change is -4.05%."),
+    ("live 1", [SIG], "Cushing stocks have given up 4.05% over the week."),
+    ("live 1", [SIG], "Cushing stocks did not rise; they fell 4.05% over the week."),
+    ("live 1", [SIG], "Cushing stocks drew 4.05% on the week, even as refinery runs rose."),
+    ("live 1", [SIG], "As refinery runs rose, Cushing stocks fell 4.05% on the week."),
+    ("live 1", [SIG], "Even after crude stocks rose, Cushing is 4.05% lower on the week."),
+    ("live 1", [SIG], "Refinery runs rose and Cushing stocks ended 4.05% lower on the week."),
+    ("live 1", [SIG], "Cushing stocks posted a 4.05% weekly draw."),
+    ("live 1", [SIG], "The Cushing 7-day percent change is 4.05% down."),
+    ("live 1", [SIG], "Cushing stocks are not up 4.05% on the week; they are down 4.05%."),
+    ("live 1", [SIG], "Cushing stocks, which rose last month, fell 4.05% this week."),
+    ("live 1", [SIG], "Cushing stocks ended the week 4.05% down."),
+    ("live 1", [SIG], "Cushing stocks are 4% lower on the week, with the z-score at 0.49."),
+    ("live 1", [SIG], "The call on OPEC crude rose 0.55 million barrels a day on the quarter, while Cushing fell 4.05% on the week."),
+    ("live 1", [EIA], "Cushing stocks fell 1,209 thousand barrels on the week."),
+    ("live 1", [EIA], "Cushing stocks drew 1.21 million barrels on the week, while crude stocks rose 3.38 million."),
+    ("live 1", [EIA], "US crude stocks rose 3.38 million barrels, gasoline 5.19 million and distillate 1.57 million."),
+    ("live 1", [EIA], "Crude stocks are 6,358 thousand barrels lower than a year ago."),
+    ("live 1", [EIA], "Brent is up 28.08 dollars on the year."),
+    ("live 1", [EIA], "Regular gasoline fell 0.19 dollars a gallon on the week."),
+    ("live 1", [EIA], "Crude imports fell 1,122 thousand barrels per day on the week, and production rose 19 thousand barrels per day."),
+    ("live 1", [EIA], "Gasoline stocks rose 5.19 million barrels while Cushing fell 1.21 million barrels."),
+    ("live 1", [EIA], "Distillate stocks rose 1.57 million barrels on the week but are 6.18 million barrels lower than a year ago."),
+    ("live 1", [EIA], "Crude oil stocks were 417,797 thousand barrels, up 3,380 on the week and down 6,358 on the year."),
+    ("live 1", [EIA], "Cushing stocks fell 1,209 thousand barrels to 26,147 even as crude stocks rose 3,380."),
+    ("live 1", [EIA], "As Cushing drew 1.21 million barrels, total crude stocks rose 3.38 million."),
+    ("live 1", [EIA], "WTI rose 0.29 dollars on the week, and Brent is up 0.04."),
+    ("live 1", [EIA], "Brent rose 28.08 dollars on the year to 92.94, while WTI is 28.02 dollars higher than a year ago."),
+    ("live 1", [EIA], "Refinery utilization rose 5.7 percentage points on the year, to 95.7%."),
+    ("live 1", [EIA], "Crude stocks rose 3.38 million barrels on the week, though they are 6.36 million barrels below last year."),
+    ("live 1", [EIA], "Regular gasoline gave up 0.19 dollars a gallon on the week."),
+    ("live 1", [EIA], "Crude imports dropped by 1,122 thousand barrels per day; Cushing lost 1.21 million barrels."),
+    ("live 1", [EIA], "SPR stocks fell 3.17 million barrels on the week and 134.56 million on the year."),
+    ("live 1", [EIA], "Propane/propylene stocks rose 12 thousand barrels on the week."),
+    ("live 1", [SIG], "Rising runs took 4.05% off Cushing stocks on the week."),
+    ("live 1", [SIG], "Higher refinery runs pulled Cushing stocks 4.05% lower on the week."),
+    ("live 1", [SIG], "Strong refinery demand drained 4.05% from Cushing over the week."),
+    ("live 1", [SIG], "Cushing stocks fell back 4.05% on the week after rising the week before."),
+    ("live 1", [SIG], "Up north, Cushing stocks fell 4.05% on the week."),
+    ("live 1", [SIG], "Cushing, up in the summer, fell 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks moved down 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks are 4.05% below where they were a week ago."),
+    ("live 1", [SIG], "Cushing stocks shrank 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks dipped 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks fell 4.05% on the week to their lowest since the summer."),
+    ("live 1", [SIG], "Cushing stocks increased their draw, down 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks gained no ground, down 4.05% on the week."),
+    ("live 1", [EIA], "Crude stocks built 3.38 million barrels on the week while Cushing drew 1.21 million."),
+    ("live 1", [EIA], "Crude stocks rose by 3,380 thousand barrels, the first build in three weeks."),
+    ("live 1", [EIA], "Gasoline rose 0.01 dollars a gallon at NY Harbor."),
+    ("live 1", [EIA], "Higher imports would have lifted stocks, but crude imports fell 1,122 thousand barrels per day."),
+    ("live 1", [EIA], "Brent, up 28.08 dollars on the year, now trades at 92.94."),
+    ("live 1", [EIA], "Total gasoline stocks rose 5.19 million barrels, a 1.55-sigma move."),
+    ("live 1", [EIA], "Cushing stocks were down 1.21 million barrels, and crude stocks were up 3.38 million."),
+    ("live 1", [SIG], "Cushing stocks fell more than 4% on the week."),
+    ("live 1", [SIG], "Cushing stocks fell a little less than 4.05% on the week."),
+    ("live 1", [SIG], "WTI rose more than Brent, while Cushing stocks fell 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks fell faster than crude stocks rose, down 4.05% on the week."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -240,6 +307,24 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     # review of 6f63817, minor (B): a lowered digit after a currency code or a plain word is a number
     ("r4 B", [W30], "WTI could fall to USD₈₀."),
     ("r4 B", [W30], "WTI could fall to₈₀ dollars."),
+    # live item 1: a change named by its period given the wrong side (d029c9c read no side for these keys)
+    ("live 1", [SIG], "Cushing stocks rose 4.0% on the week."),
+    ("live 1", [SIG], "Cushing stocks rose 4.05% over the week."),
+    ("live 1", [SIG], "Cushing stocks are up 4% on the week."),
+    ("live 1", [SIG], "Cushing stocks climbed 4.05% in seven days."),
+    ("live 1", [SIG], "Cushing inventories are 4.05% higher than a week ago."),
+    ("live 1", [EIA], "Cushing stocks rose 1,209 thousand barrels on the week."),
+    ("live 1", [EIA], "Cushing stocks rose 1.21 million barrels on the week."),
+    ("live 1", [EIA], "US crude stocks fell 3.38 million barrels on the week."),
+    ("live 1", [EIA], "Crude stocks are 6,358 thousand barrels higher than a year ago."),
+    ("live 1", [EIA], "Brent is down 28.08 dollars on the year."),
+    ("live 1", [EIA], "Regular gasoline rose 0.19 dollars a gallon on the week."),
+    ("live 1", [EIA], "Crude imports rose 1,122 thousand barrels per day on the week."),
+    ("live 1", [EIA], "Refinery utilization fell 5.7 percentage points on the year."),
+    ("live 1", [SIG], "Cushing stocks rose by a further 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks rose more than 4% on the week."),
+    ("live 1", [EIA], "Cushing stocks built 1.21 million barrels on the week."),
+    ("live 1", [SIG], "Cushing stocks rose more than 4% on the week, the steepest climb in months."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),

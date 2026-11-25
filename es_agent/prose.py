@@ -964,6 +964,113 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
     return moves, levels, quiet
 
 
+# ---- a change named by its period (25 Nov 2026) ----------------------------------------------------------------------
+# Until then a reading's value was a change only when its key said "change", so a key that names a change by its
+# period was read as nothing at all: with the signals' metric.cushing_7d_pct at -4.05, "Cushing stocks rose 4.0% on
+# the week" passed, and so did "rose 4.05%" and "are up 4%" (reproduced on d029c9c). Such a key is now a change with
+# a side. The shapes, from the fixture's readings, the server's signal catalogue and engine._report: an N-day, -week,
+# -month, -quarter or -year percent (cushing_7d_pct, eu_oil_imports_3m_pct), wow, yoy, mom, qoq, dod, chg and
+# revision, with an optional _pct, and the report's own forms in another unit (Cushing, OK.wow_in_million_barrels).
+# A key that says "change" was read before and is read as before. Like a server's other changes, such a value needs
+# no direction word (the report and the signals quote them bare), but a wrong one is refused. Judged narrowly, so that
+# no sentence d029c9c accepted becomes a refusal unless its word is wrong:
+#   - only a number that no fact change or "change" value has (those are judged as before), that is a rounding, as
+#     written, of such a value, in a unit that fits it, and of no other value in the answer;
+#   - a whole number under 100 only with its unit ("up 4%", not "4 weeks running");
+#   - the direction word must be the number's own: right before it, with only filler words between ("fell by 4.05%",
+#     "rose a further 4%"); or higher, lower, up or down right after it, in its clause; or a sign;
+#   - "given up" is a fall; a negation in the clause, or words before and after that disagree, leave it unjudged.
+_PERIOD_CHANGE = re.compile(r"(?:^|_)(?:(?:wow|yoy|mom|qoq|dod|chg)(?:_pct|_percent)?|revisions?|\d+[dwmqy]_(?:pct|percent))"
+                            r"(?:_in_[a-z_]+)?$")
+_JOINING = {"and", "but", "while", "whilst", "whereas", "as", "after", "before", "though", "although", "even", "which",
+            "who", "when", "where", "with", "since", "unlike", "despite", "yet", "or", "nor", "versus", "vs",
+            "against", "because", "so", "if", "then", "whose"}
+_GIVE = {"give", "gives", "gave", "given", "giving"}
+# what may stand between a direction word and its number: "fell by 4.05%", "rose a further 4%", "fell more than 4%"
+_FILLER = {"by", "of", "a", "an", "the", "some", "about", "around", "roughly", "nearly", "almost", "just", "over", "more",
+           "less", "than", "further", "another", "fully", "sharply", "slightly", "modestly", "steeply", "strongly", "much",
+           "only", "barely", "back"}
+_CLAUSE_MARK = re.compile(r"[,;:()\[\]]|\s[\u2013\u2014-]\s")
+_NEGATED = re.compile(r"\b(?:not|no|never|nor|neither|without|cannot)\b|n['\u2019]t\b", re.I)
+
+
+def _period_changes(answer: DeskAnswer) -> list[tuple[float, str | None]]:
+    """The values of the readings' keys that name a change by its period (see above), with the unit each is quoted in:
+    "percent" for a percent, the reading's unit for the value and for code's million-barrel figure, None if unknown."""
+    out: list[tuple[float, str | None]] = []
+    for r in answer.readings:
+        for k, v in r.values.items():
+            last = k.lower().split(".")[-1].strip()
+            if not v or "change" in k.lower() or not _PERIOD_CHANGE.search(last):
+                continue
+            unit = "percent" if _kind(k) == "percent" else r.value_units.get(k)
+            out.append((v, unit))
+            out += [(x, "million barrels" if "million" in name else None)
+                    for name, x in also_in(r.value_units.get(k) or "", v).items()]
+    return out
+
+
+def _period_side(sentence: str, toks: list, found: list, i: int) -> bool | None:
+    """The side the number toks[i] is given in its own clause: True for a rise, False for a fall, None for none or
+    for one that cannot be told (see above)."""
+    start = found[i].start()
+    lead = sentence[:start].rstrip()
+    if lead[-1:] in "+-\u2212" and not lead[-2:-1].isalnum():
+        return lead[-1] == "+"
+
+    def end_of(j: int) -> int:
+        return found[j].start() + len(toks[j][1])
+    before: list[str] = []
+    first = start
+    for j in range(i - 1, max(-1, i - 9), -1):
+        kind, w = toks[j]
+        if kind == "num" or w in _JOINING or _CLAUSE_MARK.search(sentence[end_of(j):first]):
+            break
+        before.append(w)
+        first = found[j].start()
+    after: list[str] = []
+    last = end_of(i)
+    for j in range(i + 1, min(len(toks), i + 4)):
+        kind, w = toks[j]
+        if kind == "num" or w in _JOINING or _CLAUSE_MARK.search(sentence[last:found[j].start()]):
+            break
+        after.append(w)
+        last = end_of(j)
+    if _NEGATED.search(sentence[first:last]):
+        return None
+    said = None
+    for at, w in enumerate(before):   # the nearest first; only filler words may stand between it and the number
+        if w in _CHANGE_UP | _CHANGE_DOWN:
+            said = False if w == "up" and at + 1 < len(before) and before[at + 1] in _GIVE else w in _CHANGE_UP
+            break
+        if w not in _FILLER:
+            break   # "Rising runs took 4.05% off Cushing": the word belongs to another noun
+    later = next((w in _CHANGE_UP for w in after if w in ("higher", "lower", "up", "down")), None)
+    if said is not None and later is not None and said != later:
+        return None
+    return said if said is not None else later
+
+
+def _period_quoted(sentence: str, toks: list, found: list, i: int, tok: str, n: float, dp: int,
+                   periods: list[tuple[float, str | None]], pool: "Pool") -> bool | None:
+    """Is toks[i] a quote of a period change, and of nothing else in the answer? Its side (True a rise), or None."""
+    start = found[i].start()
+    if start and (sentence[start - 1].isalnum() or sentence[start - 1] == "."):
+        return None   # glued to letters, or the decimals of another number
+    unit = written_unit(sentence, start, start + len(tok), tok)
+    small = dp == 0 and abs(n) < 100
+    if small and not unit.any():
+        return None   # "4 weeks running", "for 4 days": a bare whole number is not read as a period's change
+    hits = [v for v, u in periods if _rounds_to(v, n, dp) and (not unit.any() or fits(unit, u))]
+    if not hits or len({v > 0 for v in hits}) != 1:
+        return None
+    mine = {round(v, 9) for v, _ in periods}
+    if any(_rounds_to(v, n, dp) and round(v, 9) not in mine and (not unit.any() or fits(unit, u))
+           for v, kind, u in pool.tagged):
+        return None   # the number may quote another value
+    return hits[0] > 0
+
+
 def _shape_problems(answer: DeskAnswer, words: list[str]) -> list[str]:
     """A curve's shape word must be the reading's own, and not negated."""
     notes = [re.match(r"[a-z]+", r.note.lower()) for r in answer.readings if r.key.startswith("curve:")]
@@ -1017,6 +1124,7 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
     if changes and "unchanged" in all_words:
         problems.append("the summary says unchanged; the facts show a change")
     moves, levels, quiet = _signed(answer)
+    periods = _period_changes(answer)
     pool = pool_of(answer)
     clean = _blank_dates(text)
     for sentence in re.split(r"(?<=[.!?;:])\s+", clean):
@@ -1046,6 +1154,12 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                 if said is None and loud:
                     problems.append(f"'{tok}' is a change: write rose or fell (or up, down, a sign) right beside it")
                 elif said is not None and said != rose:
+                    problems.append(f"'{tok}' is described as a {'rise' if said else 'fall'}; the data shows a "
+                                    f"{'rise' if rose else 'fall'}")
+            elif not move_signs and periods:
+                rose = _period_quoted(sentence, toks, found, i, tok, n, dp, periods, pool)
+                said = None if rose is None else _period_side(sentence, toks, found, i)
+                if said is not None and said != rose:
                     problems.append(f"'{tok}' is described as a {'rise' if said else 'fall'}; the data shows a "
                                     f"{'rise' if rose else 'fall'}")
             hits = [(v, a, b) for v, a, b in levels if _quotes(v, n, dp)]
