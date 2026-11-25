@@ -199,7 +199,7 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("B: a footnote mark glued to a word", dict(facts=[brent], summary="Brent² futures are at 93.07 USD/bbl."), "footnote"),
     ("B: a footnote mark at the end of a sentence", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl, the latest "
                                                                                "settlement³."), "footnote"),
-    ("B: a direction control character", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl‮."), "direction control"),
+    ("B: a direction control character", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl\u202e."), "direction control"),
     ("B: a window in a ligature ('ﬁve-year' for a three-year average)",
      dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a ﬁve-year average of 434,167."),
      "window of 5 years"),
@@ -234,7 +234,7 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     dict(facts=[wti_up], summary="WTI spot is at $⁸⁸.¹⁰ after rising ¹.²⁰ on the week."),
     dict(facts=[wti], summary="WTI futures are at ８８.１０ USD/bbl."),
     dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl ｂｅｌｏｗ WTI spot on 2026-11-11."),
-    dict(facts=[wti], summary="WTI futures are at 88.1​0 USD/bbl."),
+    dict(facts=[wti], summary="WTI futures are at 88.1\u200b0 USD/bbl."),
     dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh, a price that includes the cost of CO₂ allowances."),
     dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh; no carbon price in tCO₂e or CO₂eq is cited."),
     dict(facts=[hh_fact], summary="Henry Hub is at $3.10 per million Btu; no series here is quoted per m³, per ㎡, in °C or in ‰."),
@@ -242,7 +242,7 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and bes
     # and took the change's verb from it (the reviewer of live-fixes-2, 25 Nov 2026)
     gold("wti_30d", summary="WTI fell… 17.26% over 30 days, to 89.53 dollars."),
     gold("wti_30d", summary="WTI fell 17.26%… over 30 days, to 89.53 dollars."),
-    gold("wti_30d", summary="WTI fell 17.26% over 30 days – to 89.53 dollars, a change of −18.68 dollars."),
+    gold("wti_30d", summary="WTI fell 17.26% over 30 days – to 89.53\u202fdollars, a change of −18.68 dollars."),
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected

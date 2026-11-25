@@ -101,7 +101,7 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("r1 B glyphs", [W30], "WTI fell 17.26% over 30 days, to 89.53 dollars, a price that does not include the cost of CO₂."),
     ("r1 B glyphs", [W30], "WTI fell 17.26% over 30 days – to 89.53 dollars."),
     ("r1 B glyphs", [W30], "WTI's 30-day change was −18.68 dollars, to 89.53."),
-    ("r1 B glyphs", [W30], "WTI fell 17.26% over 30 days, to 89.53 dollars."),
+    ("r1 B glyphs", [W30], "WTI fell 17.26% over 30 days, to 89.53\u202fdollars."),
     ("r1 B glyphs", [W30], "WTI’s fall over 30 days was 17.26%, to “89.53” dollars."),
     ("r1 B glyphs", [W30], "WTI™ fell 17.26% over 30 days, to 89.53 dollars."),
 ]

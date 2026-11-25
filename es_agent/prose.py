@@ -72,16 +72,16 @@ CODE_CAVEATS = ("Not current as of ", "Against the balance of the evidence: ", "
 # "WTI fell… 17.26% over 30 days" would lose its verb; the reviewer, 25 Nov 2026); °C and ‰ have no digit. Refused
 # with a plain message (`_glyph_problems`): a fraction sign (½, or the fraction slash NFKC writes for it: "1½" would
 # read as 11⁄2), a direction control (it can reorder what is shown), and a raised or lowered digit glued to a letter
-# or a digit (a footnote mark, "WTI²", "1.20¹"). Zero-width characters are dropped: "1​50" shows as 150 and is
+# or a digit (a footnote mark, "WTI²", "1.20¹"). Zero-width characters are dropped: "1\u200b50" shows as 150 and is
 # read as 150. Ported from live-fixes-2 (2064ff0) with the ellipsis kept whole.
 _SQUARES = "".join(chr(c) for c in range(0x3300, 0x3400) if unicodedata.decomposition(chr(c)).startswith("<square>"))
 _PROTECTED = re.compile(
     r"(?<![A-Za-z])(?:Nm|Sm|km|cm|mm|dm|Mm|MMm|m|ft|in|yd|mi)[²³](?![A-Za-z0-9²³⁰¹⁴-⁹])"
     r"|(?<![A-Za-z0-9])(?:t|kt|Mt|Gt|kg|g)?(?:CO₂(?:eq|e)?|CH₄|N₂O|SO₂|NO₂|H₂S|H₂O|H₂|O₂|O₃|N₂|NH₃|C₂H₆|C₃H₈|C₄H₁₀|C₂H₄|C₃H₆)"
     r"(?![A-Za-z0-9₀-₉])"
-    rf"|[‥…︙{_SQUARES}]+")
-_INVISIBLE = dict.fromkeys(map(ord, "​‌‍⁠﻿­᠎"))
-_BIDI = re.compile("[؜‎‏‪-‮⁦-⁩]")
+    rf"|[\u2025\u2026\ufe19{_SQUARES}]+")
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad\u180e"))
+_BIDI = re.compile("[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _RAISED_LOWERED = re.compile("[⁰¹²³⁴-⁹₀-₉]")
 
 
