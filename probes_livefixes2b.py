@@ -1260,7 +1260,7 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("rv 7510ed6 i3 control", [CYOY], "On 2025-11-07, US crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
     ("rv 7510ed6 i3 control", [W30], "On 2026-10-16, the WTI spot price was $108.21 a barrel (data as of 2026-11-17)."),
     # the builder's true sentences beside them (25 Nov 2026): "U.S." (or "i.e.", "vs.") before the base, after it, in
-    # brackets, after its date, or after a frame word that only the whole sentence shows; 7510ed6 refused 17 of these
+    # brackets, after its date, or after a frame word that only the whole sentence shows; 7510ed6 refused 16 of these
     ("builder 7510ed6", [CYOY], "In the oldest week of the comparison, U.S. crude stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
     ("builder 7510ed6", [CYOY], "At the far end of the year, U.S. crude stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
     ("builder 7510ed6", [CYOY], "U.S. crude oil stocks were 427,581 thousand barrels on 2025-11-07 (data as of 2026-11-13)."),
