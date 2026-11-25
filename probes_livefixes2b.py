@@ -180,6 +180,27 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("fix A", [HH], "Two levels matter: 3.90 is at the 90th percentile, and 4.36 is at the 95th percentile."),
     ("fix A", [FC], "The crack sits at the 88th percentile; a crack of 44.98 dollars is at the 90th percentile."),
     ("fix A", [HH], "Henry Hub is currently trading at the 66th percentile."),
+    # ... and true sentences in the shapes the rule still judges: the latest value (with its own date) in the subject,
+    # a point named after the placement, "That" for the latest value, "at most", a pronoun for a point named before
+    ("fix A", [HH], "Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 66th percentile of its last three years, "
+                    "above its median."),
+    ("fix A", [HH], "Henry Hub at 3.10 is in the 75th percentile at most."),
+    ("fix A", [BWS], "The Brent-WTI spread of 3.41 dollars is at the 34th percentile."),
+    ("fix A", [C321], "The 3-2-1 crack was 34.85 dollars. That sits at the 77th percentile of the last three years."),
+    ("fix A", [HH], "Henry Hub at 3.10 sits at the 66th percentile, below the 75th percentile of 3.22 and above the 25th of "
+                    "2.44."),
+    ("fix A", [FR], "Freight at 745.77 is at the 96th percentile, above its 95th percentile of 703.44."),
+    ("fix A", [FR], "Freight at 745.77 is in the 90th percentile and above."),
+    ("fix A", [HH], "Henry Hub was 3.10 dollars on 2026-11-17. That sits at the 66th percentile."),
+    ("fix A", [HH], "That level is at the 66th percentile, inside the band."),
+    ("fix A", [BWS], "The Brent-WTI spread of 3.41 dollars is at the 10th percentile or above."),
+    ("fix A", [FC], "The crack of 41.13 is in the 88th percentile, short of its 90th percentile of 44.98."),
+    ("fix A", [FR], "Freight crossed its 90th percentile line on 2026-07-31. That sits at the 90th percentile."),
+    ("fix A", [HH], "Henry Hub's 95th percentile is 4.36. It is at the 95th percentile by definition."),
+    ("fix A", [HH], "The upper quartile begins at 3.22. That is at the 75th percentile."),
+    ("fix A", [HH], "Watch the 90th percentile, which sits at the 90th percentile by definition."),
+    ("fix A", [POS], "Net length of 15,814 contracts sits at the 10th percentile of 156 weeks."),
+    ("fix A", [HH, FR], "Henry Hub at 3.10 sits at the 66th percentile and freight at 745.77 at the 96th percentile."),
     ("fix B", [W30], "WTI fell 17.26% over 30 days, a price that leaves out the cost of CO²."),
     ("fix B", [W30], "WTI fell 17.26% over 30 days; gas in Gm³ is not covered."),
     ("fix B", [W30], "WTI fell 17.26% over 30 days; volumes in hm³ and dam³ are not covered."),
@@ -221,6 +242,12 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("brief A", [HH], "Henry Hub's price, which sits at the 95th percentile, looks rich."),
     ("brief A", [HH], "Henry Hub is currently trading at the 95th percentile."),
     ("brief A", [FR], "Freight sits at the 95th percentile."),
+    ("brief A", [HH], "Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its last three "
+                      "years, above its 90th percentile line of 3.90."),
+    ("brief A", [BWS], "The Brent-WTI spread of 3.41 dollars is at the 90th percentile."),
+    ("brief A", [C321], "The 3-2-1 crack was 34.85 dollars. That sits at the 90th percentile of the last three years."),
+    ("brief A", [FR], "Freight at 745.77 is at the 90th percentile of its three-year window."),
+    ("brief A", [POS], "Managed money net length of 15,814 contracts sits at the 90th percentile."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),

@@ -190,6 +190,13 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
      _PLACED),
     ("A: the latest value in the sentence, the rank wrong",
      gold("henry_hub_percentile", summary="Henry Hub, at 3.10, sits at the 95th percentile."), _PLACED),
+    ("A: the latest value in the subject, with its date (the reading's own), and a point named after it",
+     gold("henry_hub_percentile", summary="Henry Hub spot gas at 3.10 dollars on 2026-11-17 sits at the 95th percentile of its "
+                                          "last three years, above its 90th percentile line of 3.90."), _PLACED),
+    ("A: a spread's latest value in the subject (it is at the 33.9th)",
+     gold("brent_wti_spread", summary="The Brent-WTI spread of 3.41 dollars is at the 90th percentile."), _PLACED),
+    ("A: 'That' pointing at the latest value", gold("crack_321", summary="The 3-2-1 crack was 34.85 dollars. That sits at the "
+                                                                          "90th percentile of the last three years."), _PLACED),
     # B: a raised, lowered, circled or full-width character is read as what it shows
     ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
     ("B: a price in lowered digits", dict(facts=[brent], summary="Brent could fall to $₈₀."), "80"),
@@ -605,8 +612,8 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
      summary="Henry Hub sits at its 95th percentile of 6.90.")),
     ("A, not judged by design: placed in the past (the tools rank only the latest value)", dict(readings=[hh_pct],
      summary="Henry Hub was at the 95th percentile last week.")),
-    ("A, not judged by design: a number in the subject (here the latest itself)", gold("brent_wti_spread",
-     summary="The Brent-WTI spread of 3.41 dollars is at the 90th percentile.")),
+    ("A, not judged by design: a number in the subject that is not the latest value (here the week's change)",
+     gold("wti_positioning", summary="The net position fell by 9,900 contracts on the week and sits at the 90th percentile.")),
     ("C, dropped from this branch: a rounded change given the wrong side",
      gold("wti_30d", "us_rigs_yoy", summary="WTI rose 17%; rigs fell 11%.")),
     ("D, moved to the lab branch: a 30-day change called the week's", gold("wti_30d", summary="WTI fell 17.26% over the week.")),
