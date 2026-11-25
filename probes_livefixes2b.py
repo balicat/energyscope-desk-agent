@@ -17,18 +17,27 @@ outputs can be compared line for line.
   true sentence of that review's probes (a period change looked back on, supposed, asked or corrected; a comparative
   on a spread denied or asked; a base value in a premise corrected; and the true sentences of the last review of
   6f63817, the reason A was dropped), and the builder's own true sentences in every frame beside them ('builder').
+  Plus, since the review of 89ab3ad (25 Nov 2026, 'rv 89ab3ad'), every true sentence of that review's three probe
+  rounds (among them the ones that items 1 and 2 still refused there, so both were dropped). The true sentences of
+  items 1 and 2 stay here: with the items dropped, each must be accepted, as on d029c9c.
   Each is also checked as a model caveat: kept by clean_caveats, unless d029c9c drops it too (CAVEAT_BOTH).
 - REFUSED_BOTH: true sentences the reviewers found refused by d029c9c too (older rules, not changed here). Reported.
 - MUST_REFUSE: wrong sentences this branch must refuse: the brief's own B sentences (B's footnote marks among them),
-  the second review's wrong sentences that d029c9c refuses and a wider rule had let through, and the live items'
-  wrong sentences (each accepted by d029c9c).
+  the second review's wrong sentences that d029c9c refuses and a wider rule had let through, and item 3's wrong
+  sentences (each accepted by d029c9c).
 - LIMIT: the brief's own A sentences and the ones 6f63817 judged. A (a percentile written as a place) was dropped
   from this branch on 25 Nov 2026 and moved to the lab branch, so each is accepted, as on d029c9c; one that is
   refused here is reported as CAUGHT and fails the run, because it would mean A was not fully removed.
 - DROPPED: the brief's own C sentence. C is not in this branch, so it is accepted as on d029c9c. Reported.
-- OPEN: wrong sentences in shapes beside the three live rules that the rules leave unread on purpose, accepted by
-  both trees (a direction word away from its number, a comparative before the number, a base value's date after a
-  determiner, a sentence that names another period). Reported, as the README's limits.
+- DROPPED_12: the wrong sentences of live items 1 (the side of a change named by its period) and 2 (the side of a
+  spread written with a comparative), dropped from this branch on 25 Nov 2026 and held on the lab branch with A, C
+  and D. Each is accepted, as on d029c9c; one refused here is CAUGHT and fails the run (the item not fully removed).
+- OPEN: wrong sentences in shapes beside item 3 that it leaves unread on purpose, accepted by both trees (a base
+  value's date after a determiner, a word beyond the plain dated level). Reported, as the README's limits.
+- B_TWINS: two wrong sentences in glyphs that B newly accepts, because it reads them as their ASCII twins, which
+  d029c9c accepts; d029c9c refused the glyph forms only by accident. Reported.
+With --json, every sentence's problems and its caveat verdict (kept or not) are written, group by group, so the outputs
+of two trees can be compared sentence by sentence (as `compare_probes.py` does, in the gates of 25 Nov 2026).
 """
 
 from __future__ import annotations
@@ -985,6 +994,251 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("builder 3", ["wti_far"], "WTI was $139.69 on 2026-11-17. No, that was 2008-06-27."),
     ("builder 3", ["wti_7"], "WTI was 89.62 dollars on 2026-11-10."),
     ("builder 3", ["wti_7"], "As of 2026-11-17, WTI was 89.53 dollars, against 89.62 a week earlier."),
+    # the review of 89ab3ad (25 Nov 2026, 'rv 89ab3ad'): every true sentence of its three probe rounds. Rounds 2 and 3
+    # found items 1 and 2 refusing true sentences that d029c9c accepts: a change compared with another series' change
+    # ('Commercial crude stocks rose by more than the 3.17 million barrel SPR draw', where 'rose' is crude's and was read
+    # as the SPR's side) and a spread's number compared with another figure ('The spot spread of 3.41 dollars is lower
+    # than the WTI spot premium of 4.88 dollars', read as Brent lower than WTI). Both items were dropped from this
+    # branch; every sentence here is accepted, as on d029c9c
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks dropped 4.0% over the past week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing inventories declined by 4.05% week on week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks shed 4.05% in seven days."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing's seven-day change is -4.05%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks drew down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "At Cushing, stocks fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell by just over 4% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell by roughly 4% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are now 4% lower on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are still 4.05% down on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing fell 4.05% on the week while refinery utilization stood at 95.70%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Refinery runs at 95.70% helped draw Cushing down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "High runs pulled Cushing stocks down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "With runs at 95.70%, Cushing stocks dropped 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Refiners used up 4.05% of Cushing's stocks on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Refinery demand soaked up 4.05% of Cushing stocks on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Refiners drew 4.05% out of Cushing on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Strong refinery demand ate into Cushing, which fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing posted a 4.05% weekly draw."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks were 4.05% lower on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks have fallen 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks have dropped by 4.05% this week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% on the week as runs climbed to 95.70%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Runs are up, and Cushing stocks are 4.05% lower on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing is down 4.05% on the week and its z-score is 0.49."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks continued to fall, by 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "The Cushing hub lost 4.05% of its stocks on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% in the latest week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% in the week to 2026-11-21."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks slid 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are 4.05% lighter than a week ago."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05%, while the Cushing z-score is 0.49."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing: down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing (-4.05% on the week) is drawing."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks, down 4.05% on the week, are not near a building-fast reading."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05%; refinery utilization is 95.70%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Stocks at Cushing fell 4.05% week over week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% over the 7 days."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% in 7 days."),
+    ("rv 89ab3ad i1 sig", [SIG], "In the last 7 days Cushing stocks fell 4.05%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing tank levels fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks eased 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks tumbled 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are 4.05% down week on week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are lower by 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Refiners pulled Cushing stocks down by 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Rising runs took Cushing down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "As runs rose, Cushing stocks fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Runs rose and Cushing stocks fell 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Gasoline cracks are firm, and Cushing is down 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks fell 4.05% on the week, up from a 0.49 z-score."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing stocks drew 1,209 thousand barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks built 3.38 million barrels last week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks rose 5.19 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "The SPR fell 3.17 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "SPR stocks are down 134.6 million barrels year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude production rose 19 thousand barrels per day on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Production is up 198 thousand barrels per day year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Brent is 28.08 dollars a barrel higher than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "WTI is up 28.02 dollars year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Diesel fell 0.19 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Retail diesel is 2.07 dollars a gallon higher than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Residential heating oil fell 0.20 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Distillate demand rose 374 thousand barrels per day on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline demand rose 23 thousand barrels per day on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Propane stocks fell 1.15 million barrels year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Year on year, gasoline stocks are up 8.56 million barrels."),
+    ("rv 89ab3ad i1 eia", [EIA], "Week on week, Cushing stocks fell 1.21 million barrels."),
+    ("rv 89ab3ad i1 eia", [EIA], "On the week, Cushing drew 1.21 million barrels while crude built 3.38 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose 3.38 million barrels on the week, while Cushing fell 1.21 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose 3.38 million barrels on the week, but the SPR lost 3.17 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Commercial crude stocks rose 3.38 million barrels to 417.80 million on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing fell 1.21 million barrels to 26.15 million on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "A 1.21 million barrel draw at Cushing left stocks at 26.15 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks are up 5.19 million barrels on the week, and distillate stocks are up 1.57 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks rose 5.19 million barrels on the week even as demand rose 23 thousand barrels per day."),
+    ("rv 89ab3ad i1 eia", [EIA], "Imports fell 1,122 thousand barrels per day, yet crude stocks rose 3.38 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose 3.38 million barrels on the week despite a 1,122 thousand barrel per day drop in imports."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks are higher by 5.19 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Distillate stocks are lower by 6.18 million barrels than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose 3.38 million barrels, more than the SPR's draw of 3.17 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks are 6.36 million barrels lower than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks fell 6.36 million barrels year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing stocks are up 4.33 million barrels year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Distillate stocks are down 6.18 million barrels from a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "WTI gained 0.29 dollars on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "WTI rose 0.29 dollars a barrel on the week, more than Brent, which was up only 0.04 dollars."),
+    ("rv 89ab3ad i1 eia", [EIA], "Refinery utilization is up 5.7 points year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Refinery utilization rose 0.5% on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks built 5.19 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose by 3.38 million barrels on the week to 417.80 million barrels."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks built 3.38 million barrels, gasoline 5.19 million and distillate 1.57 million on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "On the week, crude stocks rose 3.38 million barrels and the SPR fell 3.17 million barrels."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude imports dropped 1.12 million barrels a day on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Propane stocks rose 12 thousand barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline supplied rose 262 thousand barrels per day year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Rising imports? No: crude imports fell 1,122 thousand barrels per day on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "The SPR drew 3.17 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Releases cut the SPR by 3.17 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Lower imports did not stop crude stocks rising 3.38 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing stocks fell 1.21 million barrels on the week to 26.15 million barrels, 4.33 million above a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Heating oil at the pump fell 0.20 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "NY Harbor heating oil slipped 0.015 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Mont Belvieu propane fell 0.006 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Conventional gasoline rose 0.006 dollars a gallon on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude oil (excl. SPR) rose 3.38 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks are 3.38 million barrels higher on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks stand 3.38 million barrels higher than last week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks are 8.56 million barrels higher than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude imports are 374 thousand barrels per day lower than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "The SPR is down 3.17 million barrels this week."),
+    ("rv 89ab3ad i1 eia", [EIA], "The SPR is 3.17 million barrels lower than last week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing stocks drew 1.21 million barrels; gasoline built 5.19 million."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing drew 1.21 million barrels, down for the week."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars dearer than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is $3.41 a barrel higher than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is $3.41 a barrel cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is 3.41 dollars less expensive than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars more expensive than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "On 2026-11-17, Brent was 3.41 dollars higher than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent settled 3.41 dollars higher than WTI on 2026-11-17."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent, at 92.94, is 3.41 dollars higher than WTI at 89.53."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent at 92.94 was 3.41 dollars dearer than WTI at 89.53."),
+    ("rv 89ab3ad i2 bws", [BWS], "Spot Brent is 3.41 dollars dearer than spot WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars higher than the WTI price."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars higher than Cushing WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent's price is 3.41 dollars higher than WTI's."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI's price is 3.41 dollars lower than Brent's."),
+    ("rv 89ab3ad i2 bws", [BWS], "Europe's Brent is 3.41 dollars dearer than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "The gap leaves WTI 3.41 dollars cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is cheaper than Brent, by 3.41 dollars."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI trails Brent by 3.41 dollars."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is higher than WTI by 3.41 dollars."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is 3.41 dollars lower than Brent is."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars dearer than WTI, a spread inside its usual range."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI sells 3.41 dollars cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI crude is 3.41 dollars cheaper than Brent crude."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent crude is 3.41 dollars dearer than WTI crude."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent stands 3.41 dollars higher than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is now 3.41 dollars cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Today WTI is 3.41 dollars cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars pricier than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is about 3.4 dollars dearer than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is roughly 3 dollars cheaper than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent trades 3.41 dollars over WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "The Brent-WTI spread of 3.41 dollars is lower than its 9.71 ceiling."),
+    ("rv 89ab3ad i2 bws", [BWS], "The spread, 3.41 dollars, is lower than the 9.71 line."),
+    ("rv 89ab3ad i2 bws", [BWS], "At 3.41 dollars, Brent's lead over WTI is lower than its usual ceiling."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars higher than WTI, and the spread is at the 34th percentile."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is 3.41 dollars cheaper than Brent, so US crude is the cheaper barrel."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is dearer: 3.41 dollars higher than WTI."),
+    ("rv 89ab3ad i2 fsp", [FSP], "On futures, Brent is 8.94 dollars higher than WTI."),
+    ("rv 89ab3ad i2 fsp", [FSP], "Spot Brent is 0.20 dollars lower than its future."),
+    ("rv 89ab3ad i2 fsp", [FSP], "Spot Brent is 0.20 dollars cheaper than its own future."),
+    ("rv 89ab3ad i2 fsp", [FSP], "Spot Brent is 3.41 dollars higher than spot WTI, while on futures Brent is 8.94 dollars higher than WTI."),
+    ("rv 89ab3ad i2 fsp", [FSP], "On spot, WTI is 3.41 dollars lower than Brent; on futures it is 8.94 dollars lower."),
+    ("rv 89ab3ad i2 fsp", [FSP], "WTI is 3.41 dollars cheaper than Brent on spot, and 4.88 dollars higher than its future."),
+    ("rv 89ab3ad i2 fsp", [FSP], "The 2027-01 Brent contract is 8.94 dollars dearer than the 2027-01 WTI contract."),
+    ("rv 89ab3ad i2 fsp", [FSP], "Brent's 2027-01 future is 8.94 dollars above WTI's."),
+    ("rv 89ab3ad i3", ["wti_far"], "On 2008-06-27, WTI spot was $139.69 a barrel."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot was $139.69 on 2008-06-27 and $89.53 on 2026-11-17."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot fell from 139.69 to 89.53."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot price: $139.69 (2008-06-27)."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot price: 139.69."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot traded at $139.69 a barrel on the base date, 2008-06-27."),
+    ("rv 89ab3ad i3", ["wti_far"], "As of 2026-11-17, WTI spot was $89.53 a barrel; on 2008-06-27 it was $139.69."),
+    ("rv 89ab3ad i3", ["wti_far"], "As of 2026-11-17, WTI spot was $89.53 a barrel, against $139.69 a barrel on 2008-06-27."),
+    ("rv 89ab3ad i3", ["wti_far"], "As of 2026-11-17, the WTI spot price at the start of the window was 139.69."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot price as of 2008-06-27: 139.69."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot on 2008-06-27: $139.69 a barrel."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI's spot price was 139.69 dollars a barrel on 2008-06-27."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot was 139.69 dollars a barrel on 2008-06-27, its base date."),
+    ("rv 89ab3ad i3", ["wti_far"], "On 2026-11-17 WTI spot was 89.53 dollars a barrel, down from 139.69 on 2008-06-27."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot (2026-11-17): 89.53. WTI spot (2008-06-27): 139.69."),
+    ("rv 89ab3ad i3", ["wti_far"], "As of 2026-11-17, WTI spot was down 50.16 dollars from $139.69 a barrel."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot was $139.69 a barrel when the window opened, and $89.53 on 2026-11-17."),
+    ("rv 89ab3ad rv missing", [RIGS], "Year on year, US rigs rose 10.56% to 607."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude stocks rose by more than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Crude stocks rose by more than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude stocks rose more than the 3.17 million barrels the SPR lost."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude rose more than the 3.17 million barrel SPR release."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Gasoline stocks rose more than the 1.21 million barrel Cushing draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Gasoline stocks rose much more than the 1.21 million barrel Cushing draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Distillate stocks rose less than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "The SPR fell more than the 1.57 million barrel distillate build."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Cushing stocks fell less than the 3.38 million barrel crude build."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Cushing stocks fell by less than the 3.38 million barrel build in commercial crude."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Crude imports fell by more than the 374 thousand barrels per day distillate demand gained."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Brent rose less than the 0.19 dollar fall in diesel."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude stocks rose by over the 3.17 million barrels the SPR lost."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Crude stocks rose by more than the SPR's 3.17 million barrel draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude stocks rose by more than the 3.17 million barrel SPR draw on the week."),
+    ("rv 89ab3ad i1 other-series", [EIA], "On the week, commercial crude rose more than the 3.17 million barrels drawn from the SPR."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Gasoline stocks rose by more than the 3.17 million barrels the SPR released."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Crude stocks rose by just more than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Gasoline stocks rose by more than the 1.21 million barrel draw at Cushing."),
+    ("rv 89ab3ad i1 other-series", [EIA], "The SPR draw was bigger than the 1.57 million barrel distillate build."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Crude stocks built by more than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series", [EIA], "Commercial crude added more than the 3.17 million barrels the SPR lost."),
+    ("rv 89ab3ad i1 other2", [EIA], "WTI rose over a 1.21 million barrel Cushing draw."),
+    ("rv 89ab3ad i1 other2", [EIA], "WTI rose on a 1.21 million barrel Cushing draw."),
+    ("rv 89ab3ad i1 other2", [EIA], "Brent rose 0.04 dollars as Cushing drew 1.21 million barrels."),
+    ("rv 89ab3ad i1 other2", [EIA], "WTI rose by more than the 0.19 dollar fall in diesel."),
+    ("rv 89ab3ad i1 other2", [EIA], "WTI gained more than the 0.19 dollars diesel lost."),
+    ("rv 89ab3ad i1 other2", [EIA], "Production rose by more than the 1,122 thousand barrels per day imports lost? No."),
+    ("rv 89ab3ad i1 other2", [EIA], "Gasoline demand rose by about the 23 thousand barrels per day it gained."),
+    ("rv 89ab3ad i1 sig other", [SIG], "Cushing stocks fell more than the 0.1 million barrel per day OPEC demand revision."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread of 3.41 dollars is lower than the WTI spot premium to its future, 4.88 dollars."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread of 3.41 dollars is lower than the WTI spot-futures gap of 4.88 dollars."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot gap of 3.41 dollars is less than the WTI spot premium of 4.88 to its future."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread of 3.41 dollars is lower than the WTI futures discount of 4.88 to spot."),
+    ("rv 89ab3ad i2 subject", [FSP], "At the spot end the spread is 3.41 dollars, lower than WTI's spot premium of 4.88."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread is 3.41 dollars, lower than the 8.94 on futures."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread is 3.41 dollars lower than the futures spread of 8.94."),
+    ("rv 89ab3ad i2 subject", [FSP], "Spot spread: 3.41 dollars, lower than the 8.94 futures spread."),
+    ("rv 89ab3ad i2 subject", [FSP], "In spot, the 3.41 dollar spread is lower than the WTI spot premium of 4.88 dollars."),
+    ("rv 89ab3ad i2 subject", ["arb_us_europe"], "The spot spread of 3.41 dollars is lower than the WTI spot premium of 4.88 dollars to its future."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot spread of 3.41 dollars is smaller than the WTI spot premium of 4.88 dollars."),
+    ("rv 89ab3ad i2 subject", [FSP], "Brent's spot lead of 3.41 dollars is lower than the WTI spot premium of 4.88 dollars to its future."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot Brent premium of 3.41 dollars is lower than the WTI spot premium of 4.88 dollars over its future."),
+    ("rv 89ab3ad i2 subject", [FSP], "The spot premium of 3.41 dollars is less than the WTI contango of 4.88 dollars."),
+    ("rv 89ab3ad i2 subject", ["crude_tight"], "The spot premium of 4.88 dollars is higher than the Brent spot discount of 0.20 dollars to its future."),
+    ("rv 89ab3ad i2 subject", ["crude_tight"], "WTI's spot premium of 4.88 dollars is higher than the Brent figure, a 0.20 dollar discount."),
+    ("rv 89ab3ad i2 subject", ["wti_curve"], "The M1 premium of 11.01 dollars is higher than the M12 discount."),
+    ("rv 89ab3ad i2 subject", ["wti_curve"], "The front M1 spread of 11.01 dollars is higher than the M12 level implies."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "SPR releases added 3.17 million barrels to the market on the week."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Refiners drew down Cushing, buying 1.21 million barrels on the week."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Crude stocks rose by more than double the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Crude stocks rose as much as the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Crude stocks rose faster than the 3.17 million barrel SPR draw."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Gasoline stocks rose by almost four times the 1.21 million barrel Cushing draw."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Commercial crude climbed by more than the 3.17 million barrel fall in the SPR."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Commercial crude stocks gained more than the 3.17 million barrels drained from the SPR."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Gasoline stocks rose by more than the 1.21 million barrel draw in Cushing on the week."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Distillate stocks rose by less than the 3.17 million barrel SPR draw on the week."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "Crude stocks rose by more than the 3.17 million barrel SPR draw, so total stocks rose too."),
+    ("rv 89ab3ad i1 other-series 2", [EIA], "US crude stocks rose more than the 3.17 million barrel SPR draw this week."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -1046,6 +1300,10 @@ REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's la
     ("builder 3", ["wti_far44"], "WTI spot was $44.60 a barrel at the end of 2008, and is 89.53 on 2026-11-17."),
     ("builder 3", [W30], "As of 2026-11-17, WTI spot was $108.21 a barrel in mid-October."),
     ("builder 3", ["wti_far"], "As of 2026-11-17, WTI spot was $139.69 a barrel at the 2008 peak."),
+    # the review of 89ab3ad (25 Nov 2026): true, and refused by d029c9c too (a bare year; a quoted change with no rose
+    # or fell)
+    ("rv 89ab3ad i3", ["wti_far"], "In the data to 2026-11-17, WTI spot was $139.69 a barrel at its 2008 peak."),
+    ("rv 89ab3ad i3", ["wti_far"], "As of 2026-11-17, WTI spot was 35.91% below its level of $139.69."),
 ]
 
 MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
@@ -1061,23 +1319,7 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     # review of 6f63817, minor (B): a lowered digit after a currency code or a plain word is a number
     ("r4 B", [W30], "WTI could fall to USD₈₀."),
     ("r4 B", [W30], "WTI could fall to₈₀ dollars."),
-    # live item 1: a change named by its period given the wrong side (d029c9c read no side for these keys)
-    ("live 1", [SIG], "Cushing stocks rose 4.0% on the week."),
-    ("live 1", [SIG], "Cushing stocks rose 4.05% over the week."),
-    ("live 1", [SIG], "Cushing stocks are up 4% on the week."),
-    ("live 1", [SIG], "Cushing stocks climbed 4.05% in seven days."),
-    ("live 1", [SIG], "Cushing inventories are 4.05% higher than a week ago."),
-    ("live 1", [EIA], "Cushing stocks rose 1,209 thousand barrels on the week."),
-    ("live 1", [EIA], "Cushing stocks rose 1.21 million barrels on the week."),
-    ("live 1", [EIA], "US crude stocks fell 3.38 million barrels on the week."),
-    ("live 1", [EIA], "Crude stocks are 6,358 thousand barrels higher than a year ago."),
-    ("live 1", [EIA], "Brent is down 28.08 dollars on the year."),
-    ("live 1", [EIA], "Regular gasoline rose 0.19 dollars a gallon on the week."),
-    ("live 1", [EIA], "Crude imports rose 1,122 thousand barrels per day on the week."),
-    ("live 1", [EIA], "Refinery utilization fell 5.7 percentage points on the year."),
-    ("live 1", [SIG], "Cushing stocks rose by a further 4.05% on the week."),
-    ("live 1", [SIG], "Cushing stocks rose more than 4% on the week."),
-    ("live 1", [EIA], "Cushing stocks built 1.21 million barrels on the week."),
+    ("r4 B", [W30], "WTI could reach EUR¹⁵⁰."),
     # review 2, blocker 1: a change against its own past with the wrong window, refused by d029c9c for want of rose or
     # fell; a wider rule read "below where it was" as the direction word and let them through
     ("r2 own past", [W30], "WTI is 17.26% below where it was a week ago."),
@@ -1089,19 +1331,6 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("r2 own past", [RIGS], "Rigs are 58 above their level a month ago."),
     ("r2 own past", [C4W], "Cushing stocks are 5.24% below where they were a year ago."),
     ("r2 own past", [W30], "WTI rose 17.26% (below where it was 30 days ago)."),
-    # live item 2: a comparative on the wrong side of a named spread
-    ("live 2", [BWS], "Brent is $3.41 a barrel lower than WTI."),
-    ("live 2", [BWS], "WTI is $3.41 a barrel dearer than Brent."),
-    ("live 2", [BWS], "Brent is 3.41 dollars cheaper than WTI."),
-    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent."),
-    ("live 2", [BWS], "Brent trades 3.41 dollars less than WTI."),
-    ("live 2", [BWS], "WTI is $3.41 more expensive than Brent."),
-    ("live 2", [BWS], "Brent is 3.41 dollars a barrel less expensive than WTI."),
-    ("live 2", [BWS], "WTI is 3.41 dollars pricier than spot Brent."),
-    ("live 2", [FSP], "Brent futures are 8.94 dollars cheaper than WTI futures."),
-    ("live 2", [FSP], "WTI futures are 8.94 dollars higher than Brent."),
-    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent spot."),
-    ("live 2", [BWS], "Brent spot is 3.41 dollars lower than WTI spot on the day."),
     # live item 3: a change's base value written beside another value's date
     ("live 3", ["wti_far44"], "As of 2026-11-17, WTI spot was $44.60 a barrel."),
     ("live 3", ["wti_far44"], "WTI spot was $44.60 a barrel on 2026-11-17."),
@@ -1130,24 +1359,6 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("live 3", ["wti_far"], "On 2026-11-17, WTI spot was $139.69 a barrel."),
     ("live 3", ["wti_far"], "WTI spot was at 139.69 dollars on 2026-11-17."),
     # the review of bb2c261's and the builder's probes (25 Nov 2026): wrong, accepted by d029c9c, refused here
-    ("rv bb2c261 1", [SIG], "Cushing stocks gained 4.05% on the week."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks increased 4.05% on the week."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks were up 4.05% in the latest week."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks climbed 4% on the week."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks are 4.05% higher than a week ago."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks rose by 4.05 percent on the week."),
-    ("rv bb2c261 1", [SIG], "Cushing stocks jumped 4% week on week."),
-    ("rv bb2c261 1", [SIG], "Cushing inventories built 4.05% over seven days."),
-    ("rv bb2c261 1", [EIA], "Cushing stocks built 1,209 thousand barrels on the week."),
-    ("rv bb2c261 1", [EIA], "Brent fell 28.08 dollars on the year."),
-    ("rv bb2c261 1", [EIA], "Crude stocks drew 3.38 million barrels on the week."),
-    ("rv bb2c261 1", [EIA], "Cushing stocks are 1.21 million barrels higher than a week ago."),
-    ("rv bb2c261 2", [BWS], "WTI is 3.41 dollars a barrel higher than Brent."),
-    ("rv bb2c261 2", [BWS], "Brent sells for 3.41 dollars less than WTI."),
-    ("rv bb2c261 2", [BWS], "Spot WTI is 3.41 dollars pricier than spot Brent."),
-    ("rv bb2c261 2", [BWS], "WTI is currently 3.41 dollars higher than Brent."),
-    ("rv bb2c261 2", [BWS], "WTI now trades 3.41 dollars higher than Brent does."),
-    ("rv bb2c261 2", [FSP], "Spot Brent is 0.20 dollars higher than its future."),
     ("rv bb2c261 3", ["wti_far"], "As of 2026-11-17 WTI spot was $139.69."),
     ("rv bb2c261 3", ["wti_far"], "WTI spot (2026-11-17): $139.69."),
     ("rv bb2c261 3", ["wti_far"], "Latest WTI spot price: $139.69 a barrel (2026-11-17)."),
@@ -1165,61 +1376,19 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("rv bb2c261 3", ["wti_far"], "On 2026-11-17, Cushing WTI was at $139.69."),
     ("rv bb2c261 B", [W30], "WTI could fall near₈₀ dollars."),
     ("rv bb2c261 B", [W30], "WTI could fall to EUR₈₀."),
-    ("builder 1", [SIG], "Cushing stocks are 4.05% higher on the week."),
-    ("builder 1", [SIG], "Cushing stocks are 4.05% up week on week."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.05% last week."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.05% this week."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.05% over the past week."),
-    ("builder 1", [SIG], "In the week to 2026-11-21, Cushing stocks rose 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks built 4.05% on the week."),
-    ("builder 1", [SIG], "Cushing stocks increased by 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks rose +4.05% on the week."),
-    ("builder 1", [SIG], "Cushing stocks: +4.05% on the week."),
-    ("builder 1", [SIG], "Cushing stocks have risen 4.05% since last week."),
-    ("builder 1", [SIG], "Since a week ago, Cushing stocks have risen 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks are now 4.05% higher than a week ago."),
-    ("builder 1", [SIG], "Over the week, Cushing stocks rose 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks climbed about 4% on the week."),
-    ("builder 1", [EIA], "Cushing stocks are 1.21 million barrels higher on the week."),
-    ("builder 1", [EIA], "Cushing stocks are 4.33 million barrels lower than a year ago."),
-    ("builder 1", [EIA], "Brent is down 28.08 dollars from a year ago."),
-    ("builder 1", [EIA], "Brent is 28.08 dollars lower than a year ago."),
-    ("builder 1", [EIA], "US crude stocks are 6.36 million barrels higher than a year ago."),
-    ("builder 1", [EIA], "US crude stocks drew 3.38 million barrels on the week."),
-    ("builder 1", [EIA], "Cushing stocks are 1.21 million barrels higher than last week."),
-    ("builder 2", [BWS], "On 2026-11-17, WTI was 3.41 dollars dearer than Brent."),
-    ("builder 2", [BWS], "WTI at 89.53 is 3.41 dollars higher than Brent at 92.94."),
-    ("builder 2", [BWS], "WTI is currently 3.41 dollars dearer than Brent."),
-    ("builder 2", [BWS], "Brent spot is 3.41 dollars cheaper than WTI spot."),
-    ("builder 2", [BWS], "WTI is 3.41 dollars more expensive than Brent."),
-    ("builder 2", [FSP], "Spot WTI is 4.88 dollars cheaper than its future."),
-    ("builder 2", [FSP], "WTI futures are 8.94 dollars higher than Brent futures."),
-    ("builder 2", ["brent_curve"], "M12 is 15.09 dollars higher than M1."),
     ("builder 3", ["wti_far"], "On 2026-11-17, WTI spot was $139.69."),
     ("builder 3", [W30], "WTI spot was $108.21 a barrel on 2026-11-17."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. Brent is 3.41 dollars higher than WTI."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. No other hub built as much."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. The data show a tightening market."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. Not much else moved."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.05% on the week, a sign of slack."),
-    ("builder 1", [SIG], "U.S. data show Cushing stocks rose 4.05% on the week."),
-    ("builder 1", [SIG], "Cushing stocks rose 4.05% on the week, e.g. on weak runs."),
-    ("builder 1", [SIG], "Cushing stocks are up 4.05% on the week vs. a week ago."),
-    ("builder 1", [EIA], "U.S. crude stocks drew 3.38 million barrels on the week."),
-    ("builder 1", [EIA], "Cushing stocks built 1.21 million barrels on the week. No other hub built as much."),
-    ("builder 2", [BWS], "Brent is 3.41 dollars cheaper than WTI. No other grade is as cheap."),
-    ("builder 2", [BWS], "The gap leaves WTI 3.41 dollars dearer than Brent."),
     ("builder 3", ["wti_far"], "WTI spot was $139.69 a barrel on 2026-11-17. No other benchmark was that high."),
     ("builder 3", ["wti_far"], "As of 2026-11-17, WTI spot price was $139.69 a barrel."),
     ("builder 3", ["wti_far"], "WTI spot price: $139.69 a barrel (2026-11-17)."),
     ("builder 3", ["wti_7"], "As of 2026-11-17, WTI was 89.62 dollars a barrel."),
     ("builder 3", ["wti_7"], "WTI spot was 89.62 dollars on 2026-11-17."),
-    ("builder 1", [SIG], "Cushing stocks ended the week up 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks closed the week up 4.05%."),
-    ("builder 1", [SIG], "Cushing stocks changed by +4.05% on the week."),
-    ("builder 1", [SIG], "Cushing stocks moved +4.05% week on week."),
-    ("builder 1", [EIA], "Brent ended the year down 28.08 dollars."),
-    ("builder 1", [EIA], "Cushing stocks ended the week up 1.21 million barrels."),
+    # the review of 89ab3ad (25 Nov 2026): item 3's wrong sentences, accepted by d029c9c, refused here
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot price: $139.69 (2026-11-17)."),
+    ("rv 89ab3ad i3", ["wti_far44"], "As of 2026-11-17, WTI spot was USD44.60 a barrel."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot closed at 139.69 dollars a barrel on 2026-11-17."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI spot settled at $139.69 on 2026-11-17."),
+    ("rv 89ab3ad i3", ["wti_far"], "WTI's 2026-11-17-dated price was $139.69."),
 ]
 
 LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch
@@ -1242,25 +1411,180 @@ LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile writte
     ("brief A", [C321], "The 3-2-1 crack was 34.85 dollars. That sits at the 90th percentile of the last three years."),
     ("brief A", [FR], "Freight at 745.77 is at the 90th percentile of its three-year window."),
     ("brief A", [POS], "Managed money net length of 15,814 contracts sits at the 90th percentile."),
+    # the review of 6f63817 (minor): a rank that matches another series' rank (gasoline is at its 84.2nd; Brent's
+    # seasonal rank is 90.3)
+    ("r4 A", [EIA], "Total gasoline stocks are at the 90th percentile for the time of year."),
 ]
 
 DROPPED = [  # wrong; the brief's C, accepted here as on d029c9c because C is not in this branch
     ("brief C", [W30, RIGS], "WTI rose 17%; rigs fell 11%."),
 ]
 
-OPEN = [  # wrong, accepted by both trees: the shapes the live rules leave unread on purpose (README, "Still open")
-    # item 1 judges only a plain statement whose direction word is the number's own and names no other period
+B_TWINS = [  # wrong, accepted here and refused by d029c9c only by accident (the reviews of 906e707, 6f63817 and 89ab3ad):
+    # B reads them as their ASCII twins, which d029c9c accepts (A and D are not in this branch). Reported
+    ("r4 B twin", [HH], "Henry Hub sits at the 95ᵗʰ."),
+    ("r4 B twin", [W30], "WTI fell 1​7.26% over the week."),
+]
+
+DROPPED_12 = [  # wrong, and accepted here as on d029c9c: live items 1 and 2, dropped from this branch on 25 Nov 2026
+    # live item 1, the side of a change named by its period (Cushing's 7-day percent, the weekly report's wow and
+    # yoy): d029c9c reads no side for these keys, and neither does this branch. Every wrong sentence the item's
+    # builders and reviewers wrote, from MUST_REFUSE and OPEN of 89ab3ad and the review of 89ab3ad's first round
+    ("live 1", [SIG], "Cushing stocks rose 4.0% on the week."),
+    ("live 1", [SIG], "Cushing stocks rose 4.05% over the week."),
+    ("live 1", [SIG], "Cushing stocks are up 4% on the week."),
+    ("live 1", [SIG], "Cushing stocks climbed 4.05% in seven days."),
+    ("live 1", [SIG], "Cushing inventories are 4.05% higher than a week ago."),
+    ("live 1", [EIA], "Cushing stocks rose 1,209 thousand barrels on the week."),
+    ("live 1", [EIA], "Cushing stocks rose 1.21 million barrels on the week."),
+    ("live 1", [EIA], "US crude stocks fell 3.38 million barrels on the week."),
+    ("live 1", [EIA], "Crude stocks are 6,358 thousand barrels higher than a year ago."),
+    ("live 1", [EIA], "Brent is down 28.08 dollars on the year."),
+    ("live 1", [EIA], "Regular gasoline rose 0.19 dollars a gallon on the week."),
+    ("live 1", [EIA], "Crude imports rose 1,122 thousand barrels per day on the week."),
+    ("live 1", [EIA], "Refinery utilization fell 5.7 percentage points on the year."),
+    ("live 1", [SIG], "Cushing stocks rose by a further 4.05% on the week."),
+    ("live 1", [SIG], "Cushing stocks rose more than 4% on the week."),
+    ("live 1", [EIA], "Cushing stocks built 1.21 million barrels on the week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks gained 4.05% on the week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks increased 4.05% on the week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks were up 4.05% in the latest week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks climbed 4% on the week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks are 4.05% higher than a week ago."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks rose by 4.05 percent on the week."),
+    ("rv bb2c261 1", [SIG], "Cushing stocks jumped 4% week on week."),
+    ("rv bb2c261 1", [SIG], "Cushing inventories built 4.05% over seven days."),
+    ("rv bb2c261 1", [EIA], "Cushing stocks built 1,209 thousand barrels on the week."),
+    ("rv bb2c261 1", [EIA], "Brent fell 28.08 dollars on the year."),
+    ("rv bb2c261 1", [EIA], "Crude stocks drew 3.38 million barrels on the week."),
+    ("rv bb2c261 1", [EIA], "Cushing stocks are 1.21 million barrels higher than a week ago."),
+    ("builder 1", [SIG], "Cushing stocks are 4.05% higher on the week."),
+    ("builder 1", [SIG], "Cushing stocks are 4.05% up week on week."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.05% last week."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.05% this week."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.05% over the past week."),
+    ("builder 1", [SIG], "In the week to 2026-11-21, Cushing stocks rose 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks built 4.05% on the week."),
+    ("builder 1", [SIG], "Cushing stocks increased by 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks rose +4.05% on the week."),
+    ("builder 1", [SIG], "Cushing stocks: +4.05% on the week."),
+    ("builder 1", [SIG], "Cushing stocks have risen 4.05% since last week."),
+    ("builder 1", [SIG], "Since a week ago, Cushing stocks have risen 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks are now 4.05% higher than a week ago."),
+    ("builder 1", [SIG], "Over the week, Cushing stocks rose 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks climbed about 4% on the week."),
+    ("builder 1", [EIA], "Cushing stocks are 1.21 million barrels higher on the week."),
+    ("builder 1", [EIA], "Cushing stocks are 4.33 million barrels lower than a year ago."),
+    ("builder 1", [EIA], "Brent is down 28.08 dollars from a year ago."),
+    ("builder 1", [EIA], "Brent is 28.08 dollars lower than a year ago."),
+    ("builder 1", [EIA], "US crude stocks are 6.36 million barrels higher than a year ago."),
+    ("builder 1", [EIA], "US crude stocks drew 3.38 million barrels on the week."),
+    ("builder 1", [EIA], "Cushing stocks are 1.21 million barrels higher than last week."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. Brent is 3.41 dollars higher than WTI."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. No other hub built as much."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. The data show a tightening market."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.0% on the week. Not much else moved."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.05% on the week, a sign of slack."),
+    ("builder 1", [SIG], "U.S. data show Cushing stocks rose 4.05% on the week."),
+    ("builder 1", [SIG], "Cushing stocks rose 4.05% on the week, e.g. on weak runs."),
+    ("builder 1", [SIG], "Cushing stocks are up 4.05% on the week vs. a week ago."),
+    ("builder 1", [EIA], "U.S. crude stocks drew 3.38 million barrels on the week."),
+    ("builder 1", [EIA], "Cushing stocks built 1.21 million barrels on the week. No other hub built as much."),
+    ("builder 1", [SIG], "Cushing stocks ended the week up 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks closed the week up 4.05%."),
+    ("builder 1", [SIG], "Cushing stocks changed by +4.05% on the week."),
+    ("builder 1", [SIG], "Cushing stocks moved +4.05% week on week."),
+    ("builder 1", [EIA], "Brent ended the year down 28.08 dollars."),
+    ("builder 1", [EIA], "Cushing stocks ended the week up 1.21 million barrels."),
     ("live 1", [SIG], "Cushing stocks rose more than 4% on the week, the steepest climb in months."),
     ("rv bb2c261 1", [SIG], "Cushing stocks rose sharply, by 4.05%, on the week."),
     ("rv bb2c261 1", [SIG], "Cushing stocks posted a 4.05% rise."),
+    ("builder 1", [EIA], "Refinery utilization is 5.7 points lower than a year ago."),
+    ("builder 1", [SIG], "Cushing stocks are 4.05% higher on the week, but down on the month."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks climbed 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks gained 4% week on week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks increased by 4.05% over the past week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks jumped 4.05% in the latest week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks were up 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% on the week, and refinery utilization was 95.70%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks moved +4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing's seven-day change is +4.05%."),
+    ("rv 89ab3ad i1 sig", [SIG], "At Cushing, stocks rose by about 4% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% w/w."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are up 4.05% week on week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks have risen 4.05% this week."),
+    ("rv 89ab3ad i1 sig", [SIG], "With runs at 95.70%, Cushing stocks rose 4.05% on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% on the week as runs climbed to 95.70%."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% in seven days."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% in 7 days."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks are 4.05% up on the week."),
+    ("rv 89ab3ad i1 sig", [SIG], "Cushing stocks rose 4.05% on the week, a build."),
+    ("rv 89ab3ad i1 sig", [SIG], "Stocks at Cushing rose 4.05% week over week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks fell 3.38 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Gasoline stocks drew 5.19 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "The SPR rose 3.17 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Brent is 28.08 dollars a barrel lower than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks are 3.38 million barrels lower on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Cushing stocks are up 1.21 million barrels on the week."),
+    ("rv 89ab3ad i1 eia", [EIA], "Distillate stocks are 6.18 million barrels higher than a year ago."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks are up 6.36 million barrels year on year."),
+    ("rv 89ab3ad i1 eia", [EIA], "Week on week, Cushing stocks rose 1.21 million barrels."),
+    ("rv 89ab3ad i1 eia", [EIA], "Crude stocks rose 3.38 million barrels on the week, while Cushing rose 1.21 million."),
+    # live item 2, the side of a spread written with a comparative (cheaper, dearer, higher, lower, less ... than the
+    # other series): d029c9c reads only above, below, over, under, premium and discount, and so does this branch
+    ("live 2", [BWS], "Brent is $3.41 a barrel lower than WTI."),
+    ("live 2", [BWS], "WTI is $3.41 a barrel dearer than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars cheaper than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent."),
+    ("live 2", [BWS], "Brent trades 3.41 dollars less than WTI."),
+    ("live 2", [BWS], "WTI is $3.41 more expensive than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars a barrel less expensive than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars pricier than spot Brent."),
+    ("live 2", [FSP], "Brent futures are 8.94 dollars cheaper than WTI futures."),
+    ("live 2", [FSP], "WTI futures are 8.94 dollars higher than Brent."),
+    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent spot."),
+    ("live 2", [BWS], "Brent spot is 3.41 dollars lower than WTI spot on the day."),
+    ("rv bb2c261 2", [BWS], "WTI is 3.41 dollars a barrel higher than Brent."),
+    ("rv bb2c261 2", [BWS], "Brent sells for 3.41 dollars less than WTI."),
+    ("rv bb2c261 2", [BWS], "Spot WTI is 3.41 dollars pricier than spot Brent."),
+    ("rv bb2c261 2", [BWS], "WTI is currently 3.41 dollars higher than Brent."),
+    ("rv bb2c261 2", [BWS], "WTI now trades 3.41 dollars higher than Brent does."),
+    ("rv bb2c261 2", [FSP], "Spot Brent is 0.20 dollars higher than its future."),
+    ("builder 2", [BWS], "On 2026-11-17, WTI was 3.41 dollars dearer than Brent."),
+    ("builder 2", [BWS], "WTI at 89.53 is 3.41 dollars higher than Brent at 92.94."),
+    ("builder 2", [BWS], "WTI is currently 3.41 dollars dearer than Brent."),
+    ("builder 2", [BWS], "Brent spot is 3.41 dollars cheaper than WTI spot."),
+    ("builder 2", [BWS], "WTI is 3.41 dollars more expensive than Brent."),
+    ("builder 2", [FSP], "Spot WTI is 4.88 dollars cheaper than its future."),
+    ("builder 2", [FSP], "WTI futures are 8.94 dollars higher than Brent futures."),
+    ("builder 2", ["brent_curve"], "M12 is 15.09 dollars higher than M1."),
+    ("builder 2", [BWS], "Brent is 3.41 dollars cheaper than WTI. No other grade is as cheap."),
+    ("builder 2", [BWS], "The gap leaves WTI 3.41 dollars dearer than Brent."),
     ("rv bb2c261 2", [BWS], "Brent is cheaper than WTI by 3.41 dollars."),
     ("rv bb2c261 2", [BWS], "WTI costs 3.41 dollars more than Brent."),
     ("rv bb2c261 2", [BWS], "Brent is 3.41 dollars a barrel lower in price than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars less expensive than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI trades 3.41 dollars higher than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "On 2026-11-17, Brent was 3.41 dollars lower than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is now 3.41 dollars dearer than Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is about 3.4 dollars cheaper than WTI."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI crude is 3.41 dollars dearer than Brent crude."),
+    ("rv 89ab3ad i2 bws", [BWS], "Spot WTI is 3.41 dollars dearer than spot Brent."),
+    ("rv 89ab3ad i2 bws", [BWS], "Brent is 3.41 dollars lower than the WTI price."),
+    ("rv 89ab3ad i2 bws", [BWS], "WTI is 3.41 dollars pricier than Brent."),
+    ("rv 89ab3ad i2 fsp", [FSP], "Spot WTI is 4.88 dollars lower than its future."),
+    ("rv 89ab3ad i2 fsp", [FSP], "WTI futures are 8.94 dollars dearer than Brent futures."),
+    ("readme 2", [BWS], "WTI is 3.41 dollars dearer than Brent."),   # the README's example of the open hole
+]
+
+OPEN = [  # wrong, accepted by both trees: the shapes the base-value rule (item 3) leaves unread on purpose (README)
+    # item 3 judges only the plain dated level, so a base value's date after a determiner or a word beyond the
+    # plain level is left unread
     ("rv bb2c261 3", ["wti_far"], "WTI spot was $139.69 at the 2026-11-17 close."),
     ("rv bb2c261 3", ["wti_far"], "WTI spot is $139.69 a barrel as of the 2026-11-17 close."),
     ("rv bb2c261 3", ["wti_far"], "WTI spot is now $139.69 a barrel, its 2026-11-17 settle."),
-    ("builder 1", [EIA], "Refinery utilization is 5.7 points lower than a year ago."),
-    ("builder 1", [SIG], "Cushing stocks are 4.05% higher on the week, but down on the month."),
+    ("readme 3", ["wti_far", "brent_far"], "On 2026-11-17 Brent was 92.94 and WTI 139.69."),   # a list after an opening date
 ]
 
 # MUST_ACCEPT sentences that d029c9c drops too when they are written as a model caveat (older caveat rules: a quoted
@@ -1298,10 +1622,12 @@ def main() -> int:
     out, failed = {}, 0
     for group, cases, expect in (("MUST_ACCEPT", MUST_ACCEPT, "accept"), ("REFUSED_BOTH", REFUSED_BOTH, None),
                                  ("MUST_REFUSE", MUST_REFUSE, "refuse"), ("LIMIT", LIMIT, "limit"), ("DROPPED", DROPPED, None),
-                                 ("OPEN", OPEN, "limit")):
+                                 ("DROPPED_12", DROPPED_12, "limit"), ("OPEN", OPEN, "limit"), ("B_TWINS", B_TWINS, None)):
         for where, names, summary in cases:
             found = problems(names, summary)
-            out.setdefault(group, []).append({"where": where, "summary": summary, "problems": found})
+            # every sentence's caveat verdict too, so that two trees' outputs can be compared in both forms
+            out.setdefault(group, []).append({"where": where, "summary": summary, "problems": found,
+                                              "kept": caveat_kept(names, summary)})
             bad = (expect in ("accept", "limit") and found) or (expect == "refuse" and not found)
             failed += bool(bad)
             mark = ("refused " if found else "ACCEPTED") if expect == "refuse" else (
@@ -1319,11 +1645,48 @@ def main() -> int:
             print(f"{'CAVEAT':12} DROPPED  {'<- NOT MET ' if bad else ''}[{where}] {summary}")
     print(f"{len(MUST_ACCEPT)} must accept ({dropped} of them dropped as a caveat, {len(CAVEAT_BOTH)} by d029c9c too), "
           f"{len(REFUSED_BOTH)} refused by both, {len(MUST_REFUSE)} must refuse, {len(LIMIT)} known limits, "
-          f"{len(DROPPED)} dropped item, {len(OPEN)} open; {failed} expectation(s) not met")
+          f"{len(DROPPED)} dropped item, {len(DROPPED_12)} of the dropped items 1 and 2, {len(OPEN)} open, "
+          f"{len(B_TWINS)} glyph twins; {failed} expectation(s) not met")
     if "--json" in sys.argv:
         with open(sys.argv[sys.argv.index("--json") + 1], "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=1)
+    if "--against" in sys.argv:
+        with open(sys.argv[sys.argv.index("--against") + 1], encoding="utf-8") as f:
+            failed += against(out, json.load(f))
     return 1 if failed else 0
+
+
+def against(mine: dict, theirs: dict) -> int:
+    """Compare this tree's verdicts with d029c9c's (its --json output of this same file), sentence by sentence, in both
+    forms (the summary's problems, and kept or dropped as a caveat). This branch ships B and item 3 only, so a
+    difference is explained only by one of them: a sentence with a character outside ASCII (B), or a new 'a base value'
+    send-back and nothing else (item 3). Every other difference is printed as UNEXPLAINED and counts as a failure."""
+    unexplained = 0
+    for group, rows in mine.items():
+        if group == "CAVEAT":
+            continue
+        other = theirs[group]
+        assert [r["summary"] for r in rows] == [r["summary"] for r in other], group
+        counts = {"same": 0, "B": 0, "item 3": 0, "UNEXPLAINED": 0}
+        for r, t in zip(rows, other):
+            if (r["problems"], r["kept"]) == (t["problems"], t["kept"]):
+                counts["same"] += 1
+                continue
+            new = [p for p in r["problems"] if p not in t["problems"]]
+            gone = [p for p in t["problems"] if p not in r["problems"]]
+            if not r["summary"].isascii():
+                why = "B"
+            elif new and not gone and all("a base value" in p for p in new) and t["kept"] >= r["kept"]:
+                why = "item 3"
+            else:
+                why = "UNEXPLAINED"
+            counts[why] += 1
+            if why == "UNEXPLAINED" or group in ("MUST_ACCEPT", "REFUSED_BOTH", "LIMIT", "DROPPED", "DROPPED_12", "OPEN"):
+                print(f"AGAINST {group:12} {why:11} [{r['where']}] {r['summary']}\n"
+                      f"             d029c9c {t['problems']} kept={t['kept']}\n             here    {r['problems']} kept={r['kept']}")
+        unexplained += counts["UNEXPLAINED"]
+        print(f"AGAINST {group:12} {len(rows)} sentences: " + ", ".join(f"{k} {v}" for k, v in counts.items()))
+    return unexplained
 
 
 if __name__ == "__main__":

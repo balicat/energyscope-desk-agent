@@ -30,15 +30,11 @@ Checked, in the summary and in every caveat the model wrote:
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
   "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
-  has the same sign as that change, but a wrong one is still wrong. Since 25 Nov 2026 (the live items): a reading's
-  value whose key names a change by its period (cushing_7d_pct, the report's wow and yoy) has a side too, read only
-  where the word is the number's own and the sentence names no other period (`_period_changes`); "higher", "lower",
-  "cheaper", "dearer", "less" and "more expensive" than the other series set the side of a gap between two named
-  series as above and below do (`_compared`);
+  has the same sign as that change, but a wrong one is still wrong;
 - a change's base value is written with its own date or with none: in a plain dated level beside a date of the data
-  that is not its own, it is sent back (`_base_problem`, 25 Nov 2026).
-These three rules of 25 Nov 2026 judge only a plain statement (`_plainly_stated`, since the review of bb2c261): a
-sentence that denies, asks, supposes, reports or judges a claim, or looks back, is read by them as before.
+  that is not its own, it is sent back (`_base_problem`, 25 Nov 2026). It judges only a plain statement
+  (`_plainly_stated`, since the review of bb2c261): a sentence that denies, asks, supposes, reports or judges a claim,
+  or looks back, is read as before.
 
 Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
 on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂), notation (R², C₃, MTCO₂e) and the
@@ -827,31 +823,29 @@ def text_problems(text: str, pool: Pool) -> list[str]:
 
 
 # ---- a plain statement (the review of bb2c261, 25 Nov 2026) ---------------------------------------------------------
-# The three rules of 25 Nov 2026 (a period change's side, a comparative on a spread, a base value's date) judge only a
-# plain statement of the data. At bb2c261 they also judged sentences that state no such thing, and refused true ones
-# that d029c9c accepted: a premise corrected ("The claim that Cushing stocks rose 4.05% on the week is wrong; they fell
-# 4.05%", "WTI isn't 3.41 dollars dearer than Brent", "It is false that WTI was $139.69 on 2026-11-17"), a question
-# ("Did Cushing stocks rise 4.05% on the week? No: ..."), a condition ("If WTI were 3.41 dollars dearer than Brent",
-# "Cushing stocks would have to rise 1.21 million barrels to get back to last week's level") and a look back ("A year
-# ago, Brent was 28.08 dollars lower"). These rules now leave a sentence unjudged, as d029c9c read it, when anywhere
-# in it (to its full stop, question or exclamation mark; an abbreviation's stop, as in "U.S." or "No. 2", does not
-# end it, which only widens what is left alone) there stands:
+# The base-value rule below (live item 3) judges only a plain statement of the data. At bb2c261 it also judged
+# sentences that state no such thing, and refused true ones that d029c9c accepted: a premise corrected ("It is false
+# that WTI was $139.69 on 2026-11-17: it was 89.53 dollars", "The claim that WTI was $139.69 on 2026-11-17 is wrong"),
+# a visitor's figure answered ("You suggest WTI spot was $139.69 a barrel on 2026-11-17; the data put it at 89.53").
+# It leaves a sentence unjudged, as d029c9c read it, when anywhere in it (to its full stop, question or exclamation
+# mark; an abbreviation's stop, as in "U.S." or "No. 2", does not end it, which only widens what is left alone) there
+# stands:
 #   - a question mark or a quotation mark (a double one, an opening single one, or ' before a word);
 #   - a negation (not, no, never, n't, without, unlike, instead, rather, contrary, opposite ...);
 #   - a condition, a modal, a look ahead or a move it would take (if, unless, whether, suppose, assume, would, could,
 #     should, might, may, must, can, need, have to, will, expect, forecast, likely, next, take, require, undo,
-#     recover, regain, offset ...: "Undoing the week's draw takes a rise of 4.05%");
+#     recover, regain, offset ...);
 #   - a claim reported or judged, or the visitor (claim, suggest, say, said, wrote, according, reported, put, seems,
 #     believe, think, wrong, false, untrue, incorrect, mistaken, error, premise, correct, contradict, dispute, deny,
 #     misleading, flipped, really, in fact, question, asked, you, your, visitor ...);
-# or when the sentence after it opens by taking it back ("That is wrong.", "Not so: ...", "In fact, ...").
-# A period change and a comparative are also left unjudged in a sentence that looks back or to a norm (ago, earlier,
-# previous, prior, before, last, past, back, then, once, had, used, when, since, first, start, early, late, midweek,
-# briefly, between, range, a month, a weekday, a season, a year written alone, a date other than the data's latest,
-# high, low, peak, record, average, usual, normal, typical, seasonal ...), apart from a phrase that names the period a
-# change is measured over ("on the week", "week on week", "than a week ago", "from a year ago", "over the past week",
-# "last week", "this week"). A base value's rule reads the same look-back words (its dates are what it judges, so a
-# date does not count there).
+#   - a word that looks back or to a norm (ago, earlier, previous, prior, before, last, past, back, then, once, had,
+#     used, when, since, first, start, early, late, midweek, briefly, between, range, a month, a weekday, a season, a
+#     year written alone, high, low, peak, record, average, usual, normal, typical, seasonal ...); a date does not
+#     count, since the dates are what the rule judges;
+# or when the sentence after it opens by taking it back ("That is wrong.", "No, that was 2008-06-27.", "In fact, ...").
+# These lists were written for three rules; two of them (the side of a change named by its period, a comparative on
+# a spread) were dropped from this branch on 25 Nov 2026, and the lists are kept whole because the base-value rule
+# was reviewed with them (a shorter list would judge more sentences).
 _NOT_PLAIN = re.compile(
     r"[?\"\u201c\u201d\u201e\u00ab\u00bb\u2018]|(?:^|[\s(])'(?=\w)|n['\u2019]t\b|\b(?:have|has|had|having)\s+to\b"
     r"|\bgoing\s+to\b"
@@ -896,14 +890,6 @@ _LOOKS_BACK = re.compile(
     r"sep|sept|oct|nov|dec|monday|tuesday|wednesday|thursday|friday|saturday|sunday|spring|summer|autumn|winter|"
     r"average|averages|averaged|mean|median|usual|usually|normal|normally|norm|typical|typically|seasonal|seasonally|"
     r"consensus|trend)\b|(?<![\d.,-])(?:19|20)\d\d(?![\d.,-])", re.I)
-# the period a change is measured over, which is no look back: "on the week", "than a week ago", "last week"
-_PERIOD_WORD = r"(?:day|week|month|quarter|year|seven\s+days|7\s+days|twelve\s+months|12\s+months)"
-_PERIOD_ANCHOR = re.compile(
-    rf"\b(?:(?:on|over|in|during|across|for)\s+the\s+(?:(?:past|last|latest|most\s+recent)\s+)?{_PERIOD_WORD}"
-    r"|(?:day|week|month|quarter|year)\s+on\s+(?:day|week|month|quarter|year)"
-    r"|(?:than|from|versus|vs\.?|against|since)\s+(?:(?:a|one|the)\s+(?:day|week|month|quarter|year)\s+(?:ago|earlier|before)"
-    r"|(?:last|the\s+previous|the\s+prior)\s+(?:day|week|month|quarter|year))"
-    r"|(?:last|this)\s+(?:week|month|quarter|year))\b(?!['\u2019])", re.I)
 # a sentence ends at a full stop (not an abbreviation's: "U.S.", "e.g.", "vs.", "No. 2"), a question or an exclamation
 # mark, before a space or the end
 _SENTENCE_END = re.compile(r"(?:(?<!\b[A-Za-z])(?<!\bvs)(?<!\bNo)(?<!\bno)(?<!\betc)\.|[!?])+(?=\s|$)")
@@ -916,28 +902,11 @@ def _sentence_around(text: str, start: int) -> tuple[int, int]:
     return s0, (stop.end() if stop else len(text))
 
 
-def _plainly_stated(text: str, start: int, end: int, back: bool, latest: set[dt.date] | None = None) -> bool:
-    """Is the sentence of `text` around text[start:end] a plain statement (see above)? `text` with its dates. `back`
-    also reads the look-back words, apart from a period phrase; `latest` (when given) are the dates that are no look
-    back, the data's latest, and any other date in the sentence is one."""
+def _plainly_stated(text: str, start: int) -> bool:
+    """Is the sentence of `text` that holds text[start] a plain statement (see above)? `text` with its dates."""
     s0, s1 = _sentence_around(text, start)
     sentence = text[s0:s1]
-    if _NOT_PLAIN.search(sentence) or _TAKEN_BACK.match(text, s1):
-        return False
-    if back:
-        if latest is not None:
-            for d in _ISO.findall(sentence):
-                try:
-                    if dt.date.fromisoformat(d) not in latest:
-                        return False
-                except ValueError:
-                    return False
-        bare = _blank_dates(sentence)
-        if latest is not None:
-            bare = _PERIOD_ANCHOR.sub(" ", bare)
-        if _LOOKS_BACK.search(bare):
-            return False
-    return True
+    return not (_NOT_PLAIN.search(sentence) or _TAKEN_BACK.match(text, s1) or _LOOKS_BACK.search(_blank_dates(sentence)))
 
 
 # ---- a base value beside another value's date (live item 3, 25 Nov 2026) --------------------------------------------
@@ -1007,7 +976,7 @@ def _base_problem(text: str, clean: str, start: int, end: int, tok: str, own: se
     no plain statement (`_plainly_stated`), or that holds another number or any other word, is read as before."""
     if not _BASE_LEVEL.search(clean[max(0, start - 24):start]):
         return None
-    if not _plainly_stated(text, start, end, back=True):
+    if not _plainly_stated(text, start):
         return None
     w0 = max([m.end() for m in re.finditer(r"[.!?;](?:\s|$)", clean[:start])], default=0)   # its sentence, as below
     stop = re.search(r"[.!?;](?:\s|$)", clean[end:])
@@ -1161,13 +1130,6 @@ _CHANGE_UP = {"up", "rose", "risen", "rise", "rising", "increase", "increased", 
 _CHANGE_DOWN = {"down", "fell", "fallen", "fall", "falling", "decrease", "decreased", "decline", "declined", "dropped",
                 "drop", "draw", "drew", "shrank", "lost", "cut", "reduced", "trimmed", "slipped", "shed", "sold", "lower"}
 _LEVEL_UP, _LEVEL_DOWN = {"above", "over", "premium"}, {"below", "under", "beneath", "discount"}
-# Comparatives set the side of a gap between two named series as above and below do (live item 2, 25 Nov 2026: with
-# Brent - WTI = +3.41, "Brent is $3.41 a barrel lower than WTI" and "WTI is $3.41 a barrel dearer than Brent" passed).
-# Read only in the plain shape "<number> ... lower than <the other series>": the comparative within four words after
-# the number, "than" right after it ("less expensive than", "more expensive than"), and the series named in the next
-# two words. Not for a gap against an average, and never in place of above, below, premium or discount: where one of
-# those is in the same four words it decides, as before.
-_COMPARE_UP, _COMPARE_DOWN = {"higher", "dearer", "pricier", "expensive"}, {"lower", "cheaper", "less"}
 _AVERAGE = {"average", "norm", "usual", "mean"}
 _SMALL = {"a", "an", "the", "its", "on", "of", "per", "date"}
 _NEGATION = {"not", "no", "longer", "unlike", "never", "isn", "neither", "nor", "without", "than"}
@@ -1221,224 +1183,6 @@ def _signed(answer: DeskAnswer) -> tuple[list[float], list[tuple[float, set[str]
     return moves, levels, quiet
 
 
-# ---- a change named by its period (25 Nov 2026) ----------------------------------------------------------------------
-# Until then a reading's value was a change only when its key said "change", so a key that names a change by its
-# period was read as nothing at all: with the signals' metric.cushing_7d_pct at -4.05, "Cushing stocks rose 4.0% on
-# the week" passed, and so did "rose 4.05%" and "are up 4%" (reproduced on d029c9c). Such a key is now a change with
-# a side. The shapes, from the fixture's readings, the server's signal catalogue and engine._report: an N-day, -week,
-# -month, -quarter or -year percent (cushing_7d_pct, eu_oil_imports_3m_pct), wow, yoy, mom, qoq, dod, chg and
-# revision, with an optional _pct, and the report's own forms in another unit (Cushing, OK.wow_in_million_barrels).
-# A key that says "change" was read before and is read as before. Like a server's other changes, such a value needs
-# no direction word (the report and the signals quote them bare), but a wrong one is refused. Judged narrowly, so that
-# no sentence d029c9c accepted becomes a refusal unless its word is wrong:
-#   - only a number that no fact change or "change" value has (those are judged as before), that is a rounding, as
-#     written, of such a value, in a unit that fits it, and of no other value in the answer;
-#   - a whole number under 100 only with its unit ("up 4%", not "4 weeks running");
-#   - the direction word must be the number's own: right before it, with only filler words between ("fell by 4.05%",
-#     "rose a further 4%"); or a sign glued to it ("-4.05%"); or higher, lower, up or down right after it (its unit
-#     words between) in the one shape that says the change: a present-tense "is" or "are" right before the number and
-#     the period named right after the word ("are 4.05% higher than a week ago", "is 4.05% lower on the week"). After
-#     a past tense the word describes the earlier level, the other way round: "Cushing stocks were 1.21 million
-#     barrels higher a week ago", "A year ago, Brent was 28.08 dollars lower" are true (the review of bb2c261);
-#   - "given up" is a fall; words before and after that disagree leave it unjudged;
-#   - only in a plain statement (`_plainly_stated`, the review of bb2c261): a negation, a question, a condition, a
-#     claim reported or judged, a look back or a norm anywhere in the sentence leaves it unjudged ("The claim that
-#     Cushing stocks rose 4.05% on the week is wrong", "Did Cushing stocks rise 4.05%?", "Cushing stocks would have to
-#     rise 1.21 million barrels to get back to last week's level").
-# A key that compares with a norm (us_stocks_vs_5y_pct) is a gap against an average (`_signed`), not a period's change.
-_PERIOD_CHANGE = re.compile(r"(?:^|_)(?:(?:wow|yoy|mom|qoq|dod|chg)(?:_pct|_percent)?|revisions?|\d+[dwmqy]_(?:pct|percent))"
-                            r"(?:_in_[a-z_]+)?$")
-_JOINING = {"and", "but", "while", "whilst", "whereas", "as", "after", "before", "though", "although", "even", "which",
-            "who", "when", "where", "with", "since", "unlike", "despite", "yet", "or", "nor", "versus", "vs",
-            "against", "because", "so", "if", "then", "whose"}
-_GIVE = {"give", "gives", "gave", "given", "giving"}
-# a verb before "up" that makes it no rise: "ended up 4.05% lower", "ate up 4.05% of the tanks", "used up"
-_UP_NOT_RISE = {"end", "ends", "ended", "ending", "wind", "winds", "wound", "winding", "finish", "finishes", "finished",
-                "finishing", "eat", "eats", "ate", "eaten", "eating", "use", "uses", "used", "using", "take", "takes",
-                "took", "taken", "taking", "soak", "soaks", "soaked", "soaking", "mop", "mops", "mopped", "burn",
-                "burns", "burned", "burnt", "suck", "sucks", "sucked", "snap", "snaps", "snapped", "buy", "buys",
-                "bought", "free", "frees", "freed", "freeing", "clear", "clears", "cleared", "open", "opens", "opened",
-                "swallow", "swallowed", "gobble", "gobbled", "make", "makes", "made", "pick", "picks", "picked", "sum",
-                "sums", "summed", "add", "adds", "added", "adding", "wrap", "wraps", "wrapped", "fill", "fills",
-                "filled", "tie", "ties", "tied", "lock", "locks", "locked", "show", "shows", "showed", "shown"}
-# what may stand between a direction word and its number: "fell by 4.05%", "rose a further 4%", "fell more than 4%"
-_FILLER = {"by", "of", "a", "an", "the", "some", "about", "around", "roughly", "nearly", "almost", "just", "over", "more",
-           "less", "than", "further", "another", "fully", "sharply", "slightly", "modestly", "steeply", "strongly", "much",
-           "only", "barely", "back"}
-_CLAUSE_MARK = re.compile(r"[,;:()\[\]]|\s[\u2013\u2014-]\s")
-_NEGATED = re.compile(r"\b(?:not|no|never|nor|neither|without|cannot)\b|n['\u2019]t\b", re.I)
-
-
-# The period a key's change is measured over (cushing_7d_pct and wow a week, yoy and 52w_pct a year, 3m_pct and qoq a
-# quarter), or None where the key does not say (chg, revision). A sentence that names another period is not read
-# for it (the review of bb2c261: "Cushing's weekly change has been as large as +4.05% this year", "Cushing stocks swung
-# from +4.05% to -4.05% over two weeks"): a window word tied to the wrong change is item D's, on the lab branch.
-_PERIOD_OF = {"wow": "week", "yoy": "year", "mom": "month", "qoq": "quarter", "dod": "day"}
-_DAYS_OF = {"d": 1, "day": 1, "days": 1, "daily": 1, "w": 7, "week": 7, "weeks": 7, "weekly": 7, "m": 30.44,
-            "month": 30.44, "months": 30.44, "monthly": 30.44, "q": 91.3, "quarter": 91.3, "quarters": 91.3,
-            "quarterly": 91.3, "y": 365.25, "year": 365.25, "years": 365.25, "yearly": 365.25, "annual": 365.25,
-            "annually": 365.25}
-_HOW_MANY = {"a": 1, "an": 1, "one": 1, "single": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
-             "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "thirty": 30, "ninety": 90,
-             "fifty-two": 52}
-_MENTION = re.compile(r"\b(?:(\d+|[a-z]+(?:-[a-z]+)?)[\s-]+)?(days?|daily|weeks?|weekly|months?|monthly|quarters?|"
-                      r"quarterly|years?|yearly|annual|annually)\b|\b([dwmqy])/\3\b|\b(?:ytd|mtd|qtd)\b|\bto[\s-]+date\b",
-                      re.I)
-# a period word that is a unit's, not a window: "barrels per day", "a day" after a unit noun
-_RATE_BEFORE = re.compile(r"(?:\bper|/|\b(?:barrels?|bbl|b|tonnes?|tons?|feet|ft|cf|mcf|bcf|cubic|gallons?|units?)\s+an?)\s*$",
-                          re.I)
-
-
-def _period_class(days: float) -> str:
-    for name, lo, hi in (("day", 1, 1), ("week", 7, 7), ("month", 28, 31), ("quarter", 89, 92), ("year", 364, 366)):
-        if lo <= days <= hi:
-            return name
-    return "other"
-
-
-def _key_period(last: str) -> str | None:
-    """The period of a key's last segment (see _PERIOD_OF), or None."""
-    m = re.search(r"(?:^|_)(\d+)([dwmqy])_(?:pct|percent)", last)
-    if m:
-        return _period_class(int(m[1]) * _DAYS_OF[m[2]])
-    m = re.search(r"(?:^|_)(wow|yoy|mom|qoq|dod)(?:_|$)", last)
-    return _PERIOD_OF[m[1]] if m else None
-
-
-def _periods_named(sentence: str) -> set[str]:
-    """The periods a sentence names: "on the week" a week, "the 7-day change" a week, "this year" a year, "over two
-    weeks" and "year to date" another ("other"); not "barrels per day"."""
-    out: set[str] = set()
-    for m in _MENTION.finditer(_blank_dates(sentence)):
-        if m[3]:
-            out.add(_period_class(_DAYS_OF[m[3].lower()]))
-            continue
-        if not m[2]:
-            out.add("other")   # ytd, to date
-            continue
-        word = m[2].lower()
-        head = sentence[:m.start(2)]
-        if _RATE_BEFORE.search(head):
-            continue
-        count = (m[1] or "").lower()
-        n = int(count) if count.isdigit() else _HOW_MANY.get(count)
-        if n is None:
-            n = 0 if word.endswith("s") else 1   # "in recent weeks", "for years": no one period
-        out.add(_period_class(n * _DAYS_OF[word]) if n else "other")
-    return out
-
-
-def _period_changes(answer: DeskAnswer) -> list[tuple[float, str | None, str | None]]:
-    """The values of the readings' keys that name a change by its period (see above), with the unit each is quoted in
-    ("percent" for a percent, the reading's unit for the value and for code's million-barrel figure, None if unknown)
-    and the key's period (`_key_period`)."""
-    out: list[tuple[float, str | None, str | None]] = []
-    for r in answer.readings:
-        for k, v in r.values.items():
-            last = k.lower().split(".")[-1].strip()
-            if not v or "change" in k.lower() or "_vs_" in last or not _PERIOD_CHANGE.search(last):
-                continue
-            unit, period = "percent" if _kind(k) == "percent" else r.value_units.get(k), _key_period(last)
-            out.append((v, unit, period))
-            out += [(x, name.replace("_", " "), period)
-                    for name, x in also_in(r.value_units.get(k) or "", v).items()]   # as pool_of
-    return out
-
-
-# the present tense that says a change ("Cushing stocks are 4.05% lower than a week ago"), the adverbs that may stand
-# between it and the number, and the unit words between the number and its side word
-_PRESENT = {"is", "are", "stands", "stand", "sits", "sit", "trades", "trade", "remains", "remain"}
-_ADVERB = {"now", "currently", "presently", "still", "already", "also", "about", "around", "roughly", "nearly", "almost",
-           "just", "some", "only"}
-_SIDE_UNITS = {"percent", "per", "cent", "percentage", "points", "point", "pp", "thousand", "million", "billion",
-               "barrels", "barrel", "bbl", "b", "d", "dollars", "dollar", "usd", "cents", "cent", "a", "an", "day",
-               "gallon", "gal", "tonne", "tonnes", "mmbtu", "btu", "contracts", "contract", "rigs", "rig", "mb", "kb",
-               "bpd", "us"}
-
-
-def _period_side(sentence: str, toks: list, found: list, i: int) -> bool | None:
-    """The side the number toks[i] is given in its own clause: True for a rise, False for a fall, None for none or
-    for one that cannot be told (see above). The caller has found the sentence a plain statement."""
-    start = found[i].start()
-    if start and sentence[start - 1] in "+-\u2212" and not sentence[start - 2:start - 1].isalnum():
-        return sentence[start - 1] == "+"
-
-    def end_of(j: int) -> int:
-        return found[j].start() + len(toks[j][1])
-    before: list[str] = []
-    first = start
-    for j in range(i - 1, max(-1, i - 9), -1):
-        kind, w = toks[j]
-        if kind == "num" or w in _JOINING or _CLAUSE_MARK.search(sentence[end_of(j):first]):
-            break
-        before.append(w)
-        first = found[j].start()
-    if _NEGATED.search(sentence[first:end_of(i)]):
-        return None
-    said = None
-    for at, w in enumerate(before):   # the nearest first; only filler words may stand between it and the number
-        if w in _CHANGE_UP | _CHANGE_DOWN:
-            verb = before[at + 1] if at + 1 < len(before) else ""
-            if w == "up" and verb in _GIVE:
-                said = False   # "given up 4.05%"
-            elif w == "up" and verb in _UP_NOT_RISE:
-                return None    # "ended up 4.05% lower", "ate up 4.05% of the tanks": "up" is not the side
-            else:
-                said = w in _CHANGE_UP
-            break
-        if w not in _FILLER:
-            break   # "Rising runs took 4.05% off Cushing": the word belongs to another noun
-    # a side word after the number: in its next three words (in its clause), and right after its unit words
-    near, last = [], end_of(i)
-    for j in range(i + 1, min(len(toks), i + 4)):
-        kind, w = toks[j]
-        if kind == "num" or w in _JOINING or _CLAUSE_MARK.search(sentence[last:found[j].start()]):
-            break
-        near.append(w)
-        last = end_of(j)
-    near_side = next((w in _CHANGE_UP for w in near if w in ("higher", "lower", "up", "down")), None)
-    side_after, anchored, last = None, False, end_of(i)
-    for j in range(i + 1, min(len(toks), i + 7)):
-        kind, w = toks[j]
-        if kind == "num" or _CLAUSE_MARK.search(sentence[last:found[j].start()]):
-            break
-        if w in ("higher", "lower", "up", "down"):
-            side_after, anchored = w in _CHANGE_UP, bool(_PERIOD_ANCHOR.match(sentence[end_of(j):].lstrip()))
-            break
-        if w not in _SIDE_UNITS:
-            break
-        last = end_of(j)
-    if said is not None:   # words before and after that disagree leave it unjudged
-        disagree = (near_side is not None and near_side != said) or (side_after is not None and side_after != said)
-        return None if disagree else said
-    lead = next((w for w in before if w not in _ADVERB), None)
-    if side_after is not None and anchored and lead in _PRESENT:
-        return side_after   # "are 4.05% higher than a week ago": not "were ... higher a week ago", the level then
-    return None
-
-
-def _period_quoted(sentence: str, toks: list, found: list, i: int, tok: str, n: float, dp: int,
-                   periods: list[tuple[float, str | None, str | None]],
-                   pool: "Pool") -> tuple[bool, set[str | None], float] | None:
-    """Is toks[i] a quote of a period change, and of nothing else in the answer? (its side, True a rise; the periods of
-    the keys it quotes; the value), or None."""
-    start = found[i].start()
-    if start and (sentence[start - 1].isalnum() or sentence[start - 1] == "."):
-        return None   # glued to letters, or the decimals of another number
-    unit = written_unit(sentence, start, start + len(tok), tok)
-    small = dp == 0 and abs(n) < 100
-    if small and not unit.any():
-        return None   # "4 weeks running", "for 4 days": a bare whole number is not read as a period's change
-    hits = [(v, per) for v, u, per in periods if _rounds_to(v, n, dp) and (not unit.any() or fits(unit, u))]
-    if not hits or len({v > 0 for v, _ in hits}) != 1:
-        return None
-    mine = {round(v, 9) for v, _, _ in periods}
-    if any(_rounds_to(v, n, dp) and round(v, 9) not in mine and (not unit.any() or fits(unit, u))
-           for v, kind, u in pool.tagged):
-        return None   # the number may quote another value
-    return hits[0][0] > 0, {per for _, per in hits}, round(abs(hits[0][0]), 9)
-
-
 def _shape_problems(answer: DeskAnswer, words: list[str]) -> list[str]:
     """A curve's shape word must be the reading's own, and not negated."""
     notes = [re.match(r"[a-z]+", r.note.lower()) for r in answer.readings if r.key.startswith("curve:")]
@@ -1473,36 +1217,18 @@ def _slope_problems(answer: DeskAnswer, words: set[str]) -> list[str]:
     return []
 
 
-def _compared(rest: list[str], a: set[str], b: set[str], subject: set[str]) -> tuple[str | None, str | None]:
-    """The comparative written after a gap's number and the series it compares with, in the plain shape only (see
-    _COMPARE_UP): ("lower", "wti") for "Brent is 3.41 a barrel lower than WTI"; (None, None) otherwise. The other
-    series must be the subject, named before the number in its clause, and the compared one not: in "The 3.41 spread
-    is less than WTI's move" or "The Brent-WTI spread of 3.41 is lower than ..." the comparative is the gap's own.
-    Nor when the compared series is followed by a possessive or a past tense: "than Brent's low", "than Brent was a
-    year ago" compare with something else of Brent's (the review of bb2c261). The caller has found the sentence a
-    plain statement (`_plainly_stated`)."""
-    for j, w in enumerate(rest[:4]):
-        if w in _COMPARE_UP | _COMPARE_DOWN:
-            k = j + 1 if w in ("less", "more") and rest[j + 1:j + 2] == ["expensive"] else j
-            at = next((x for x in range(k + 2, min(k + 4, len(rest))) if rest[x] in a | b), None) if rest[k + 1:k + 2] == [
-                "than"] else None
-            target = None if at is None else rest[at]
-            mine, other = (b, a) if target in b else (a, b)
-            if target is None or not subject & other or subject & mine or rest[at + 1:at + 2] and rest[at + 1] in _OF_THEN:
-                return None, None
-            return w, target
-    return None, None
-
-
-# what after the compared series makes the comparison one with something else of it: a possessive, a past tense
-_OF_THEN = {"s", "was", "were", "had", "did", "used", "been"}
-
-
 def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]:
     """Direction words that contradict the data, and quoted changes with no direction at all.
-    Reads the summary, or `text` when one of the model's caveats is being checked, as it is shown (`normal`)."""
+    Reads the summary, or `text` when one of the model's caveats is being checked, as it is shown (`normal`): the
+    answer and the text are read through `normal`, then judged by d029c9c's rules, unchanged (`_direction_released`)."""
     answer = _normal_answer(answer)
-    text = normal(answer.summary if text is None else text)
+    return _direction_released(answer, normal(answer.summary if text is None else text))
+
+
+def _direction_released(answer: DeskAnswer, text: str | None = None) -> list[str]:
+    """Direction words that contradict the data, and quoted changes with no direction at all.
+    Reads the summary, or `text` when one of the model's caveats is being checked."""
+    text = answer.summary if text is None else text
     lowered = [w.lower() for w in re.findall(r"[A-Za-z]+", text)]
     all_words = set(lowered)
     problems = _shape_problems(answer, lowered) + _slope_problems(answer, all_words)
@@ -1517,19 +1243,9 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
     if changes and "unchanged" in all_words:
         problems.append("the summary says unchanged; the facts show a change")
     moves, levels, quiet = _signed(answer)
-    periods = _period_changes(answer)
     pool = pool_of(answer)
     clean = _blank_dates(text)
-    # the data's latest dates, which are no look back for the period changes and the comparatives (`_plainly_stated`)
-    latest = ({f.latest_period for f in answer.facts if f.latest_period} | {s.period for s in answer.spreads}
-              | {r.period for r in answer.readings})
-    s_at = s_next = 0   # where `sentence` starts, in `clean` and in `text` alike
     for sentence in re.split(r"(?<=[.!?;:])\s+", clean):
-        s_at = clean.find(sentence, s_next)
-        s_next = s_at + len(sentence)
-
-        def plain() -> bool:   # the live rules of 25 Nov 2026 judge only a plain statement
-            return _plainly_stated(text, s_at, s_next, back=True, latest=latest)
         found = list(_TOKEN.finditer(sentence))
         toks = [("num", m.group().rstrip(",")) if m.lastgroup == "num" else ("word", m.group().lower()) for m in found]
         commas = [m.start() for m in re.finditer(r",(?!\d)", sentence)]
@@ -1538,28 +1254,6 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
         stretched = {_STRETCHED[b] for a, b in zip(seq, seq[1:]) if a == "stretched" and b in _STRETCHED}
         says_high = sentence_words & _HIGH or "high" in stretched
         says_low = sentence_words & _LOW or "low" in stretched
-        # the period changes this sentence quotes, with the side each is given (live item 1): read first, so that a
-        # figure given both sides in one sentence ("swung from +4.05% to -4.05%") is left unjudged
-        period_said: dict[int, tuple[bool, bool, float]] = {}
-        if periods and any(k == "num" for k, _ in toks):
-            s0, s1 = _sentence_around(text, s_at)
-            named = _periods_named(text[s0:s1])
-            for i, (kind, tok) in enumerate(toks):
-                if kind != "num":
-                    continue
-                n, dp = _parse(tok)
-                if any(_quotes(v, n, dp) for v in moves + quiet):
-                    continue   # a fact's change or a "change" value: judged as before, below
-                quoted = _period_quoted(sentence, toks, found, i, tok, n, dp, periods, pool)
-                if quoted is None or not plain() or any(named - {per} for per in quoted[1]):
-                    continue   # another period named: "this year" for a 7-day change; or no plain statement
-                said = _period_side(sentence, toks, found, i)
-                if said is not None:
-                    period_said[i] = (quoted[0], said, quoted[2])
-        sides_of: dict[float, set[bool]] = {}
-        for _, said, value in period_said.values():
-            sides_of.setdefault(value, set()).add(said)
-        both_ways = {value for value, sides in sides_of.items() if len(sides) > 1}
         for i, (kind, tok) in enumerate(toks):
             if kind != "num":
                 continue
@@ -1580,11 +1274,6 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                 elif said is not None and said != rose:
                     problems.append(f"'{tok}' is described as a {'rise' if said else 'fall'}; the data shows a "
                                     f"{'rise' if rose else 'fall'}")
-            elif not move_signs and i in period_said:
-                rose, said, value = period_said[i]
-                if said != rose and value not in both_ways:
-                    problems.append(f"'{tok}' is described as a {'rise' if said else 'fall'}; the data shows a "
-                                    f"{'rise' if rose else 'fall'}")
             hits = [(v, a, b) for v, a, b in levels if _quotes(v, n, dp)]
             if len(hits) == 1:
                 v, a, b = hits[0]
@@ -1600,13 +1289,9 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                     if at is not None:
                         word, tail = rest[at], rest[at + 1:]
                 target = next((w for w in tail[:6] if w in a | b), None) if word else None
-                if word is None and a and plain():   # a gap between two named series (a spread, a_minus_b), not an average
-                    begin = max([c for c in commas if c < found[i].start()], default=-1)
-                    subject = {w for (k, w), m in zip(toks[:i], found[:i]) if k == "word" and m.start() > begin}
-                    word, target = _compared(rest, a, b, subject)
                 if target is not None:
                     expect_above = (v > 0) if target in b else (v < 0)
-                    if (word in _LEVEL_UP | _COMPARE_UP) != expect_above:
+                    if (word in _LEVEL_UP) != expect_above:
                         problems.append(f"'{tok}' with '{word}' points the wrong way; the data has it the other way round")
             ranks = [v for v in pool.percentiles if _rounds_to(v, n, dp)]
             others = [t for k, t in toks if k == "num" and t != tok and any(_rounds_to(v, *_parse(t)) for v in pool.percentiles)]
