@@ -104,22 +104,33 @@ cites it, and does not speculate.
     "claim", "suggest", "says", "wrong", "false", "you", "ago", "peak" ...), or a next sentence that opens by taking
     it back ("That is wrong.", "No, ...", "In fact ..."), leaves it unjudged. So "As of 2026-11-17, WTI's pre-crisis
     price was 139.69", "WTI's spot price on 2008-06-27, as of 2026-11-17, was $139.69" and "The claim that WTI was
-    $139.69 on 2026-11-17 is wrong" pass. The sentence is read whole, to its end or a semicolon: the full stop of an
-    abbreviation ("U.S.", "vs.", "No. 2") does not end it. The rule's earlier candidates (up to 7510ed6, never
+    $139.69 on 2026-11-17 is wrong" pass. The sentence is read whole, to its end or a semicolon: the full stop of a
+    single-letter abbreviation ("U.S.") or of "vs.", "No." and "etc." does not end it; the stop of any other
+    abbreviation ("excl.", "Okla.", "Co.") does. The rule's earlier candidates (up to 7510ed6, never
     released) read "On 2025-11-07, U.S. crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)" only
     from "U.S." on, so the base's own date and the words before it went unseen, and the true sentence was sent back.
   A caveat that fails is removed by code. `prose_controls.py` plants 141 such errors and must reject every one, and
   must pass 236 correct sentences and every recorded answer; it runs in CI and in the release gate.
   What was measured for the two rules of 25 Nov 2026 (text read as shown, a base value's date), against the
-  released checker (d029c9c), and nothing more: `probes_livefixes2b.py` holds every sentence the reviewers of these
-  rules and of the rules tried beside them wrote, and the builder's own. Its 1,157 true sentences are each accepted
+  released checker (d029c9c), and nothing more: `probes_livefixes2b.py` holds the sentences the reviewers of these
+  rules and of the rules tried beside them gave in their findings, and the builder's own (not every probe a reviewer
+  ran). Its 1,157 true sentences are each accepted
   and each kept as a caveat, as on d029c9c, and the 54 true ones d029c9c refuses get its verdict; its 78 wrong ones
   are refused (69 of them accepted by d029c9c); the 144 wrong ones of the two rules dropped (below) are accepted, as
   on d029c9c. Run against d029c9c's verdicts (`--against`), every sentence gets the same verdict, as a summary and as
   a caveat, except the sentences in glyphs and the base values written beside another date. Over the four lab
   experiments' 4,195 recorded answers (aa-51c2e06, maxtok-cb7b799, parity-ab34c25, skills-34319fa, both arms), the
   summaries refused and the model's caveats kept are the same as d029c9c's, byte for byte. That covers these
-  sentences and these answers; it does not show that no other true sentence is refused.
+  sentences and these answers; it does not show that no other true sentence is refused. Known send-backs of the two
+  rules, true sentences refused that the last review constructed and the recorded answers do not hold:
+  - a base-date sentence with an abbreviation of two or more letters and its stop ("excl.", "Okla.", "Co.",
+    "Admin.") between the base's own date and its number, or with the base's own date in the sentence before (a
+    heading or a question): the rule does not see the own date and sends the true sentence back;
+  - a circled, bracketed or stopped digit used as a list marker, or a footnote mark after a space ("① WTI fell
+    17.26% ...", "(see note ¹)"): read as an untraced 1.
+  And one consequence that is not a send-back: a wrong sentence written in glyphs now gets the same verdict as its
+  plain twin, so where the twin passes through one of the open holes below ("at the 95ᵗʰ percentile", a zero-width
+  space inside "17.26"), the glyph form passes too; before, about ten such sentences were refused only by accident.
 - **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
   list of rules about English, and English is larger than the list. The reviewer measured it with test sentences
   the rules had not been shown, true tables under wrong prose:
