@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Librarian: Dig deeper (preview)</title>
+<style>
+  :root { --paper:#f3ecdc; --card:#fdfaf2; --ink:#1b1813; --ink2:#3f392f; --ink3:#655d4e; --rule:#d3c8ab; --accent:#8c2a1a; --blue:#1f4e79; --code:#efe7d2; --warn:#8a5a00;
+    --serif: Charter,'Iowan Old Style',Georgia,serif; --mono: ui-monospace,'Cascadia Mono',Consolas,monospace; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#17150f; --card:#201d15; --ink:#f0e9d6; --ink2:#d2c9b2; --ink3:#a79e88; --rule:#3d3728; --accent:#e0866f; --blue:#8fb8e3; --code:#2a261b; --warn:#e3b45c; } }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--serif); font-size:18px; line-height:1.6; padding:0 16px 40px; display:flex; flex-direction:column; align-items:center; }
+  main { width:100%; max-width:780px; }
+  h1 { font-weight:400; font-size:clamp(24px,5vw,34px); letter-spacing:.2em; text-align:center; padding:5vh 0 6px; }
+  .tag { text-align:center; font-style:italic; color:var(--ink2); }
+  .banner { margin:18px 0 0; padding:8px 12px; border:1px dashed var(--ink3); font-size:15px; color:var(--ink2); }
+  .card { margin-top:22px; background:var(--card); border:1px solid var(--rule); border-top:4px solid var(--accent); border-radius:3px; padding:20px 22px; }
+  .label { font-family:var(--mono); font-size:12.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:18px 0 6px; }
+  .q { font-style:italic; color:var(--ink2); margin-bottom:10px; }
+  ul.caveats { margin-left:20px; font-size:16px; color:var(--ink2); }
+  details.deeper { margin-top:18px; border-top:1px solid var(--rule); padding-top:12px; }
+  details.deeper > summary { cursor:pointer; font-size:17px; font-weight:600; }
+  details.deeper > summary::before { content:""; display:inline-block; width:18px; height:18px; margin:0 8px 0 2px; vertical-align:-3px; border-radius:3px; background:var(--accent);
+    clip-path:polygon(50% 100%,0 40%,25% 40%,25% 0,75% 0,75% 40%,100% 40%); }
+  .pbtitle { font-size:16px; color:var(--ink2); margin:8px 0; }
+  ol.st { margin-left:22px; font-size:16px; }
+  ol.st li.done { color:var(--ink3); }
+  ol.st li .tag2 { font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--blue); margin-left:6px; display:inline-block; }
+  .lead { margin:10px 0 14px; }
+  .lead .why { font-size:16px; }
+  .lead .num { font-family:var(--mono); font-size:12.5px; color:var(--accent); margin-right:6px; }
+  pre.call { margin-top:4px; background:var(--code); border:1px solid var(--rule); border-radius:3px; padding:8px 10px; font-family:var(--mono); font-size:13px; overflow-x:auto; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--blue); }
+  .lead.missing pre.call { color:var(--warn); }
+  .lead .miss { font-size:13.5px; color:var(--warn); margin-top:3px; }
+  ul.notes, ul.must { margin-left:20px; font-size:16px; color:var(--ink2); }
+  ul.notes b { font-family:var(--mono); font-size:12.5px; font-weight:400; color:var(--ink3); }
+  .copyrow { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  button.copy { font:inherit; font-size:16px; color:var(--paper); background:var(--ink); border:1.5px solid var(--ink); border-radius:4px; padding:7px 18px; cursor:pointer; }
+  button.copy:hover { background:var(--accent); border-color:var(--accent); }
+  button:focus-visible, summary:focus-visible { outline:3px solid var(--blue); outline-offset:2px; }
+  .ok { font-size:14.5px; color:var(--ink2); }
+  .small { font-size:14px; color:var(--ink3); margin-top:6px; }
+</style></head><body><main>
+<h1>THE LIBRARIAN</h1>
+<p class="tag">Preview of a possible "Dig deeper" section. Not deployed.</p>
+<p class="banner">Preview, 25 Nov 2026. The answer is a real one saved the same day. The Dig deeper part below it is built by code from the readings the answer cites (branch <code>leads</code>, es_agent/leads.py); the model is not asked for it.</p>
+<div class="card" id="card"></div>
+</main>
+<script>
+var ANSWER = __ANSWER__;
+var DEEPER = __DEEPER__;
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+function callText(l) { return (l.tool || l.proposed_tool) + "(" + JSON.stringify(l.args).slice(1, -1).replace(/,"/g, ', "').replace(/"([a-z_]+)":/g, "$1=") + ")"; }
+(function () {
+  var card = document.getElementById("card");
+  card.appendChild(el("div", "label", "Question"));
+  card.appendChild(el("p", "q", ANSWER.question));
+  card.appendChild(el("div", "label", "Answer"));
+  card.appendChild(el("p", "", ANSWER.summary));
+  card.appendChild(el("div", "label", "Caveats"));
+  var ul = el("ul", "caveats"); ANSWER.caveats.forEach(function (c) { ul.appendChild(el("li", "", c)); }); card.appendChild(ul);
+  var d = DEEPER; if (!d) return;
+  var box = el("details", "deeper"); box.open = true;
+  box.appendChild(el("summary", "", "Dig deeper: " + d.leads.length + " calls for your own agent"));
+  box.appendChild(el("p", "pbtitle", "Routine: " + d.playbook.title + " (" + d.playbook.id + ", version " + d.playbook.version + "). The answer above already did the first steps; the rest are below as calls."));
+  box.appendChild(el("div", "label", "Steps"));
+  var ol = el("ol", "st");
+  var all = d.done.map(function (s) { return [s, true]; }).concat(d.left.map(function (s) { return [s, false]; }));
+  all.sort(function (a, b) { return a[0].step - b[0].step; }).forEach(function (p) {
+    var li = el("li", p[1] ? "done" : "", p[0].text); li.value = p[0].step;
+    li.appendChild(el("span", "tag2", p[1] ? "done in the answer" : "left"));
+    ol.appendChild(li);
+  });
+  box.appendChild(ol);
+  box.appendChild(el("div", "label", "Calls (EnergyScope MCP server)"));
+  d.leads.forEach(function (l) {
+    var w = el("div", "lead" + (l.tool ? "" : " missing"));
+    var p = el("p", "why"); p.appendChild(el("span", "num", "step " + l.step)); p.appendChild(document.createTextNode(l.why)); w.appendChild(p);
+    w.appendChild(el("pre", "call", callText(l)));
+    if (!l.tool) w.appendChild(el("p", "miss", "No such tool yet: " + l.proposed_tool + " is proposed, not built."));
+    box.appendChild(w);
+  });
+  box.appendChild(el("div", "label", "Analyst notes"));
+  var nl = el("ul", "notes"); d.notes.forEach(function (n) { var li = el("li"); li.appendChild(el("b", "", n.about + " ")); li.appendChild(document.createTextNode(n.text)); nl.appendChild(li); }); box.appendChild(nl);
+  box.appendChild(el("div", "label", "A good answer must"));
+  var ml = el("ul", "must"); d.must_say.forEach(function (m) { ml.appendChild(el("li", "", m)); }); box.appendChild(ml);
+  var row = el("div", "copyrow"), b = el("button", "copy", "Copy for your agent"), ok = el("span", "ok", "");
+  b.type = "button";
+  function fallback() { var t = el("textarea"); t.value = d.for_your_agent; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); done(); } catch (e) { ok.textContent = "Copy failed."; } t.remove(); }
+  function done() { ok.textContent = "Copied. Paste it into your own agent, with the EnergyScope MCP server connected."; }
+  b.onclick = function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(d.for_your_agent).then(done, fallback); else fallback();
+  };
+  row.appendChild(b); row.appendChild(ok); box.appendChild(row);
+  box.appendChild(el("p", "small", "Your agent runs the calls with its own model and key. Sending its finished text back to be checked is not built yet."));
+  card.appendChild(box);
+})();
+</script></body></html>
