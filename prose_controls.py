@@ -390,6 +390,8 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     gold("wti_30d", summary="As of 2026-11-17, WTI was 108.21 last month and 89.53 now."),
     gold("cushing_4w", summary="Cushing stocks fell to 26,147 thousand barrels on 2026-11-13 (27,594)."),
     gold("us_crude_yoy", summary="US crude stocks were 427.58 million barrels on 2025-11-07 and 417.8 million on 2026-11-13."),
+    dict(facts=[wti_far], summary="Eighteen years before 2026-11-17, WTI was 139.69."),
+    gold("us_crude_yoy", summary="A year before 2026-11-13, US crude stocks were 427,581 thousand barrels."),
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected

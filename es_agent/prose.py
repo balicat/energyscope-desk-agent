@@ -844,6 +844,9 @@ _BASE_CUE = re.compile(
 # price 89.53")
 _JOINED = re.compile(r"\b(?:and|but|while|whilst|whereas|yet|or|nor|so|though|although|because|after|before|since|"
                      r"until|when|then)\b", re.I)
+# a date written after a word of a span or an offset is not the value's own day ("Eighteen years before 2026-11-17,
+# WTI was 139.69", "until 2026-11-17", "in the year to 2026-11-13")
+_DATE_SPAN = re.compile(r"\b(?:before|after|since|until|till|through|thru|to|from|between|by|ending|ended|ends)\s*$", re.I)
 _DATE_OF_NEXT = re.compile(r"(?:\b(?:its|their|the|a|an|this|that)|['’]s)\s*$", re.I)
 
 
@@ -863,10 +866,10 @@ def _base_problem(text: str, clean: str, start: int, end: int, tok: str, own: se
     later = next((m for m in dates if m.start() >= end), None)
     earlier = next((m for m in reversed(dates) if m.end() <= start), None)
     if (later is not None and not _DIGITS.search(clean, end, later.start()) and not _JOINED.search(clean, end, later.start())
-            and not _DATE_OF_NEXT.search(clean[:later.start()])):
+            and not _DATE_OF_NEXT.search(clean[:later.start()]) and not _DATE_SPAN.search(clean[:later.start()])):
         beside = later
     elif (earlier is not None and not _DIGITS.search(clean, earlier.end(), start) and not _DIGITS.search(clean, s0, earlier.start())
-          and not _JOINED.search(clean, earlier.end(), start)):
+          and not _JOINED.search(clean, earlier.end(), start) and not _DATE_SPAN.search(clean[:earlier.start()])):
         beside = earlier   # a date that follows another number is that number's ("26,147 on 2026-11-13 (27,594)")
     else:
         return None

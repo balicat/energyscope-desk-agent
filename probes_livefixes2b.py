@@ -397,6 +397,43 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("live 3", ["wti_far"], "WTI was 139.69; on 2026-11-17 it was 89.53."),
     ("live 3", ["wti_far"], "WTI was 139.69 against a 2026-11-17 close of 89.53."),
     ("live 3", ["wti_far", "brent_far"], "Brent was 139.38 and WTI 139.69 on 2008-06-27; on 2026-11-17 they were 92.94 and 89.53."),
+    # the builder's last pass over items 1-3 (true sentences a desk analyst would write)
+    ("live 1", [SIG], "Cushing stocks fell 4.05% on the week, their steepest weekly draw in a month, while crude stocks rose."),
+    ("live 1", [SIG], "On the week, Cushing is down 4.05%."),
+    ("live 1", [SIG], "Cushing's 4.05% weekly decline is the signal to watch."),
+    ("live 1", [SIG], "Cushing inventories slipped 4.05% w/w."),
+    ("live 1", [SIG], "Cushing stocks lost about 4% in seven days."),
+    ("live 1", [SIG], "Cushing drew down 4.05% on the week."),
+    ("live 1", [SIG], "Over the week Cushing stocks moved 4.05% lower."),
+    ("live 1", [SIG], "Cushing stocks were 4.05% lower over seven days, and the z-score is 0.49."),
+    ("live 1", [SIG], "The Cushing 7-day change was a fall of 4.05%."),
+    ("live 1", [SIG], "Cushing stocks were down 4.05%, not up."),
+    ("live 1", [SIG], "The signals show Cushing up 0.49 sigma on its z-score but down 4.05% on the week."),
+    ("live 1", [EIA], "Refinery utilization was 95.7%, up 0.5 points on the week."),
+    ("live 1", [EIA], "Gasoline product supplied rose 23 thousand barrels per day on the week."),
+    ("live 1", [EIA], "Gasoline demand was up 262 thousand barrels per day year on year."),
+    ("live 1", [EIA], "Distillate demand fell 97 thousand barrels per day on the year."),
+    ("live 1", [EIA], "Crude production rose 198 thousand barrels per day year on year, to 14,032."),
+    ("live 1", [EIA], "Crude imports were down 374 thousand barrels per day from a year earlier."),
+    ("live 1", [EIA], "The SPR is 134.56 million barrels lower than a year ago."),
+    ("live 1", [EIA], "Propane prices at Mont Belvieu are up 0.41 dollars a gallon on the year."),
+    ("live 1", [EIA], "Heating oil is 1.95 dollars a gallon dearer than a year ago."),
+    ("live 2", [BWS], "WTI is 3.41 dollars below Brent and cheaper than Dubai."),
+    ("live 2", [BWS], "Brent trades 3.41 dollars higher than WTI, well below its 90th percentile of 9.71."),
+    ("live 3", ["wti_far"], "WTI at 139.69 on 2008-06-27 compares with 89.53 on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI was 139.69 on 2008-06-27 and 89.53 on 2026-11-17."),
+    ("live 3", ["wti_far"], "WTI was at 139.69 when the lookback began and is 89.53 on 2026-11-17."),
+    ("live 3", ["wti_far"], "As of 2026-11-17, WTI is down 50.16 dollars on 139.69."),
+    ("live 3", ["wti_far"], "For 2026-11-17, the 6717-day base was 139.69."),
+    ("live 3", ["wti_far"], "WTI: 89.53 on 2026-11-17 (139.69 on 2008-06-27)."),
+    ("live 3", ["wti_far"], "WTI is 89.53 on 2026-11-17; 139.69 was the 2008-06-27 level."),
+    ("live 3", ["wti_far"], "Eighteen years before 2026-11-17, WTI was 139.69."),
+    ("live 3", [CYOY], "A year before 2026-11-13, US crude stocks were 427,581 thousand barrels."),
+    ("live 3", ["wti_far"], "Until 2026-11-17 the window's first price, 139.69, held as its high."),
+    ("live 3", ["wti_far"], "Back on 2008-06-27, WTI was 139.69."),
+    ("live 3", ["wti_far"], "In the 6717 days to 2026-11-17, WTI's opening price was 139.69."),
+    ("live 3", ["wti_far"], "Measured to 2026-11-17, WTI was 139.69 at the start."),
+    ("live 3", [W30], "In the 30 days to 2026-11-17, WTI was 108.21 at the start and 89.53 at the end."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -422,6 +459,8 @@ REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's la
     ("live 3 old rules", ["wti_far"], "On 2026-11-17 WTI was 89.53 dollars, 50.16 below the 139.69 it fetched on 2008-06-27."),
     ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was 89.53, half the 139.69 of mid-2008."),
     ("live 3 old rules", ["wti_far"], "As of 2026-11-17, WTI was 89.53 dollars, well under its 2008 peak of 139.69."),
+    ("live 2 old rules", [BWS], "Brent's premium to WTI is 3.41 dollars, smaller than its 5.56 mean."),
+    ("live 3 old rules", ["wti_far"], "WTI is 89.53 on 2026-11-17, a 35.91% fall from 139.69."),
 ]
 
 MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
@@ -504,6 +543,8 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("live 3", ["wti_far"], "WTI spot closed at $139.69 on 2026-11-17."),
     ("live 3", ["wti_far"], "WTI spot printed $139.69 on 2026-11-17."),
     ("live 3", ["wti_far"], "WTI spot was $139.69 a barrel as of 2026-11-17."),
+    ("live 3", ["wti_far"], "On 2026-11-17, WTI spot was $139.69 a barrel."),
+    ("live 3", ["wti_far"], "WTI spot was at 139.69 dollars on 2026-11-17."),
 ]
 
 LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch
