@@ -43,6 +43,7 @@ HH, FR, FC = "henry_hub_percentile", "freight_history", "futures_crack"
 BWS, POS, C321 = "brent_wti_spread", "wti_positioning", "crack_321"
 W30, RIGS, C4W, CYOY, W5, SURP = "wti_30d", "us_rigs_yoy", "cushing_4w", "us_crude_yoy", "wti_five_years", "week_surprises"
 SIG, EIA = "regime_signals", "eia_weekly_brief"
+FSP, SREV = "futures_spread", "spread_reversion"
 
 MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     # review 1, blocker 1 (D): two windows in one sentence
@@ -282,6 +283,50 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("live 1", [SIG], "Cushing stocks fell a little less than 4.05% on the week."),
     ("live 1", [SIG], "WTI rose more than Brent, while Cushing stocks fell 4.05% on the week."),
     ("live 1", [SIG], "Cushing stocks fell faster than crude stocks rose, down 4.05% on the week."),
+    # live item 2 (25 Nov 2026): comparatives on a spread between two named series (Brent - WTI = +3.41; on futures the
+    # reading's brent_minus_wti = +8.94), on the right side, and the shapes the rule leaves as d029c9c read them
+    ("live 2", [BWS], "Brent is $3.41 a barrel dearer than WTI."),
+    ("live 2", [BWS], "WTI is $3.41 cheaper than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars higher than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars lower than Brent."),
+    ("live 2", [BWS], "WTI trades 3.41 dollars less than Brent."),
+    ("live 2", [BWS], "Brent is $3.41 more expensive than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars a barrel less expensive than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars pricier than spot WTI."),
+    ("live 2", [BWS], "Brent's 3.41 lower-than-usual premium over WTI is at the 34th percentile."),
+    ("live 2", [BWS], "Brent's 3.41 lower-than-usual spread to WTI sits at the 34th percentile."),
+    ("live 2", [BWS], "The Brent-WTI spread of 3.41 dollars is lower than its 90th percentile of 9.71."),
+    ("live 2", [BWS], "The spread of 3.41 dollars is lower than Brent's usual premium over WTI."),
+    ("live 2", [BWS], "Brent is 3.41 dollars above WTI, and WTI is cheaper than Brent."),
+    ("live 2", [BWS], "At 3.41 dollars, the spread is lower than usual, with WTI cheaper than Brent."),
+    ("live 2", [BWS], "WTI at 89.53 is 3.41 dollars cheaper than Brent at 92.94."),
+    ("live 2", [BWS], "The 3.41-dollar spread means WTI is cheaper than Brent."),
+    ("live 2", [BWS], "Brent costs 3.41 dollars more than WTI."),
+    ("live 2", [BWS], "WTI trades at a 3.41 dollar discount to Brent."),
+    ("live 2", [BWS], "Brent trades at a 3.41 dollar premium to WTI."),
+    ("live 2", [BWS], "Brent is 3.41 dollars over WTI, though lower than a year ago."),
+    ("live 2", [BWS], "Brent's premium over WTI narrowed to 3.41 dollars, lower than a year ago."),
+    ("live 2", [BWS], "The spread is 3.41 dollars, less than half its 90th percentile line."),
+    ("live 2", [BWS], "WTI, 3.41 dollars cheaper than Brent, is the better buy for a refiner."),
+    ("live 2", [BWS], "Brent at 92.94 is higher than WTI at 89.53, by 3.41 dollars."),
+    ("live 2", [BWS], "Brent is 3.41 dollars higher than WTI's 89.53."),
+    ("live 2", [BWS], "WTI is lower than Brent by 3.41 dollars."),
+    ("live 2", [FSP], "Brent futures are 8.94 dollars higher than WTI futures."),
+    ("live 2", [FSP], "WTI futures are 8.94 dollars cheaper than Brent."),
+    ("live 2", [FSP], "Brent futures are 8.94 dollars higher than WTI, above their 90th percentile of 6.73."),
+    ("live 2", [BWS], "The spread of 3.41 dollars leaves WTI cheaper than Brent."),
+    ("live 2", [BWS], "The spread of 3.41 dollars makes Brent dearer than WTI."),
+    ("live 2", [BWS], "A gap of 3.41 dollars is lower than Brent's usual premium to WTI."),
+    ("live 2", [BWS], "Brent's 3.41 premium is lower than WTI's typical discount."),
+    ("live 2", [BWS], "WTI, at 89.53, is 3.41 dollars cheaper than Brent."),
+    ("live 2", [BWS], "Brent spot is 3.41 dollars higher than WTI spot on the day."),
+    ("live 2", [BWS], "Europe's Brent is 3.41 dollars higher than Cushing WTI."),
+    ("live 2", [BWS], "Brent is 3.41 dollars higher than WTI, which is cheaper than Brent."),
+    ("live 2", [BWS], "WTI is 3.41 dollars under Brent, so Brent is dearer than WTI."),
+    ("live 2", [BWS, W30], "WTI fell 18.68 dollars over 30 days; Brent is 3.41 dollars higher than WTI."),
+    ("live 2", [SREV], "Brent is 3.41 dollars higher than WTI, below its 5.56 mean."),
+    ("live 2", [FSP], "WTI futures are 8.94 dollars lower than Brent futures for 2027-01 delivery."),
+    ("live 2", [BWS, W30], "The Brent-WTI spread of 3.41 dollars is lower than WTI's 30-day fall of 18.68 dollars."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -292,6 +337,9 @@ REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's la
     ("r2 minor", [RIGS], "US rigs rose 58 over 52 weeks."),
     ("r2 minor", [W30], "WTI fell 17.26% over 22 trading days."),
     ("r2 minor", [HH], "Henry Hub is above its 50th percentile."),
+    # live item 2's probes: true, and refused by both on d029c9c's rule that a quoted change needs rose or fell
+    ("live 2 old rule", [BWS, W30], "The 3.41 spread is less than WTI's 30-day move of 18.68 dollars."),
+    ("live 2 old rule", [BWS, W30], "Brent's 3.41 premium is smaller than WTI's 18.68 fall over 30 days."),
 ]
 
 MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
@@ -336,6 +384,19 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("r2 own past", [RIGS], "Rigs are 58 above their level a month ago."),
     ("r2 own past", [C4W], "Cushing stocks are 5.24% below where they were a year ago."),
     ("r2 own past", [W30], "WTI rose 17.26% (below where it was 30 days ago)."),
+    # live item 2: a comparative on the wrong side of a named spread
+    ("live 2", [BWS], "Brent is $3.41 a barrel lower than WTI."),
+    ("live 2", [BWS], "WTI is $3.41 a barrel dearer than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars cheaper than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent."),
+    ("live 2", [BWS], "Brent trades 3.41 dollars less than WTI."),
+    ("live 2", [BWS], "WTI is $3.41 more expensive than Brent."),
+    ("live 2", [BWS], "Brent is 3.41 dollars a barrel less expensive than WTI."),
+    ("live 2", [BWS], "WTI is 3.41 dollars pricier than spot Brent."),
+    ("live 2", [FSP], "Brent futures are 8.94 dollars cheaper than WTI futures."),
+    ("live 2", [FSP], "WTI futures are 8.94 dollars higher than Brent."),
+    ("live 2", [BWS], "WTI is 3.41 dollars higher than Brent spot."),
+    ("live 2", [BWS], "Brent spot is 3.41 dollars lower than WTI spot on the day."),
 ]
 
 LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch

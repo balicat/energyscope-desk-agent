@@ -237,6 +237,20 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
     ("1: a dod", dict(readings=[period_rep], summary="WTI fell 0.42 dollars on the day."), _SIDE),
     ("1: a chg", dict(readings=[period_rep], summary="WTI fell 1.37 dollars."), _SIDE),
     ("1: a yoy_pct", dict(readings=[period_rep], summary="US crude stocks are up 2.29% on the year."), _SIDE),
+    # live item 2: a comparative on the wrong side of a spread between two named series (Brent - WTI = +3.41; on futures,
+    # the reading's brent_minus_wti = +8.94); d029c9c read only above, below, over, under, premium and discount
+    ("2: 'lower than' with the spread's first series as subject",
+     gold("brent_wti_spread", summary="Brent is $3.41 a barrel lower than WTI."), "points the wrong way"),
+    ("2: 'dearer than' with the second series as subject",
+     gold("brent_wti_spread", summary="WTI is $3.41 a barrel dearer than Brent."), "points the wrong way"),
+    ("2: 'cheaper than'", gold("brent_wti_spread", summary="Brent is 3.41 dollars cheaper than WTI."), "points the wrong way"),
+    ("2: 'higher than'", gold("brent_wti_spread", summary="WTI is 3.41 dollars higher than Brent."), "points the wrong way"),
+    ("2: 'less than'", gold("brent_wti_spread", summary="Brent trades 3.41 dollars less than WTI."), "points the wrong way"),
+    ("2: 'more expensive than'", gold("brent_wti_spread", summary="WTI is $3.41 more expensive than Brent."), "points the wrong way"),
+    ("2: 'less expensive than'", gold("brent_wti_spread", summary="Brent is 3.41 dollars a barrel less expensive than WTI."),
+     "points the wrong way"),
+    ("2: a reading's a_minus_b gap (futures)", gold("futures_spread", summary="Brent futures are 8.94 dollars cheaper than WTI futures."),
+     "points the wrong way"),
 ]
 
 FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
@@ -321,6 +335,22 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
                                         "million barrels a day."),
     dict(readings=[period_rep], summary="US gasoline demand fell 85 thousand barrels per day on the month, and WTI rose 0.42 dollars "
                                         "on the day."),
+    # live item 2: comparatives on the right side, and the shapes the rule leaves as d029c9c read them
+    gold("brent_wti_spread", summary="Brent is $3.41 a barrel dearer than WTI."),
+    gold("brent_wti_spread", summary="WTI is $3.41 cheaper than Brent."),
+    gold("brent_wti_spread", summary="WTI is 3.41 dollars a barrel less expensive than Brent, and Brent trades 3.41 dollars higher "
+                                     "than WTI."),
+    gold("brent_wti_spread", summary="WTI at 89.53 is 3.41 dollars cheaper than Brent at 92.94."),
+    gold("brent_wti_spread", summary="Brent's 3.41 lower-than-usual premium over WTI is at the 34th percentile."),
+    gold("brent_wti_spread", summary="Brent's 3.41 lower-than-usual spread to WTI sits at the 34th percentile."),
+    gold("brent_wti_spread", summary="The spread of 3.41 dollars is lower than Brent's usual premium over WTI."),
+    gold("brent_wti_spread", summary="The Brent-WTI spread of 3.41 dollars is lower than its 90th percentile of 9.71."),
+    gold("brent_wti_spread", "wti_30d", summary="The Brent-WTI spread of 3.41 dollars is lower than WTI's 30-day fall of 18.68 "
+                                                "dollars."),
+    gold("brent_wti_spread", summary="The spread of 3.41 dollars leaves WTI cheaper than Brent."),
+    gold("brent_wti_spread", summary="Brent's premium over WTI narrowed to 3.41 dollars, lower than a year ago."),
+    gold("brent_wti_spread", summary="WTI is lower than Brent by 3.41 dollars."),
+    gold("futures_spread", summary="WTI futures are 8.94 dollars lower than Brent futures for 2027-01 delivery."),
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected

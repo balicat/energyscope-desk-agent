@@ -911,6 +911,13 @@ _CHANGE_UP = {"up", "rose", "risen", "rise", "rising", "increase", "increased", 
 _CHANGE_DOWN = {"down", "fell", "fallen", "fall", "falling", "decrease", "decreased", "decline", "declined", "dropped",
                 "drop", "draw", "drew", "shrank", "lost", "cut", "reduced", "trimmed", "slipped", "shed", "sold", "lower"}
 _LEVEL_UP, _LEVEL_DOWN = {"above", "over", "premium"}, {"below", "under", "beneath", "discount"}
+# Comparatives set the side of a gap between two named series as above and below do (live item 2, 25 Nov 2026: with
+# Brent - WTI = +3.41, "Brent is $3.41 a barrel lower than WTI" and "WTI is $3.41 a barrel dearer than Brent" passed).
+# Read only in the plain shape "<number> ... lower than <the other series>": the comparative within four words after
+# the number, "than" right after it ("less expensive than", "more expensive than"), and the series named in the next
+# two words. Not for a gap against an average, and never in place of above, below, premium or discount: where one of
+# those is in the same four words it decides, as before.
+_COMPARE_UP, _COMPARE_DOWN = {"higher", "dearer", "pricier", "expensive"}, {"lower", "cheaper", "less"}
 _AVERAGE = {"average", "norm", "usual", "mean"}
 _SMALL = {"a", "an", "the", "its", "on", "of", "per", "date"}
 _NEGATION = {"not", "no", "longer", "unlike", "never", "isn", "neither", "nor", "without", "than"}
@@ -1105,6 +1112,22 @@ def _slope_problems(answer: DeskAnswer, words: set[str]) -> list[str]:
     return []
 
 
+def _compared(rest: list[str], a: set[str], b: set[str], subject: set[str]) -> tuple[str | None, str | None]:
+    """The comparative written after a gap's number and the series it compares with, in the plain shape only (see
+    _COMPARE_UP): ("lower", "wti") for "Brent is 3.41 a barrel lower than WTI"; (None, None) otherwise. The other
+    series must be the subject, named before the number in its clause, and the compared one not: in "The 3.41 spread
+    is less than WTI's move" or "The Brent-WTI spread of 3.41 is lower than ..." the comparative is the gap's own."""
+    for j, w in enumerate(rest[:4]):
+        if w in _COMPARE_UP | _COMPARE_DOWN:
+            k = j + 1 if w in ("less", "more") and rest[j + 1:j + 2] == ["expensive"] else j
+            target = next((x for x in rest[k + 2:k + 4] if x in a | b), None) if rest[k + 1:k + 2] == ["than"] else None
+            mine, other = (b, a) if target in b else (a, b)
+            if target is None or not subject & other or subject & mine:
+                return None, None
+            return w, target
+    return None, None
+
+
 def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]:
     """Direction words that contradict the data, and quoted changes with no direction at all.
     Reads the summary, or `text` when one of the model's caveats is being checked, as it is shown (`normal`)."""
@@ -1177,9 +1200,13 @@ def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]
                     if at is not None:
                         word, tail = rest[at], rest[at + 1:]
                 target = next((w for w in tail[:6] if w in a | b), None) if word else None
+                if word is None and a:   # a gap between two named series (a spread, a key a_minus_b), not an average
+                    begin = max([c for c in commas if c < found[i].start()], default=-1)
+                    subject = {w for (k, w), m in zip(toks[:i], found[:i]) if k == "word" and m.start() > begin}
+                    word, target = _compared(rest, a, b, subject)
                 if target is not None:
                     expect_above = (v > 0) if target in b else (v < 0)
-                    if (word in _LEVEL_UP) != expect_above:
+                    if (word in _LEVEL_UP | _COMPARE_UP) != expect_above:
                         problems.append(f"'{tok}' with '{word}' points the wrong way; the data has it the other way round")
             ranks = [v for v in pool.percentiles if _rounds_to(v, n, dp)]
             others = [t for k, t in toks if k == "num" and t != tok and any(_rounds_to(v, *_parse(t)) for v in pool.percentiles)]
