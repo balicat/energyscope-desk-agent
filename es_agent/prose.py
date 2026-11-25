@@ -30,7 +30,15 @@ Checked, in the summary and in every caveat the model wrote:
   word must be the reading's own and not negated; "steepened" or "flattened" must be the reading's
   own word; a high percentile may not be called low, nor a low one high ("stretched" takes its side word:
   "stretched short" is low). A usual change (the norm a change is compared with) needs no direction word when it
-  has the same sign as that change, but a wrong one is still wrong.
+  has the same sign as that change, but a wrong one is still wrong;
+- a percentile written as a place (25 Nov 2026). A sentence that puts the subject AT the Nth percentile ("X is at /
+  sits at / trades at / is in the Nth percentile", "X is at its Nth percentile"), with no value of that percentile
+  point after it, claims a rank: N must be a cited rank, rounded as written, never the N of a key (p95). Any other
+  use of "the Nth percentile" is read as before.
+
+Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
+on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂) and the ellipsis stay as written; a
+fraction sign, a direction control or a footnote digit glued to a word is refused with the way to write it.
 
 Not checked, and stated as limits in the README: two true values or dates attached to the wrong
 nouns when they share a unit (Brent's price given to WTI), and claims made in words alone ("a record high", "has narrowed" where no earlier value was
@@ -42,6 +50,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from .models import DeskAnswer
@@ -50,6 +59,84 @@ from .models import DeskAnswer
 # the same opening and appends its own, so the prefix marks text that needs no tracing.
 CODE_CAVEATS = ("Not current as of ", "Against the balance of the evidence: ", "Not like for like: ",
                 "Average-price contract: ", "Shorter history: ")
+
+
+# ---- the text as a reader sees it -----------------------------------------------------------------------------------
+# Every check reads text through `normal` (25 Nov 2026, the adversary's B): until then a raised or lowered digit was
+# no digit to the checks, so "WTI will reach $¹⁵⁰" and "a fall to $₈₀" passed while "$150" was refused. NFKC makes
+# raised, lowered, full-width, circled and mathematical digits plain digits (and full-width letters, %, $ plain), so
+# they are read and checked as the numbers they show. Applied to both sides alike: the summary, the caveats, the
+# visitor's question (the echo rule) and every text a tool returned (names, ids, units, notes, contexts, value keys).
+# Kept as written, so they read as before (no number): the unit and formula glyphs below (m², m³, CO₂, CH₄ ...), the
+# squared unit signs (㎡), and the ellipsis (NFKC writes "…" as three full stops, which would end the sentence there:
+# "WTI fell… 17.26% over 30 days" would lose its verb; the reviewer, 25 Nov 2026); °C and ‰ have no digit. Refused
+# with a plain message (`_glyph_problems`): a fraction sign (½, or the fraction slash NFKC writes for it: "1½" would
+# read as 11⁄2), a direction control (it can reorder what is shown), and a raised or lowered digit glued to a letter
+# or a digit (a footnote mark, "WTI²", "1.20¹"). Zero-width characters are dropped: "1​50" shows as 150 and is
+# read as 150. Ported from live-fixes-2 (2064ff0) with the ellipsis kept whole.
+_SQUARES = "".join(chr(c) for c in range(0x3300, 0x3400) if unicodedata.decomposition(chr(c)).startswith("<square>"))
+_PROTECTED = re.compile(
+    r"(?<![A-Za-z])(?:Nm|Sm|km|cm|mm|dm|Mm|MMm|m|ft|in|yd|mi)[²³](?![A-Za-z0-9²³⁰¹⁴-⁹])"
+    r"|(?<![A-Za-z0-9])(?:t|kt|Mt|Gt|kg|g)?(?:CO₂(?:eq|e)?|CH₄|N₂O|SO₂|NO₂|H₂S|H₂O|H₂|O₂|O₃|N₂|NH₃|C₂H₆|C₃H₈|C₄H₁₀|C₂H₄|C₃H₆)"
+    r"(?![A-Za-z0-9₀-₉])"
+    rf"|[‥…︙{_SQUARES}]+")
+_INVISIBLE = dict.fromkeys(map(ord, "​‌‍⁠﻿­᠎"))
+_BIDI = re.compile("[؜‎‏‪-‮⁦-⁩]")
+_RAISED_LOWERED = re.compile("[⁰¹²³⁴-⁹₀-₉]")
+
+
+def normal(text: str) -> str:
+    """`text` as the checks read it: NFKC, zero-width characters dropped, the unit glyphs and the ellipsis kept (see
+    above). An all-ASCII text comes back unchanged."""
+    if text.isascii():
+        return text
+    text = text.translate(_INVISIBLE)
+    out, at = [], 0
+    for m in _PROTECTED.finditer(text):
+        out += [unicodedata.normalize("NFKC", text[at:m.start()]), m.group()]
+        at = m.end()
+    return "".join(out) + unicodedata.normalize("NFKC", text[at:])
+
+
+def _glyph_problems(text: str) -> list[str]:
+    """What `normal` cannot read safely, each with the way to write it."""
+    if text.isascii():
+        return []
+    text = text.translate(_INVISIBLE)
+    bad = [f"U+{ord(m.group()):04X} (a direction control character, which can reorder what is shown: write plain text)"
+           for m in _BIDI.finditer(text)]
+    bad += [f"{ch} (write the number in digits, as a decimal)" for ch in dict.fromkeys(text)
+            if "⁄" in unicodedata.normalize("NFKC", ch)]
+    kept = [m.span() for m in _PROTECTED.finditer(text)]
+    for m in _RAISED_LOWERED.finditer(text):
+        i = m.start()
+        if any(a <= i < b for a, b in kept) or i == 0:
+            continue
+        before = unicodedata.normalize("NFKC", text[i - 1])
+        if before.isalnum() and not _RAISED_LOWERED.match(text[i - 1]):
+            word = re.search(r"\S*$", text[:i + 1])[0][-12:]   # the word it is glued to, as written
+            bad.append(f"{word} (a raised or lowered digit after a letter or a digit reads as a footnote mark or part of "
+                       "the number: write numbers in plain digits, apart from words)")
+    return list(dict.fromkeys(bad))
+
+
+def _fold(x):
+    if isinstance(x, str):
+        return normal(x)
+    if isinstance(x, list):
+        return [_fold(v) for v in x]
+    if isinstance(x, dict):
+        return {(normal(k) if isinstance(k, str) else k): _fold(v) for k, v in x.items()}
+    return x
+
+
+def _normal_answer(answer: DeskAnswer) -> DeskAnswer:
+    """The answer with every text in it read through `normal`: its own sentences and everything the tools returned
+    (fact names, ids and units; spread names, notes and contexts; reading keys, titles, notes, contexts, counters,
+    units and value keys). The same object when nothing changes, which is every all-ASCII answer."""
+    data = answer.model_dump()
+    folded = _fold(data)
+    return answer if folded == data else DeskAnswer.model_validate(folded)
 
 _ISO = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 _DIGITS = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -218,6 +305,11 @@ class Pool:
     percents: list[float] = field(default_factory=list)
     counts: list[float] = field(default_factory=list)
     percentiles: list[float] = field(default_factory=list)  # a subset of percents: ranks, for the high/low rule
+    # every value that is a percentile rank (percentile, net_percentile, crack_percentile, the server's *_pctl): what a
+    # sentence placing the value "at the Nth percentile" must match; and the percentile points (p5, p95) by their N,
+    # with their values (a point named with its own value is not a placement)
+    ranks: list[float] = field(default_factory=list)
+    points: dict[str, list[float]] = field(default_factory=dict)
     dates: set[dt.date] = field(default_factory=set)
     names: set[str] = field(default_factory=set)    # plain numbers that are part of a name or of code-written text
     # ... and the words beside each in the text it came from: a name's number may be written only beside one of them
@@ -254,6 +346,11 @@ class Pool:
         self.put(value, kind, unit)
         if kind == "percent" and "percentile" in key:
             self.percentiles.append(value)
+        point = re.fullmatch(r"(?:.*[._])?p(\d{1,2})", key)   # p95, segments.p95, spread_p10, net_p90
+        if point:
+            self.points.setdefault(point[1], []).append(value)
+        elif kind != "count" and re.search(r"percentile|pctl", key.lower()):
+            self.ranks.append(value)
 
     def text(self, *parts: str) -> None:
         joined = " ".join(parts)
@@ -363,6 +460,7 @@ class Pool:
 
 
 def pool_of(answer: DeskAnswer) -> Pool:
+    answer = _normal_answer(answer)
     p = Pool()
     for f in answer.facts:
         for x in (f.latest_value, f.base_value, f.change_abs):
@@ -595,8 +693,11 @@ def text_problems(text: str, pool: Pool) -> list[str]:
 
     A number written WITH a unit must also match a value in that unit (since 21 Nov 2026, David: a price change of
     0.19 dollars a gallon written as "0.19 million barrels" passed, because the number and the unit were each true
-    somewhere in the answer). A value whose unit code does not know is matched on its number alone."""
-    bad = []
+    somewhere in the answer). A value whose unit code does not know is matched on its number alone.
+
+    The text is read as it is shown (`normal`): a raised, lowered or full-width digit is a digit."""
+    bad = _glyph_problems(text)
+    text = normal(text)
     for d in _ISO.findall(text):
         try:
             ok = dt.date.fromisoformat(d) in pool.dates
@@ -610,6 +711,11 @@ def text_problems(text: str, pool: Pool) -> list[str]:
         if not clean[:m.start()].rstrip()[-1:].isdigit():  # "414,417 thousand barrels" is a unit, not a spelled number
             bad.append(f"{m.group()} (write the number in digits, from a tool result)")
     for tok, start, end, whole, glued in _numbers(clean):
+        if not glued and _placed_at_percentile(clean, start, end, tok, pool):
+            problem = _rank_problem(tok, whole, pool)
+            if problem:   # "Henry Hub sits at the 95th percentile" at the 65.93rd: a key's N is not a rank
+                bad.append(problem)
+                continue
         if glued and whole in pool.tokens:
             continue  # M12, PF4: a name a tool returned
         suffix = glued_suffix(tok, whole) if glued else ""
@@ -672,6 +778,72 @@ def text_problems(text: str, pool: Pool) -> list[str]:
     return bad
 
 
+# ---- a percentile written as a place --------------------------------------------------------------------------------
+# "X sits at the Nth percentile" claims a rank. Until 25 Nov 2026 the N of a reading's keys p5, p25, p75, p95 passed
+# there as a name, so with Henry Hub at its 65.93rd percentile "Henry Hub sits at the 95th percentile" passed (the
+# adversary's A), and a rank was matched against any value ("is at the 3rd percentile" on a price of 3.10). Now, in
+# these shapes only, N must be the value's own rank, rounded as written: a verb that puts the subject there (is, are,
+# was, were, sits, trades, stands, ranks; at or in), then "the", "its", "their" or nothing, then N with or without its
+# ordinal, then the word "percentile". Read as before (not judged here), so a wider rule cannot refuse a true sentence
+# (the reviewers of live-fixes-2, 25 Nov 2026): a point named with its own value after it ("sits at its 95th
+# percentile of 4.36"); a point noun after it ("the 90th percentile line"), "or above", a hyphenated form ("a
+# 95th-percentile level"); a negation in its clause ("is not at", "never sits at"); a condition in its sentence
+# ("would", "if", "need to", "to sit at"); a clause whose subject is another point ("its median sits at the 50th
+# percentile"); and every other use of "the Nth percentile" ("the 95th percentile of the window is 4.36", "well short
+# of its 95th percentile").
+_PLACING = re.compile(r"\b(?P<to>to\s+)?(?:is|are|was|were|sits?|sat|trades?|traded|trading|stands?|stood|ranks?|ranked)\s+"
+                      r"(?:(?:now|currently|still|already|right|just|squarely)\s+)?(?:at|in)\s+(?:(?:the|its|their)\s+)?$", re.I)
+_PCTL_NEXT = re.compile(r"(?:st|nd|rd|th)?\s+percentile\b(?![-’'])", re.I)
+_POINT_AFTER = re.compile(r"[\s-]+(?:lines?|bands?|ranges?|marks?|levels?|thresholds?|cut-?offs?|points?|values?|prices?|"
+                          r"figures?|bounds?|boundar(?:y|ies)|zones?|areas?|territory|regions?|buckets?)\b"
+                          r"|\s+(?:or|and)\s+(?:above|higher|over|more|beyond|below|lower|under|less|up|down|better|worse)\b",
+                          re.I)
+_PLACE_NEGATED = re.compile(r"\b(?:not|never|no|nor|neither|nowhere|hardly|barely)\b|n['’]t\b", re.I)
+_PLACE_CONDITION = re.compile(r"\b(?:if|unless|whether|would|could|should|might|may|must|can|cannot|need(?:s|ed)?|"
+                              r"ha(?:s|ve|d)\s+to|ought|when|whenever|once|until|unlikely|likely|possibly|perhaps|"
+                              r"expect(?:s|ed)?|suppose|supposing|assuming|imagine|hypothetical(?:ly)?|scenario)\b", re.I)
+_OTHER_POINT = re.compile(r"\bmedian\b|\b[pP]\d{1,2}\b|\d(?:st|nd|rd|th)\b|\bpercentile\b|\blines?\b|\bbands?\b", re.I)
+
+
+def _placed_at_percentile(clean: str, start: int, end: int, tok: str, pool: Pool) -> bool:
+    """Does the sentence put its subject at the percentile written at clean[start:end], with no value of that point
+    after it (see above)? Then the number is a rank."""
+    lead = _PLACING.search(clean, max(0, start - 60), start)
+    after = _PCTL_NEXT.match(clean, end)
+    if not lead or lead["to"] or not after or _POINT_AFTER.match(clean, after.end()):
+        return False
+    at = lead.start()
+    sentence = max([m.end() for m in re.finditer(r"[.;!?](?:\s|$)", clean[:at])], default=0)
+    clause = max([sentence] + [sentence + m.end() for m in re.finditer(r"[,;:]", clean[sentence:at])])
+    if _PLACE_CONDITION.search(clean, sentence, at) or _PLACE_NEGATED.search(clean, clause, at) \
+            or _OTHER_POINT.search(clean, clause, at):
+        return False
+    # a value of that point after it in the sentence ("sits at its 95th percentile of 4.36"): read as before. A
+    # window or count ("of its 5-year range", "over 3 years") is no value of the point.
+    stop = re.search(r"[.;!?](?:\s|$)", clean[after.end():])
+    rest = clean[after.end():after.end() + stop.start() if stop else len(clean)]
+    n = _parse(tok)[0]
+    values = pool.points.get(f"{n:g}", []) if n.is_integer() else []
+    for m in _DIGITS.finditer(rest):
+        x = m.group().rstrip(",")
+        if _META_NOUN.match(rest, m.start() + len(x)) or re.match(r"-[A-Za-z]", rest[m.start() + len(x):]):
+            continue
+        if any(_quotes(v, *_parse(x)) for v in values):
+            return False
+    return True
+
+
+def _rank_problem(tok: str, whole: str, pool: Pool) -> str | None:
+    """None when `tok` is a cited rank, rounded as written; else the reason, in plain words."""
+    n, dp = _parse(tok)
+    if any(_rounds_to(v, n, dp) for v in pool.ranks):
+        return None
+    shown = ", ".join(f"{v:g}" for v in sorted(set(round(v, 2) for v in pool.ranks)))
+    has = f"the cited ranks are {shown}" if shown else "no cited value is a percentile rank"
+    return (f"{whole} percentile (the sentence puts the value at the {whole} percentile, and {has}. Write the value's own "
+            "percentile, or name a percentile point with its value, as in 'its 95th percentile is 4.36')")
+
+
 def _meta_before(clean: str, start: int, pool: Pool, hits: list) -> bool:
     """Is a window or count of the data written with its noun, or its own key, right before it: "observations 747",
     "lookback_years 5", "a window of 90", "n = 747"?"""
@@ -712,7 +884,8 @@ def window_problems(answer: DeskAnswer) -> list[str]:
     """A window named in words ("the five-year average", "over ten years") must be one a reading or fact used.
     Until 21 Nov 2026 the words were free: a three-year seasonal average written as "five-year" passed (the
     adversary). Allowed: the years a reading names in its values (years, lookback_years ...) or its own text,
-    a fact's lookback in whole years, a spread's percentile_years."""
+    a fact's lookback in whole years, a spread's percentile_years. Read as shown (`normal`)."""
+    answer = _normal_answer(answer)
     allowed: set[int] = set()
     for r in answer.readings:
         allowed |= {int(v) for k, v in r.values.items() if "years" in k.lower().split(".")[-1] and float(v).is_integer()}
@@ -759,8 +932,8 @@ _PLUMBING = re.compile(r"\b(?:facts|series facts?|series lookups?|cited readings
 def echoes(text: str, asked: str, words: int) -> bool:
     """Does `text` repeat `words` or more consecutive words of what the visitor wrote? A visitor who
     asks for a sentence "exactly" must not see it come back as The Librarian's own, under the tick."""
-    mine = re.findall(r"[a-z0-9']+", text.lower())
-    theirs = " " + " ".join(re.findall(r"[a-z0-9']+", asked.lower())) + " "
+    mine = re.findall(r"[a-z0-9']+", normal(text).lower())
+    theirs = " " + " ".join(re.findall(r"[a-z0-9']+", normal(asked).lower())) + " "
     return any(" " + " ".join(mine[i:i + words]) + " " in theirs for i in range(len(mine) - words + 1))
 
 
@@ -772,9 +945,11 @@ def clean_caveats(answer: DeskAnswer, plumbing: bool = True, asked: str = "") ->
     direction the data does not, or talks about the machinery. A caveat is where a number goes
     when the summary may not hold it, so the summary's rules apply there too."""
     pool = pool_of(answer)
+    # read as shown: a caveat that only looks like code's ("Ｎot current as of ...") is dropped, as one that copies
+    # code's opening exactly always was (code writes its own)
     return [c for c in model_caveats(answer)
-            if not text_problems(c, pool) and not direction_problems(answer, c)
-            and not (plumbing and _PLUMBING.search(c)) and not (asked and echoes(c, asked, ECHO_CAVEAT))]
+            if not text_problems(c, pool) and not direction_problems(answer, c) and not normal(c).startswith(CODE_CAVEATS)
+            and not (plumbing and _PLUMBING.search(normal(c))) and not (asked and echoes(c, asked, ECHO_CAVEAT))]
 
 
 # ---- direction -------------------------------------------------------------------------------
@@ -873,8 +1048,9 @@ def _slope_problems(answer: DeskAnswer, words: set[str]) -> list[str]:
 
 def direction_problems(answer: DeskAnswer, text: str | None = None) -> list[str]:
     """Direction words that contradict the data, and quoted changes with no direction at all.
-    Reads the summary, or `text` when one of the model's caveats is being checked."""
-    text = answer.summary if text is None else text
+    Reads the summary, or `text` when one of the model's caveats is being checked, as it is shown (`normal`)."""
+    answer = _normal_answer(answer)
+    text = normal(answer.summary if text is None else text)
     lowered = [w.lower() for w in re.findall(r"[A-Za-z]+", text)]
     all_words = set(lowered)
     problems = _shape_problems(answer, lowered) + _slope_problems(answer, all_words)

@@ -228,7 +228,7 @@ class ScenarioLabelled(Evaluator[str, DeskAnswer]):
         if not any(r.hypothetical for r in ctx.output.readings):
             return EvaluationReason(True, "no scenario in the answer")
         words = ("if ", "would", "hypothetical", "scenario", "what-if", "assuming")
-        ok = any(w in ctx.output.summary.lower() for w in words)
+        ok = any(w in prose.normal(ctx.output.summary).lower() for w in words)   # read as shown, as the checks read it
         return EvaluationReason(ok, "scenario stated as a condition" if ok else "scenario numbers presented without a condition")
 
 

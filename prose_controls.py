@@ -142,6 +142,109 @@ seas_years = Reading(key="seasonal:PET.WCESTUS1.W:5", title="US crude stocks aga
                              "value_in_2021": 434020.0, "value_in_2025": 424155.0},
                      request={"tool": "seasonal", "action": "seasonal", "body": {}})
 
+# The suite's own tool results (results/golden.json, the frozen data): an answer with the facts, spreads and readings
+# of the named recorded answers, and a summary of its own
+with open("results/golden.json", encoding="utf-8") as _f:
+    _GOLDEN = json.load(_f)
+
+
+def gold(*names: str, summary: str) -> dict:
+    return {part: [x for n in names for x in _GOLDEN[n].get(part, [])] for part in ("facts", "spreads", "readings")} | {
+        "summary": summary}
+
+
+# live-fixes-2b (25 Nov 2026): A, a percentile written as a place, and B, text read as it is shown (the adversary's A
+# and B, reproduced on de8726a), ported from live-fixes-2 in their narrow form. Each WRONG case names the reason it
+# must be refused for, and each was accepted by d029c9c (the released checker).
+# A server percentile reading as the suite's henry_hub_percentile has it
+hh_srv = Reading(key="percentile:NG.RNGWHHD.D:3", title="Henry Hub Natural Gas Spot Price, Daily: latest against its last 3 years",
+                 period=D, units="Dollars per Million Btu", series_ids=["NG.RNGWHHD.D"],
+                 values={"target_value": 3.1, "percentile": 65.930388, "max": 30.72, "median": 2.9, "p5": 1.58, "p10": 1.83,
+                         "p25": 2.44, "p75": 3.22, "p90": 3.9, "p95": 4.364, "observations": 747.0, "years": 3.0},
+                 context="It is inside its usual range, between the 10th and 90th percentile lines (1.83 and 3.90) of the window.",
+                 request={"tool": "percentile", "action": "percentile", "body": {}})
+_PLACED = "puts the value at the"
+FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
+    # A: "X sits at the Nth percentile" claims a rank; a key's name (p5, p25, p75, p95) is not one
+    ("A: the 95th taken from the key p95 as a rank", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile."), _PLACED),
+    ("A: the 5th taken from the key p5 as a rank", dict(readings=[hh_pct], summary="Henry Hub sits at the 5th percentile."), _PLACED),
+    ("A: the 25th taken from the key p25, with the window after it (a window is no value of the point)",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 25th percentile of its 5-year range."), _PLACED),
+    ("A: is in the 75th, from the key p75", dict(readings=[hh_pct], summary="Henry Hub is in the 75th percentile."), _PLACED),
+    ("A: is at its 95th", dict(readings=[hh_pct], summary="Henry Hub is at its 95th percentile."), _PLACED),
+    ("A: trades at the 95th", dict(readings=[hh_pct], summary="Henry Hub trades at the 95th percentile of its window."), _PLACED),
+    ("A: a rank matched against a price (4.21 rounds to the 4th)",
+     dict(readings=[hh_pct], summary="Henry Hub is at the 4th percentile of 5 years."), _PLACED),
+    ("A: a rank written 'the N percentile', matched against a price",
+     dict(readings=[hh_pct], summary="Henry Hub is at the 4.21 percentile."), _PLACED),
+    ("A: placed at a point, with the latest value after it (not the point's)",
+     dict(readings=[hh_pct], summary="Henry Hub sits at the 95th percentile, at 4.21."), _PLACED),
+    ("A: in raised digits", dict(readings=[hh_pct], summary="Henry Hub sits at the ⁹⁵th percentile."), _PLACED),
+    ("A: freight placed at its 95th (it is at the 96.02nd)", gold("freight_history", summary="Freight sits at the 95th percentile."),
+     _PLACED),
+    ("A: the crack placed at its 90th (it is at the 87.7th)", gold("futures_crack", summary="The crack sits at the 90th percentile."),
+     _PLACED),
+    ("A: funds placed at the 90th (they are at the 10.3rd)", gold("wti_positioning", summary="Managed money is at the 90th percentile."),
+     _PLACED),
+    # B: a raised, lowered, circled or full-width character is read as what it shows
+    ("B: a price in raised digits", dict(facts=[wti_up], summary="WTI will reach $¹⁵⁰ by spring."), "150"),
+    ("B: a price in lowered digits", dict(facts=[brent], summary="Brent could fall to $₈₀."), "80"),
+    ("B: a percent in raised digits", dict(facts=[wti_up], summary="WTI is up ¹⁴% on the week."), "14"),
+    ("B: a price in circled digits", dict(facts=[wti_up], summary="WTI could reach $①⑤⓪ by spring."), "150"),
+    ("B: a unit in full-width letters", dict(facts=[wti_up], summary="WTI rose 1.20 ｍｉｌｌｉｏｎ ｂａｒｒｅｌｓ on the week."),
+     "million barrel"),
+    ("B: a level word in full-width letters, pointing the wrong way",
+     dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl ａｂｏｖｅ WTI spot on 2026-11-11."), "points the wrong way"),
+    ("B: a fraction sign", dict(facts=[wti_up], summary="WTI rose ½ a dollar on the week."), "as a decimal"),
+    ("B: a footnote mark glued to a word", dict(facts=[brent], summary="Brent² futures are at 93.07 USD/bbl."), "footnote"),
+    ("B: a footnote mark at the end of a sentence", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl, the latest "
+                                                                               "settlement³."), "footnote"),
+    ("B: a direction control character", dict(facts=[brent], summary="Brent futures are at 93.07 USD/bbl‮."), "direction control"),
+    ("B: a window in a ligature ('ﬁve-year' for a three-year average)",
+     dict(readings=[seasonal3], summary="US crude stocks are 417,797 thousand barrels against a ﬁve-year average of 434,167."),
+     "window of 5 years"),
+    ("B: a month name in full-width letters", dict(readings=[freight], summary="Freight is at the 96th percentile, its highest "
+                                                                              "since Ｊｕｌｙ."), "write dates"),
+    ("B: a date in raised digits that no tool returned", gold("wti_30d", summary="WTI was 89.53 dollars on ²⁰²⁶-¹¹-¹⁸."),
+     "2026-11-18"),
+]
+
+FIXES_LF2B_RIGHT = [  # true sentences in the shapes the two fixes read, and beside them
+    # A: placed at its own rank
+    dict(readings=[hh_pct], summary="Henry Hub sits at the 66th percentile of its last 5 years."),
+    dict(readings=[hh_pct], summary="Henry Hub is at the 65.9th percentile, between its 25th and 75th percentiles (2.80 and 4.60)."),
+    dict(readings=[hh_srv], summary="Henry Hub at 3.10 sits at the 65.93 percentile, inside its usual range (between the 10th and "
+                                    "90th percentile lines of 1.83 and 3.90)."),
+    dict(readings=[funds], summary="Managed money ranks at the 6.8th percentile of 156 weeks."),
+    dict(readings=[freight], summary="Freight is now at the 96th percentile of 3 years, above its 90th percentile line."),
+    dict(readings=[hh_pct], summary="Henry Hub sits at the 66ᵗʰ percentile."),
+    # A: what the placement rule does not judge, read as on d029c9c
+    dict(readings=[hh_pct], summary="For Henry Hub to sit at the 95th percentile it would have to reach 6.90."),
+    dict(readings=[hh_pct], summary="Henry Hub is not at its 95th percentile."),
+    dict(readings=[hh_pct], summary="Henry Hub never sits at the 95th percentile for long."),
+    dict(readings=[freight], summary="Freight is in the 90th percentile or above."),
+    dict(readings=[hh_pct], summary="If Henry Hub rose to 6.90 it would sit at the 95th percentile."),
+    gold("henry_hub_percentile", summary="The 95th percentile of the window is 4.36."),
+    gold("henry_hub_percentile", summary="The 90th percentile, at 3.90, is the line to watch."),
+    gold("henry_hub_percentile", summary="Henry Hub is well short of its 95th percentile."),
+    gold("henry_hub_percentile", summary="Henry Hub is nowhere near its 95th percentile."),
+    gold("henry_hub_percentile", summary="Henry Hub would have to climb to its 95th percentile of 4.36 before it looked expensive."),
+    gold("freight_history", summary="Freight has not fallen below its 90th percentile line (268.00) since 2026-07-31, 112 days."),
+    # B: read as shown, and the glyphs that keep their own meaning
+    dict(facts=[wti_up], summary="WTI spot is at $⁸⁸.¹⁰ after rising ¹.²⁰ on the week."),
+    dict(facts=[wti], summary="WTI futures are at ８８.１０ USD/bbl."),
+    dict(spreads=[gap], summary="Brent spot was 0.62 USD/bbl ｂｅｌｏｗ WTI spot on 2026-11-11."),
+    dict(facts=[wti], summary="WTI futures are at 88.1​0 USD/bbl."),
+    dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh, a price that includes the cost of CO₂ allowances."),
+    dict(facts=[power_eur], summary="German day-ahead power was €95.40 per MWh; no carbon price in tCO₂e or CO₂eq is cited."),
+    dict(facts=[hh_fact], summary="Henry Hub is at $3.10 per million Btu; no series here is quoted per m³, per ㎡, in °C or in ‰."),
+    # the ellipsis stays one character: NFKC writes it as three full stops, which ended the sentence before the number
+    # and took the change's verb from it (the reviewer of live-fixes-2, 25 Nov 2026)
+    gold("wti_30d", summary="WTI fell… 17.26% over 30 days, to 89.53 dollars."),
+    gold("wti_30d", summary="WTI fell 17.26%… over 30 days, to 89.53 dollars."),
+    gold("wti_30d", summary="WTI fell 17.26% over 30 days – to 89.53 dollars, a change of −18.68 dollars."),
+]
+
 WRONG = [  # (what is wrong, the answer); every one must be rejected
     ("L1: a value key's years written as a quantity", dict(readings=[seas_years], summary="WTI will hit 2021 to 2025 by spring.")),
     ("L1: a value key's year after 'reach'", dict(readings=[seas_years], summary="Brent could reach 2025 next year.")),
@@ -463,6 +566,17 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
           summary="Stocks of 417,797 thousand barrels are below their five-year average of 434,167.")),
     ("stocks including the SPR, where the series excludes it",
      dict(facts=[stocks], summary="US crude stocks including the SPR are 414,417 thousand barrels.")),
+    # live-fixes-2b (25 Nov 2026) ships A and B narrow. Kept visible here: the wider wordings of A, C and D, moved to the
+    # lab branch, and the one shape A leaves to d029c9c by design (a point named with its own value)
+    ("A, moved to the lab branch: a rank claimed in a wider wording", dict(readings=[hh_pct],
+     summary="Henry Hub is trading at a 95th-percentile level.")),
+    ("A, moved to the lab branch: placed on a point's line", dict(readings=[hh_pct], summary="Henry Hub sits on its 95th percentile line.")),
+    ("A, moved to the lab branch: a point's ordinal alone, placed", dict(readings=[hh_pct], summary="Henry Hub sits at the 95th.")),
+    ("A, not judged by design: placed at a point named with its own value", dict(readings=[hh_pct],
+     summary="Henry Hub sits at its 95th percentile of 6.90.")),
+    ("C, dropped from this branch: a rounded change given the wrong side",
+     gold("wti_30d", "us_rigs_yoy", summary="WTI rose 17%; rigs fell 11%.")),
+    ("D, moved to the lab branch: a 30-day change called the week's", gold("wti_30d", summary="WTI fell 17.26% over the week.")),
 ]
 
 
@@ -478,6 +592,26 @@ def main() -> int:
         found = problems(kw)
         print(f"{'rejected ' if found else 'ACCEPTED '} {label}")
         failed += not found
+    # live-fixes-2b: each wrong answer must be refused for its own reason, not for another one it happens to trip
+    for label, kw, why in FIXES_LF2B:
+        found = problems(kw)
+        ok = any(why in p for p in found)
+        print(f"{'rejected ' if ok else 'ACCEPTED ' if not found else 'WRONG REASON'} {label}"
+              + ("" if ok or not found else f"\n          -> {found} (expected '{why}')"))
+        failed += not ok
+    for kw in FIXES_LF2B_RIGHT:
+        found = problems(kw)
+        if found:
+            print(f"REJECTED a correct answer: {kw['summary']}\n          -> {found}")
+        failed += bool(found)
+    # a caveat that only looks like code's is the model's, and the validator drops it however it reads (until 25 Nov
+    # 2026 only an exact copy of code's opening was dropped)
+    from es_agent import prose
+    mimic = DeskAnswer(facts=[brent], summary="Brent futures are at 93.07 USD/bbl.",
+                       caveats=["Ｎot current as of 2026-11-17: Brent futures M1."])
+    kept = prose.clean_caveats(mimic)
+    print(f"{'dropped  ' if not kept else 'KEPT     '} a model caveat dressed as code's (full-width N): {kept}")
+    failed += bool(kept)
     for kw in RIGHT:
         found = problems(kw)
         if found:
@@ -528,8 +662,8 @@ def main() -> int:
         if found:
             print(f"REJECTED the recorded answer {name}: {found}")
         failed += bool(found)
-    print(f"{len(WRONG)} wrong answers, {len(RIGHT)} right answers, {len(golden)} recorded answers, {len(LIMIT)} known limits; "
-          f"{failed} expectation(s) not met")
+    print(f"{len(WRONG) + len(FIXES_LF2B)} wrong answers, {len(RIGHT) + len(FIXES_LF2B_RIGHT)} right answers, {len(golden)} "
+          f"recorded answers, {len(LIMIT)} known limits; {failed} expectation(s) not met")
     return 1 if failed else 0
 
 

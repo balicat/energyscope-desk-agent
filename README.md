@@ -85,6 +85,20 @@ cites it, and does not speculate.
     explicit sign, right beside it (`rose 1.20`, `+1.20`), so an unlisted verb cannot slip through. A gap with
     `above`, `below`, `premium` or `discount` must point the right way, read up to the next comma. A curve's shape
     word must be the reading's own and not negated. A high percentile may not be called low.
+  - a percentile written as a place ("Henry Hub sits at the 95th percentile", "is in the 90th percentile", with no
+    value of that percentile point after it) must be the value's own rank, rounded as written (since 25 Nov 2026:
+    until then the 95 of the reading's key p95 passed there as a name, with Henry Hub at its 66th percentile). Every
+    other use of "the Nth percentile" is read as before, and so are a negation, a condition and a point named with
+    its own value ("its 95th percentile is 4.36"). Wider wordings ("at a 95th-percentile level", "on its 95th
+    percentile line") are not read yet.
+  - text is read as it is shown (since 25 Nov 2026): raised, lowered, full-width and circled digits are the digits
+    they show, in the prose and in every text a tool returned, so "$¹⁵⁰" is checked as 150. Unit glyphs (m², CO₂),
+    °C, ‰ and the ellipsis keep their meaning; a fraction sign, a direction control character or a footnote digit
+    glued to a word is refused with the way to write it.
+  Not yet checked, and tried on 25 Nov 2026 (branch live-fixes-2): the side of a change quoted rounded ("rose 17%"
+  for a fall of 17.26% passes, "rose 17.26%" does not), and a window word given to the wrong change ("fell 17.26%
+  over the week" for a 30-day change). The wider rules for both refused true sentences a reviewer wrote, so they
+  were not released.
   A caveat that fails is removed by code. `prose_controls.py` plants 36 such errors and must reject every one, and
   must pass 14 correct sentences and every recorded answer; it runs in CI and in the release gate.
 - **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
@@ -489,6 +503,7 @@ es_agent/charts.py    the series behind an answer, for the page to draw
 es_agent/memory.py    what a follow-up is allowed to remember
 librarian_mcp.py      an MCP server over the public API
 prose_controls.py     wrong sentences over true tables: the control for the prose checks
+probes_livefixes2b.py the true sentences two reviewers wrote against the frozen data: each must be accepted
 ops/watch_public.sh   is the public address answering? run every two minutes
 es_agent/sources.py   DataSource protocol: Parquet lake, Arrow Flight, frozen fixture, recorder; the server's actions
 es_agent/scripted.py  offline stand-in for the model (Pydantic AI FunctionModel)
