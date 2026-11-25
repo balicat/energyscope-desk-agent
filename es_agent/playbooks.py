@@ -29,7 +29,8 @@ PLAYBOOKS: list[dict] = [
             6: "Limits: what the data cannot show; label untested causes as unproven.",
         },
         # steps the triggering reading already does, by reading kind
-        "done": {"fspread": [1, 2], "fcrack": [1, 2], "crack": [1], "arb": [1]},
+        # crack kinds: no pair lead exists (crude in $/bbl against products in $/gal), so no step is claimed done
+        "done": {"fspread": [1, 2], "arb": [1]},
         "notes": [
             {"about": "PET.RWTC.D", "by": "analyst note",
              "text": "US pipeline crude trades by trade month, which runs from the 26th to the 25th; physical differentials to futures are commonly set per trade month."},
@@ -48,6 +49,8 @@ PLAYBOOKS: list[dict] = [
         "leads": [
             {"step": 3, "each": "pairs_long", "why": "How unusual is the distance of {a} from {b} against its history?",
              "tool": "spread", "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_long}"}},
+            {"step": 3, "only": ["crack"], "why": "How unusual is this crack spread against its own history (the server converts the products to dollars per barrel)?",
+             "tool": "crack_spread", "args": {"ratio": "{ratio}", "crude": "{crude}", "gasoline": "{gasoline}", "distillate": "{distillate}", "start": "{start_long}"}},
             {"step": 4, "each": "pairs_long", "why": "When did the gap of {a} from {b} step to a new level, or drift?",
              "tool": "gap_breakpoints", "args": {"series_a": "{a}", "series_b": "{b}", "start": "{start_recent}"}},
             {"step": 5, "each": "spots", "why": "Any one-day jump in {id} that reverses the next day?",
@@ -73,7 +76,7 @@ PLAYBOOKS: list[dict] = [
         "done": {"seasonal": [1, 2], "percentile": [2]},
         "notes": [
             {"about": "weekly stocks", "by": "analyst note",
-             "text": "A weekly series is matched on the report week (ISO week), so a holiday shifts the comparison by one week."},
+             "text": "A weekly series is matched on the ISO week: a holiday moves the release day, and a 53-week year shifts the week by one."},
             {"about": "seasonal percentile", "by": "analyst note",
              "text": "A percentile over only five prior years moves in steps of 20 points: do not read a few points of it as a change."},
         ],
@@ -82,7 +85,7 @@ PLAYBOOKS: list[dict] = [
             "Say whether the series is moving toward or away from normal.",
         ],
         "leads": [
-            {"step": 1, "why": "The same week in each prior year, with the range and z-score.",
+            {"step": 1, "needs_years": 5, "why": "The same week in each prior year, with the range and z-score.",
              "tool": "seasonal", "args": {"series_id": "{id}", "lookback_years": 5}},
             {"step": 2, "why": "Where the latest value ranks in the full history, not only the seasonal window.",
              "tool": "percentile", "args": {"series_id": "{id}", "start": "{start_long}"}},
@@ -124,6 +127,17 @@ PLAYBOOKS: list[dict] = [
     },
 ]
 
+# A spot series and the continuous future of its own commodity, in the same unit: the only pair a lead may make.
+# Anything else (a crude price against a product price, a continuous front against a dated contract) is not a pair.
+OWN_FUTURE: dict[str, dict] = {
+    "PET.RWTC.D": {"future": "NYMEX.WTI.FRONT.D", "commodity": "WTI", "unit": "USD/bbl"},
+    "PET.RBRTE.D": {"future": "ICE.BRENT.M1.D", "commodity": "Brent", "unit": "USD/bbl"},
+}
+
+# Series whose history is shorter than the seasonal lead needs (about five years): no seasonal lead for them.
+# The catalogue says use SHIP.BWET.D for returns, not levels.
+SHORT_HISTORY: dict[str, str] = {"SHIP.BWET.D": "starts 2023-05; use it for returns, not levels"}
+
 # A dated contract has a short history; a lead that ranks against history uses its continuous series instead.
 # (pattern of the dated series, the continuous series it maps to). RBOB and HO have no confirmed continuous
 # series, so they stay as they are.
@@ -149,6 +163,7 @@ MCP_TOOLS: dict[str, set[str]] = {
                "curve_prefix", "positioning_series"},
     "gap_breakpoints": {"series_a", "series_b", "start", "end", "min_shift", "min_size"},
     "jumps": {"series_id", "series_b", "start", "end", "k"},
+    "crack_spread": {"ratio", "crude", "gasoline", "distillate", "start", "end"},
     "stats": {"series_id", "start", "end"},
     "latest": {"series_ids", "include_coverage", "watchlist"},
 }

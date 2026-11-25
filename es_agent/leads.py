@@ -10,7 +10,7 @@ import json
 import re
 from datetime import date, timedelta
 
-from .playbooks import CONTINUOUS, PLAYBOOKS
+from .playbooks import CONTINUOUS, OWN_FUTURE, PLAYBOOKS, SHORT_HISTORY
 
 RULES = ["Quote only numbers a tool returned.", "Label untested causes as unproven."]
 
@@ -44,19 +44,17 @@ def slots(reading) -> dict:
     s = {"id": ids[0] if ids else "", "ids": ids, "period": period, "start_long": "2016-01-01",
          "start_recent": _back(period, 140), "start_8w": _back(period, 56),
          "lookback_days": 30 if key.endswith(":month") else 7}
-    spot = [i for i in ids if i.startswith("PET.")]
-    fut = [i for i in ids if i.startswith(("NYMEX.", "ICE.", "GME."))]
     pairs = []
-    for sp in spot:  # a spot price against the future of its own market
-        wti, brent = sp in ("PET.RWTC.D",), sp in ("PET.RBRTE.D",)
-        mine = [f for f in fut if (wti and ".WTI." in f) or (brent and ".BRENT." in f)]
-        if mine:
-            pairs.append({"a": sp, "b": mine[0]})
-    if not pairs and len(ids) >= 2:  # no spot against future: the first two measures against each other
-        pairs = [{"a": ids[0], "b": ids[1]}]
+    for sp in ids:  # a spot price against the continuous future of its own commodity (a table, never a guess)
+        own = OWN_FUTURE.get(sp)
+        if own and any(continuous(i) == own["future"] for i in ids):
+            pairs.append({"a": sp, "b": own["future"]})
     s["pairs"] = pairs
     s["spots"] = list(dict.fromkeys(continuous(p["a"]) for p in pairs))
-    s["pairs_long"] = [{"a": continuous(p["a"]), "b": continuous(p["b"])} for p in pairs]
+    s["pairs_long"] = pairs
+    kind = _kind(key)
+    if kind == "crack" and len(ids) == 3:  # crude, gasoline, distillate: the server tool takes them as they are
+        s.update(ratio=key.split(":", 1)[1], crude=ids[0], gasoline=ids[1], distillate=ids[2])
     return s
 
 
@@ -95,7 +93,11 @@ def deeper(answer: dict, question: str | None = None) -> dict | None:
         left = [n for n in sorted(pb["steps"]) if n not in done]
         leads = []
         for t in pb["leads"]:
-            if t["step"] in done:
+            if t["step"] in done or ("only" in t and kind not in t["only"]):
+                continue
+            if t.get("needs_years") and s["id"] in SHORT_HISTORY:
+                continue  # too little history for a same-time-of-year comparison
+            if t["tool"] == "crack_spread" and "ratio" not in s:
                 continue
             if t.get("each"):
                 for item in s[t["each"]]:
@@ -130,12 +132,20 @@ def call_text(ld: dict) -> str:
     return f"{ld['tool']}({args})"
 
 
+def _label(answer: dict) -> str:
+    """Checked only when the answer says so and was not degraded; otherwise says why not."""
+    if answer.get("checked") is True and not answer.get("degraded"):
+        return "checked by code against the data"
+    why = answer.get("degraded_reason") or "; ".join(answer.get("check_problems") or []) or "the check did not pass or did not run"
+    return f"NOT fully checked: {why}"[:300]
+
+
 def brief(d: dict, answer: dict, question: str | None) -> str:
     """A plain-text block to paste into the reader's own agent."""
     L = ["Needs the EnergyScope data tools (MCP server energyscope-mcp 2.16.0 or later). A free key: https://energyscope.io/signup"]
     if question:
         L.append(f"QUESTION: {question}")
-    L.append(f"FAST ANSWER (checked by code against the data): {answer.get('summary', '')}")
+    L.append(f"FAST ANSWER ({_label(answer)}): {answer.get('summary', '')}")
     L += [f"- caveat: {c}" for c in answer.get("caveats") or []]
     L += ["", f"ROUTINE: {d['playbook']['title']} ({d['playbook']['id']} v{d['playbook']['version']})"]
     L.append("Already done in the fast answer: " + ("; ".join(f"{x['step']}. {x['text']}" for x in d["done"]) or "nothing"))

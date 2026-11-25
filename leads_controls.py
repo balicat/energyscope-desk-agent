@@ -103,6 +103,73 @@ for dated, cont in [("ICE.BRENT.2027-01.D", "ICE.BRENT.M1.D"), ("NYMEX.WTI.2027-
     check(continuous(dated) == cont, f"continuous({dated}) = {cont}")
 check(d is not None and sorted((ld["args"]["series_id"], ld["args"].get("series_b") or "") for ld in d["leads"] if ld["tool"] == "jumps") == [("PET.RBRTE.D", ""), ("PET.RBRTE.D", "ICE.BRENT.M1.D"), ("PET.RWTC.D", ""), ("PET.RWTC.D", "NYMEX.WTI.FRONT.D")], "brent-wti: jumps on each spot series and on each spot-against-front gap")
 check([x["tool"] for x in deeper(ANSWERS["what-changed-this-week"])["planned"]] == ["consensus_expectations"], "what-changed: consensus_expectations stays planned")
+# --- adversary round (26 Nov 2026): no pair of different commodities or units, honest label, short histories
+from es_agent.playbooks import OWN_FUTURE, SHORT_HISTORY  # noqa: E402
+
+PAIR_TOOLS = ("spread", "gap_breakpoints")
+
+
+def pair_leads(d):
+    """(a, b) of every lead that pairs two series: spread, gap_breakpoints, and jumps with a series_b."""
+    out = []
+    for ld in d["leads"]:
+        a = ld["args"]
+        if ld["tool"] in PAIR_TOOLS:
+            out.append((a["series_a"], a["series_b"]))
+        elif ld["tool"] == "jumps" and a.get("series_b"):
+            out.append((a["series_id"], a["series_b"]))
+    return out
+
+
+def same_commodity(a, b):
+    return a in OWN_FUTURE and OWN_FUTURE[a]["future"] == b
+
+
+CRACK = ["PET.RWTC.D", "PET.EER_EPMRU_PF4_RGC_DPG.D", "PET.EER_EPD2F_PF4_Y35NY_DPG.D"]
+dc = deeper({"summary": "s", "cites": ["crack:3-2-1"], "readings": [reading("crack:3-2-1", CRACK)]}, "q")
+check(dc is not None and pair_leads(dc) == [], "crack: no lead pairs two series")
+check(dc is not None and any(ld["tool"] == "crack_spread" and ld["args"]["crude"] == CRACK[0] and ld["args"]["gasoline"] == CRACK[1]
+                             and ld["args"]["distillate"] == CRACK[2] and ld["args"]["ratio"] == "3-2-1" for ld in dc["leads"]),
+      "crack: a crack_spread lead with the reading's own three series")
+check(dc is not None and dc["done"] == [], "crack: no step is claimed done")
+FC = ["NYMEX.WTI.2026-12.D", "NYMEX.RBOB.2026-12.D", "NYMEX.HO.2026-12.D"]
+df = deeper({"summary": "s", "cites": ["fcrack:3-2-1"], "readings": [reading("fcrack:3-2-1", FC)]}, "q")
+check(df is not None and pair_leads(df) == [] and all(ld["tool"] != "jumps" for ld in df["leads"]),
+      "fcrack: no pair, gap or jumps lead (a continuous front is never paired with a dated contract)")
+check(df is not None and df["done"] == [], "fcrack: no step is claimed done")
+
+golden = json.load(open("results/golden.json", encoding="utf8"))
+n_leads = n_pairs = 0
+for qid, ans in golden.items():
+    d = deeper(ans, "q")
+    if not d:
+        continue
+    n_leads += len(d["leads"])
+    for a, b in pair_leads(d):
+        n_pairs += 1
+        check(same_commodity(a, b), f"golden {qid}: pair lead {a} / {b} is a spot and its own future")
+check(True, f"golden: deeper() ran over {len(golden)} answers, {n_leads} leads, {n_pairs} pair leads, every one same commodity and unit")
+
+ok_ans = {"summary": "s", "caveats": [], "cites": ["seasonal:PET.WCESTUS1.W:5"], "checked": True, "degraded": False,
+          "readings": [reading("seasonal:PET.WCESTUS1.W:5", ["PET.WCESTUS1.W"])]}
+check("(checked by code against the data)" in deeper(ok_ans, "q")["for_your_agent"], "label: checked and not degraded says checked")
+bad = deeper({**ok_ans, "checked": False, "check_problems": ["a number did not match"]}, "q")["for_your_agent"]
+check("checked by code" not in bad and "NOT fully checked: a number did not match" in bad, "label: a failed check says so")
+deg = deeper({**ok_ans, "degraded": True, "degraded_reason": "no summary passed the checks"}, "q")["for_your_agent"]
+check("checked by code" not in deg and "NOT fully checked: no summary passed the checks" in deg, "label: a degraded answer says why")
+check("checked by code" not in deeper({k: v for k, v in ok_ans.items() if k != "checked"}, "q")["for_your_agent"],
+      "label: an answer that does not say it was checked is not called checked")
+src = open("serve.py", encoding="utf8").read()
+check(src.index("deeper(out, question)") > src.index("degraded_reason=degraded"), "serve: deeper is built after checked and degraded are set")
+
+bw = {"summary": "s", "caveats": [], "cites": ["percentile:SHIP.BWET.D:5"], "checked": True,
+      "readings": [reading("percentile:SHIP.BWET.D:5", ["SHIP.BWET.D"])]}
+db = deeper(bw, "q")
+check("SHIP.BWET.D" in SHORT_HISTORY and all(ld["tool"] != "seasonal" for ld in db["leads"]), "short history: no seasonal lead for SHIP.BWET.D")
+pc = {**ok_ans, "cites": ["percentile:PET.WCESTUS1.W:5"], "readings": [reading("percentile:PET.WCESTUS1.W:5", ["PET.WCESTUS1.W"])]}
+check(any(ld["tool"] == "seasonal" for ld in deeper(pc, "q")["leads"]), "long history: a seasonal lead for a weekly stock series")
+check(all("holiday shifts the comparison" not in n["text"] for p in PLAYBOOKS for n in p["notes"]), "the ISO-week note no longer says a holiday shifts the week")
+
 if d and "--show" in sys.argv:
     print(json.dumps(d, indent=1)); print(d["for_your_agent"])
 

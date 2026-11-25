@@ -243,12 +243,6 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
     except Exception as e:
         out["excel"] = []
         print(f"excel: {type(e).__name__}: {e}"[:300], file=sys.stderr, flush=True)
-    try:  # the rest of the analyst's routine as ready-to-run calls; built by code, never by the model
-        d = deeper(out, question)
-        if d:
-            out["deeper"] = d
-    except Exception as e:
-        print(f"deeper: {type(e).__name__}: {e}"[:300], file=sys.stderr, flush=True)
     seconds = round(time.time() - t0, 2)
     usd = _cost(usage, messages)
     with _state_lock:
@@ -278,6 +272,12 @@ def answer(question: str, session: str | None = None, emit=lambda tool, args: No
         degraded_reason=degraded,
         usd=round(usd, 5),
     )
+    try:  # built after checked/degraded are final (its text says how far the answer was checked); by code, never by the model
+        d = deeper(out, question)
+        if d:
+            out["deeper"] = d
+    except Exception as e:
+        print(f"deeper: {type(e).__name__}: {e}"[:300], file=sys.stderr, flush=True)
     return out
 
 
