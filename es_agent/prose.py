@@ -34,7 +34,8 @@ Checked, in the summary and in every caveat the model wrote:
 - a change's base value is written with its own date or with none: in a plain dated level beside a date of the data
   that is not its own, it is sent back (`_base_problem`, 25 Nov 2026). It judges only a plain statement
   (`_plainly_stated`, since the review of bb2c261): a sentence that denies, asks, supposes, reports or judges a claim,
-  or looks back, is read as before.
+  or looks back, is read as before. Both read the same whole sentence: an abbreviation's stop ("U.S.") does not end
+  it (`_PIECE_END`, since the review of 7510ed6).
 
 Every text is read as it is shown (`normal`, 25 Nov 2026): raised, lowered, full-width and circled digits are digits,
 on both sides (the prose and every text a tool returned); unit glyphs (m², CO₂), notation (R², C₃, MTCO₂e) and the
@@ -915,7 +916,7 @@ def _plainly_stated(text: str, start: int) -> bool:
 # WTI spot was $139.69 a barrel." passed (the adversary's 6.D, found on the sandbox, reproduced on d029c9c). Now a
 # number that quotes nothing but base values, written as a level ("was $139.69", "traded at 139.69", "a price of",
 # ": 139.69"), with a date of its own that is not the base's date, is sent back. Its date is the first date after it in
-# the sentence (to a full stop or semicolon) with no other number between ("139.69 on 2026-11-17", "139.69 a barrel,
+# the sentence (to its end or a semicolon, `_PIECE_END`) with no other number between ("139.69 on 2026-11-17", "139.69 a barrel,
 # on 2026-11-17", "USD139.69 ... (2026-11-17)"), else a date before it with no number before or after it up to the
 # base ("As of 2026-11-17, WTI spot was ...", "WTI spot, from the 2026-11-17 data, was ...", "WTI's
 # 2026-11-17-dated price was"): a date written after another number is that number's.
@@ -949,6 +950,14 @@ _JOINED = re.compile(r"\b(?:and|but|while|whilst|whereas|yet|or|nor|so|though|al
 # WTI was 139.69", "until 2026-11-17", "in the year to 2026-11-13")
 _DATE_SPAN = re.compile(r"\b(?:before|after|since|until|till|through|thru|to|from|between|by|ending|ended|ends)\s*$", re.I)
 _DATE_OF_NEXT = re.compile(r"(?:\b(?:its|their|the|a|an|this|that)|['’]s)\s*$", re.I)
+# The sentence the rule reads is the one `_plainly_stated` reads (_SENTENCE_END: an abbreviation's stop, as in "U.S.",
+# "vs." or "No. 2", does not end it), cut at a semicolon (`_PIECE_END`); a clause ends at a comma, a colon, a bracket,
+# a semicolon or that sentence's end (`_CLAUSE_END`). Until the review of 7510ed6 (25 Nov 2026) the rule cut its
+# sentence at any full stop before a space, "U.S. " too, so in "On 2025-11-07, U.S. crude oil stocks were 427,581
+# thousand barrels (data as of 2026-11-13)." it read only what follows "U.S.", missed the base's own date and the words
+# before it, and sent the true sentence back as written beside 2026-11-13; the same sentence with "US" passed.
+_PIECE_END = re.compile(rf"{_SENTENCE_END.pattern}|;(?=\s|$)")
+_CLAUSE_END = re.compile(rf"[;:()\[\]]|,(?!\d)|{_SENTENCE_END.pattern}")
 
 
 # The words of a plain dated level of a base value, the one shape judged (the review of bb2c261, 25 Nov 2026: a word
@@ -978,21 +987,20 @@ def _base_problem(text: str, clean: str, start: int, end: int, tok: str, own: se
         return None
     if not _plainly_stated(text, start):
         return None
-    w0 = max([m.end() for m in re.finditer(r"[.!?;](?:\s|$)", clean[:start])], default=0)   # its sentence, as below
-    stop = re.search(r"[.!?;](?:\s|$)", clean[end:])
-    w1 = end + stop.start() if stop else len(clean)
+    # its sentence, cut at a semicolon: the one sentence every test below reads (`_PIECE_END`)
+    s0 = max([m.end() for m in _PIECE_END.finditer(clean, 0, start)], default=0)
+    stop = _PIECE_END.search(clean, end)
+    s1 = stop.start() if stop else len(clean)
     plain = _BASE_PLAIN | {w for w in names if not _LOOKS_BACK.fullmatch(w)}
-    if set(re.findall(r"[a-z]+", clean[w0:w1].lower())) - plain or len(_DIGITS.findall(clean, w0, w1)) != 1:
+    if set(re.findall(r"[a-z]+", clean[s0:s1].lower())) - plain or len(_DIGITS.findall(clean, s0, s1)) != 1:
         return None
-    if {x.isoformat() for x in own} & set(_ISO.findall(text, w0, w1)):
+    if {x.isoformat() for x in own} & set(_ISO.findall(text, s0, s1)):
         return None   # its own date is in its sentence: "WTI's spot price on 2008-06-27, as of 2026-11-17, was $139.69"
     lo = max([m.end() for m in re.finditer(r"[;:()\[\]]|,(?!\d)", clean[:start])], default=0)
-    hi = next((lo2.start() + end for lo2 in re.finditer(r"[;:()\[\]]|,(?!\d)|[.!?](?:\s|$)", clean[end:])), len(clean))
+    stop = _CLAUSE_END.search(clean, end)
+    hi = stop.start() if stop else len(clean)
     if _BASE_CUE.search(clean, lo, hi):
         return None
-    s0 = max([m.end() for m in re.finditer(r"[.!?;](?:\s|$)", text[:start])], default=0)
-    stop = re.search(r"[.!?;](?:\s|$)", text[end:])
-    s1 = end + stop.start() if stop else len(text)
     dates = [m for m in _ISO.finditer(text, s0, s1)]
     later = next((m for m in dates if m.start() >= end), None)
     earlier = next((m for m in reversed(dates) if m.end() <= start), None)

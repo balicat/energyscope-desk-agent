@@ -238,6 +238,33 @@ FIXES_LF2B = [  # (what is wrong, the answer, the reason it must be refused for)
                                                                                        "a barrel."), _BASE),
     ("3: ... 'settled at' with the latest date (the review of 89ab3ad)",
      dict(facts=[wti_far], summary="WTI spot settled at $139.69 on 2026-11-17."), _BASE),
+    # since the review of 7510ed6, the rule reads one sentence across an abbreviation's stop: the year-ago base given
+    # the latest date, with "U.S." between them (the "U" is a word of the fact's own name, "U.S. Ending Stocks ...")
+    ("3: ... with 'U.S.' between the date and the base (the review of 7510ed6)",
+     gold("us_crude_yoy", summary="As of 2026-11-13, U.S. crude oil stocks were 427,581 thousand barrels."), _BASE),
+]
+
+# The review of 7510ed6's evidence (25 Nov 2026): true, accepted by d029c9c, refused by 7510ed6. Item 3 cut its sentence
+# at the stop of "U.S.", so it missed the base's own date before it and sent the sentence back as written beside the
+# latest date (es_agent/prose.py `_PIECE_END`). Right controls, each also kept as a caveat (main), with two of the
+# builder's beside them: a frame word before "U.S." that only the whole sentence shows.
+RIGHT_7510ED6 = [
+    gold("us_crude_yoy", summary="On 2025-11-07, U.S. crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    gold("us_crude_yoy", summary="On 2025-11-07, U.S. crude stocks were 427.58 million barrels (2026-11-13 data)."),
+    gold("us_crude_yoy", summary="As of 2025-11-07, U.S. ending stocks were 427,581 thousand barrels (latest data 2026-11-13)."),
+    gold("us_crude_yoy", summary="On 2025-11-07, U.S. crude oil stocks stood at 427,581 thousand barrels, data as of 2026-11-13."),
+    gold("us_crude_yoy", summary="On 2025-11-07, commercial U.S. crude oil stocks were 427,581 thousand barrels (data as of "
+                                 "2026-11-13)."),
+    gold("us_crude_yoy", summary="On 2025-11-07, total U.S. crude stocks were 427.58 million barrels (data as of 2026-11-13)."),
+    gold("us_crude_yoy", summary="For 2025-11-07, U.S. stocks of crude oil were 427,581 thousand barrels (data as of 2026-11-13)."),
+    gold("us_crude_yoy", summary="On 2025-11-07, U.S. crude stocks were 427,581 thousand barrels, latest data 2026-11-13."),
+    gold("wti_30d", summary="On 2026-10-16, the U.S. WTI spot price was $108.21 a barrel (data as of 2026-11-17)."),
+    gold("wti_30d", summary="On 2026-10-16, U.S. spot WTI was $108.21 a barrel (data as of 2026-11-17)."),
+    gold("wti_30d", summary="On 2026-10-16, the U.S. spot price of WTI was $108.21 (latest data: 2026-11-17)."),
+    gold("cushing_4w", summary="On 2026-10-16, U.S. Cushing stocks were 27,594 thousand barrels (data as of 2026-11-13)."),
+    dict(facts=[wti_far], summary="At the far end of the window, U.S. WTI spot was $139.69 a barrel (data as of 2026-11-17)."),
+    gold("us_crude_yoy", summary="In the oldest week of the comparison, U.S. crude stocks were 427,581 thousand barrels (data "
+                                 "as of 2026-11-13)."),
 ]
 
 # The review of 89ab3ad's evidence (25 Nov 2026): true, accepted by d029c9c, refused by 89ab3ad. Item 1 read a direction
@@ -444,6 +471,8 @@ FIXES_LF2B_RIGHT = [  # true sentences in the shapes B reads, and beside them
     *RIGHT_BB2C261,
     # the review of 89ab3ad (25 Nov 2026), the same way
     *RIGHT_89AB3AD,
+    # the review of 7510ed6 (25 Nov 2026): item 3 reads one sentence across "U.S.", the same way
+    *RIGHT_7510ED6,
 ]
 
 WRONG = [  # (what is wrong, the answer); every one must be rejected
@@ -894,6 +923,13 @@ LIMIT = [  # wrong, and still accepted: what the checks cannot see
     # unread, accepted by both trees
     ("live 3, narrow on purpose: any word beyond the plain dated level",
      dict(facts=[wti_far], summary="As of 2026-11-17, WTI spot was still $139.69 a barrel.")),
+    # since the review of 7510ed6: "U" is no word of WTI's fact name, so "U.S." is a word beyond the plain level; and a
+    # sentence after one that ends in an abbreviation is read with it, as one sentence, as the plain-statement test
+    # reads it
+    ("live 3, narrow on purpose: 'U.S.' where the fact's name has no 'U'",
+     dict(facts=[wti_far], summary="As of 2026-11-17, U.S. WTI spot was $139.69 a barrel.")),
+    ("live 3, narrow on purpose: a sentence after one that ends in 'U.S.'",
+     gold("us_crude_yoy", summary="Stocks are counted in the U.S. As of 2026-11-13, crude oil stocks were 427,581 thousand barrels.")),
 ]
 
 
@@ -938,9 +974,9 @@ def main() -> int:
     print(f"{'limit    ' if ok else 'now caught: move it to the wrong cases'} a model caveat giving the 7-day change the "
           f"wrong side (live item 1, dropped): kept {kept}")
     failed += not ok
-    # the reviews of bb2c261 and 89ab3ad: their true sentences written as model caveats are kept (those heads dropped
-    # them)
-    for kw in RIGHT_BB2C261 + RIGHT_89AB3AD:
+    # the reviews of bb2c261, 89ab3ad and 7510ed6: their true sentences written as model caveats are kept (those heads
+    # dropped them)
+    for kw in RIGHT_BB2C261 + RIGHT_89AB3AD + RIGHT_7510ED6:
         body = dict(kw)
         line = body.pop("summary")
         a = DeskAnswer(**body, summary="", caveats=[line])
@@ -999,7 +1035,7 @@ def main() -> int:
             print(f"REJECTED the recorded answer {name}: {found}")
         failed += bool(found)
     print(f"{len(WRONG) + len(FIXES_LF2B)} wrong answers, {len(RIGHT) + len(FIXES_LF2B_RIGHT)} right answers "
-          f"({len(RIGHT_BB2C261) + len(RIGHT_89AB3AD)} of them also as caveats), {len(golden)} recorded answers, "
+          f"({len(RIGHT_BB2C261) + len(RIGHT_89AB3AD) + len(RIGHT_7510ED6)} of them also as caveats), {len(golden)} recorded answers, "
           f"{len(LIMIT)} known limits; "
           f"{failed} expectation(s) not met")
     return 1 if failed else 0

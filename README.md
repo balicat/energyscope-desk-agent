@@ -104,19 +104,22 @@ cites it, and does not speculate.
     "claim", "suggest", "says", "wrong", "false", "you", "ago", "peak" ...), or a next sentence that opens by taking
     it back ("That is wrong.", "No, ...", "In fact ..."), leaves it unjudged. So "As of 2026-11-17, WTI's pre-crisis
     price was 139.69", "WTI's spot price on 2008-06-27, as of 2026-11-17, was $139.69" and "The claim that WTI was
-    $139.69 on 2026-11-17 is wrong" pass.
-  A caveat that fails is removed by code. `prose_controls.py` plants 140 such errors and must reject every one, and
-  must pass 222 correct sentences and every recorded answer; it runs in CI and in the release gate.
+    $139.69 on 2026-11-17 is wrong" pass. The sentence is read whole, to its end or a semicolon: the full stop of an
+    abbreviation ("U.S.", "vs.", "No. 2") does not end it. The rule's earlier candidates (up to 7510ed6, never
+    released) read "On 2025-11-07, U.S. crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)" only
+    from "U.S." on, so the base's own date and the words before it went unseen, and the true sentence was sent back.
+  A caveat that fails is removed by code. `prose_controls.py` plants 141 such errors and must reject every one, and
+  must pass 236 correct sentences and every recorded answer; it runs in CI and in the release gate.
   What was measured for the two rules of 25 Nov 2026 (text read as shown, a base value's date), against the
   released checker (d029c9c), and nothing more: `probes_livefixes2b.py` holds every sentence the reviewers of these
-  rules and of the rules tried beside them wrote, and the builder's own. Its 1,115 true sentences are each accepted
-  and each kept as a caveat, as on d029c9c, and the 54 true ones d029c9c refuses get its verdict; its 74 wrong ones
-  are refused (65 of them accepted by d029c9c); the 144 wrong ones of the two rules dropped (below) are accepted, as
+  rules and of the rules tried beside them wrote, and the builder's own. Its 1,157 true sentences are each accepted
+  and each kept as a caveat, as on d029c9c, and the 54 true ones d029c9c refuses get its verdict; its 78 wrong ones
+  are refused (69 of them accepted by d029c9c); the 144 wrong ones of the two rules dropped (below) are accepted, as
   on d029c9c. Run against d029c9c's verdicts (`--against`), every sentence gets the same verdict, as a summary and as
-  a caveat, except the sentences in glyphs and the base values written beside another date. The refusals over the
-  four lab experiments' recorded answers (aa-51c2e06, maxtok-cb7b799, parity-ab34c25, skills-34319fa) are the same
-  as d029c9c's, byte for byte. That covers these sentences and these answers; it does not show that no other true
-  sentence is refused.
+  a caveat, except the sentences in glyphs and the base values written beside another date. Over the four lab
+  experiments' 4,195 recorded answers (aa-51c2e06, maxtok-cb7b799, parity-ab34c25, skills-34319fa, both arms), the
+  summaries refused and the model's caveats kept are the same as d029c9c's, byte for byte. That covers these
+  sentences and these answers; it does not show that no other true sentence is refused.
 - **What the tick does not prove, with the measured rate.** The tables are recomputed; the wording is checked by a
   list of rules about English, and English is larger than the list. The reviewer measured it with test sentences
   the rules had not been shown, true tables under wrong prose:
@@ -154,8 +157,11 @@ cites it, and does not speculate.
       of 3.41 dollars is lower than the WTI spot premium of 4.88 dollars" (true) as Brent lower than WTI;
   - the shapes the base-date rule leaves unread on purpose: any word beyond the plain dated level ("As of
     2026-11-17, WTI spot was still $139.69 a barrel"), a date after a determiner ("WTI spot was $139.69 at the
-    2026-11-17 close"), a list after an opening date ("On 2026-11-17 Brent was 92.94 and WTI 139.69"), and any
-    sentence that is no plain statement, even one that states the wrong date beside its frame.
+    2026-11-17 close"), a list after an opening date ("On 2026-11-17 Brent was 92.94 and WTI 139.69"), "U.S." in
+    a sentence about a series whose own name has no "U" ("As of 2026-11-17, U.S. WTI spot was $139.69 a barrel":
+    the "U" is a word beyond the plain level), a sentence after one that ends in an abbreviation ("Stocks are
+    counted in the U.S. As of 2026-11-13, crude oil stocks were 427,581 thousand barrels", read as one sentence),
+    and any sentence that is no plain statement, even one that states the wrong date beside its frame.
   Such answers are kept in `prose_controls.py` as known limits. The page
   says what was checked: the sources were recomputed, every number and date in the text matches one of them,
   and the wording around the numbers is checked by rules, not proved.

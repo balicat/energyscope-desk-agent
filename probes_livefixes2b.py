@@ -19,12 +19,14 @@ outputs can be compared line for line.
   6f63817, the reason A was dropped), and the builder's own true sentences in every frame beside them ('builder').
   Plus, since the review of 89ab3ad (25 Nov 2026, 'rv 89ab3ad'), every true sentence of that review's three probe
   rounds (among them the ones that items 1 and 2 still refused there, so both were dropped). The true sentences of
-  items 1 and 2 stay here: with the items dropped, each must be accepted, as on d029c9c.
+  items 1 and 2 stay here: with the items dropped, each must be accepted, as on d029c9c. Plus, since the review of
+  7510ed6 (25 Nov 2026, 'rv 7510ed6'), the true sentences with "U.S." that item 3 refused there, the review's two
+  controls without it, and the builder's own beside them ('builder 7510ed6').
   Each is also checked as a model caveat: kept by clean_caveats, unless d029c9c drops it too (CAVEAT_BOTH).
 - REFUSED_BOTH: true sentences the reviewers found refused by d029c9c too (older rules, not changed here). Reported.
 - MUST_REFUSE: wrong sentences this branch must refuse: the brief's own B sentences (B's footnote marks among them),
   the second review's wrong sentences that d029c9c refuses and a wider rule had let through, and item 3's wrong
-  sentences (each accepted by d029c9c).
+  sentences (each accepted by d029c9c), among them four with "U.S." in the stocks fixture (since the review of 7510ed6).
 - LIMIT: the brief's own A sentences and the ones 6f63817 judged. A (a percentile written as a place) was dropped
   from this branch on 25 Nov 2026 and moved to the lab branch, so each is accepted, as on d029c9c; one that is
   refused here is reported as CAUGHT and fails the run, because it would mean A was not fully removed.
@@ -33,7 +35,8 @@ outputs can be compared line for line.
   spread written with a comparative), dropped from this branch on 25 Nov 2026 and held on the lab branch with A, C
   and D. Each is accepted, as on d029c9c; one refused here is CAUGHT and fails the run (the item not fully removed).
 - OPEN: wrong sentences in shapes beside item 3 that it leaves unread on purpose, accepted by both trees (a base
-  value's date after a determiner, a word beyond the plain dated level). Reported, as the README's limits.
+  value's date after a determiner, a word beyond the plain dated level, "U.S." where the fact's name has no "U", a
+  sentence after one that ends in an abbreviation). Reported, as the README's limits.
 - B_TWINS: two wrong sentences in glyphs that B newly accepts, because it reads them as their ASCII twins, which
   d029c9c accepts; d029c9c refused the glyph forms only by accident. Reported.
 With --json, every sentence's problems and its caveat verdict (kept or not) are written, group by group, so the outputs
@@ -1239,6 +1242,53 @@ MUST_ACCEPT = [  # (where it comes from, golden answers, the sentence)
     ("rv 89ab3ad i1 other-series 2", [EIA], "Distillate stocks rose by less than the 3.17 million barrel SPR draw on the week."),
     ("rv 89ab3ad i1 other-series 2", [EIA], "Crude stocks rose by more than the 3.17 million barrel SPR draw, so total stocks rose too."),
     ("rv 89ab3ad i1 other-series 2", [EIA], "US crude stocks rose more than the 3.17 million barrel SPR draw this week."),
+    # the review of 7510ed6 (25 Nov 2026, 'rv 7510ed6'): item 3 read its sentence only from the stop of "U.S." on, so
+    # it missed the base's own date and every word before it, and refused these true sentences (accepted by d029c9c);
+    # the last two are the review's controls without "U.S.", accepted by both trees
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, U.S. crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, U.S. crude stocks were 427.58 million barrels (2026-11-13 data)."),
+    ("rv 7510ed6 i3", [CYOY], "As of 2025-11-07, U.S. ending stocks were 427,581 thousand barrels (latest data 2026-11-13)."),
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, U.S. crude oil stocks stood at 427,581 thousand barrels, data as of 2026-11-13."),
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, commercial U.S. crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, total U.S. crude stocks were 427.58 million barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3", [CYOY], "For 2025-11-07, U.S. stocks of crude oil were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3", [CYOY], "On 2025-11-07, U.S. crude stocks were 427,581 thousand barrels, latest data 2026-11-13."),
+    ("rv 7510ed6 i3", [W30], "On 2026-10-16, the U.S. WTI spot price was $108.21 a barrel (data as of 2026-11-17)."),
+    ("rv 7510ed6 i3", [W30], "On 2026-10-16, U.S. spot WTI was $108.21 a barrel (data as of 2026-11-17)."),
+    ("rv 7510ed6 i3", [W30], "On 2026-10-16, the U.S. spot price of WTI was $108.21 (latest data: 2026-11-17)."),
+    ("rv 7510ed6 i3", [C4W], "On 2026-10-16, U.S. Cushing stocks were 27,594 thousand barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3 control", [CYOY], "On 2025-11-07, US crude oil stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("rv 7510ed6 i3 control", [W30], "On 2026-10-16, the WTI spot price was $108.21 a barrel (data as of 2026-11-17)."),
+    # the builder's true sentences beside them (25 Nov 2026): "U.S." (or "i.e.", "vs.") before the base, after it, in
+    # brackets, after its date, or after a frame word that only the whole sentence shows; 7510ed6 refused 17 of these
+    ("builder 7510ed6", [CYOY], "In the oldest week of the comparison, U.S. crude stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "At the far end of the year, U.S. crude stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "U.S. crude oil stocks were 427,581 thousand barrels on 2025-11-07 (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, crude oil stocks in the U.S. were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07 U.S. crude stocks were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. crude oil stocks were 427,581 thousand barrels; the latest data are for 2026-11-13."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. commercial crude stocks, i.e. excluding the SPR, were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. crude stocks were 427,581 thousand barrels, vs. 417,797 on 2026-11-13."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. crude stocks were 427.58 million barrels (data as of 2026-11-13, U.S. EIA)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. crude stocks were 427,581 thousand barrels. Data as of 2026-11-13."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, the U.S. crude oil stock level was 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [CYOY], "On 2025-11-07, U.S. ending stocks of crude oil excluding SPR were 427,581 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [W30], "On 2026-10-16, WTI, the U.S. benchmark, was $108.21 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", [W30], "On 2026-10-16, U.S. benchmark WTI was $108.21 a barrel, data as of 2026-11-17."),
+    ("builder 7510ed6", [W30], "At the far end of the window, U.S. WTI spot was $108.21 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", [W30], "On 2026-10-16, U.S. WTI was $108.21 a barrel. Data as of 2026-11-17."),
+    ("builder 7510ed6", [W30], "On 2026-10-16, U.S. WTI spot was $108.21 a barrel (latest data 2026-11-17)."),
+    ("builder 7510ed6", [W30], "On 2026-10-16, WTI (U.S. crude) was $108.21 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", ["wti_far"], "At the far end of the window, U.S. WTI spot was $139.69 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", ["wti_far"], "In the oldest observation of the window, U.S. WTI spot was $139.69 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", ["wti_far"], "On 2008-06-27, U.S. WTI spot was $139.69 a barrel (data as of 2026-11-17)."),
+    ("builder 7510ed6", ["wti_far"], "On 2008-06-27, the U.S. benchmark WTI was $139.69 a barrel; the latest data are for 2026-11-17."),
+    ("builder 7510ed6", ["wti_far"], "At the window's far end, U.S. WTI spot was $139.69 a barrel, data as of 2026-11-17."),
+    ("builder 7510ed6", ["wti_far"], "On 2008-06-27, U.S. spot WTI was $139.69 a barrel (data to 2026-11-17)."),
+    ("builder 7510ed6", [C4W], "At the far end of the four weeks, U.S. Cushing stocks were 27,594 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [C4W], "On 2026-10-16, stocks at Cushing, OK (U.S.) were 27,594 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [C4W], "On 2026-10-16, Cushing stocks (U.S. hub) were 27,594 thousand barrels (data as of 2026-11-13)."),
+    ("builder 7510ed6", [C4W], "On 2026-10-16, U.S. Cushing stocks were 27,594 thousand barrels, latest data 2026-11-13."),
 ]
 
 REFUSED_BOTH = [  # true, and refused by d029c9c as well (the second review's last minor; the first review's third)
@@ -1389,6 +1439,13 @@ MUST_REFUSE = [  # wrong; (where it comes from, golden answers, the sentence)
     ("rv 89ab3ad i3", ["wti_far"], "WTI spot closed at 139.69 dollars a barrel on 2026-11-17."),
     ("rv 89ab3ad i3", ["wti_far"], "WTI spot settled at $139.69 on 2026-11-17."),
     ("rv 89ab3ad i3", ["wti_far"], "WTI's 2026-11-17-dated price was $139.69."),
+    # the builder, after the review of 7510ed6 (25 Nov 2026): wrong, accepted by d029c9c; read as one sentence across
+    # "U.S.", they are the plain dated level of the "US" form (the fact's own name, "U.S. Ending Stocks ...", gives
+    # the "U" its place among the subject's words)
+    ("builder 7510ed6", [CYOY], "As of 2026-11-13, U.S. crude oil stocks were 427,581 thousand barrels."),
+    ("builder 7510ed6", [CYOY], "U.S. crude oil stocks were 427,581 thousand barrels on 2026-11-13."),
+    ("builder 7510ed6", [CYOY], "Crude oil stocks were 427,581 thousand barrels in the U.S. on 2026-11-13."),
+    ("builder 7510ed6", [CYOY], "As of 2026-11-13, U.S. crude stocks were 427.58 million barrels."),
 ]
 
 LIMIT = [  # wrong, and accepted here as on d029c9c: item A, a percentile written as a place, moved to the lab branch
@@ -1585,6 +1642,12 @@ OPEN = [  # wrong, accepted by both trees: the shapes the base-value rule (item 
     ("rv bb2c261 3", ["wti_far"], "WTI spot is $139.69 a barrel as of the 2026-11-17 close."),
     ("rv bb2c261 3", ["wti_far"], "WTI spot is now $139.69 a barrel, its 2026-11-17 settle."),
     ("readme 3", ["wti_far", "brent_far"], "On 2026-11-17 Brent was 92.94 and WTI 139.69."),   # a list after an opening date
+    # the builder, after the review of 7510ed6 (25 Nov 2026): "U" is no word of the fact's name (WTI's, Cushing's), so a
+    # sentence with "U.S." in it holds a word beyond the plain level; and a sentence after one that ends in an
+    # abbreviation ("in the U.S. As of ...") is read with it, as one sentence, by this rule as by the plain-statement test
+    ("builder 7510ed6", ["wti_far"], "As of 2026-11-17, U.S. WTI spot was $139.69 a barrel."),
+    ("builder 7510ed6", [C4W], "As of 2026-11-13, U.S. Cushing stocks were 27,594 thousand barrels."),
+    ("builder 7510ed6", [CYOY], "Stocks are counted in the U.S. As of 2026-11-13, crude oil stocks were 427,581 thousand barrels."),
 ]
 
 # MUST_ACCEPT sentences that d029c9c drops too when they are written as a model caveat (older caveat rules: a quoted
